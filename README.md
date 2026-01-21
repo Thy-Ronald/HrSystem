@@ -38,8 +38,8 @@ GITHUB_TOKEN=your_pat   # improves rate limits
 # EmailJS Configuration (for contract expiration notifications)
 EMAILJS_SERVICE_ID=service_xre2ekc
 EMAILJS_TEMPLATE_ID=template_jfkytol
-EMAILJS_PUBLIC_KEY=your_public_key  # Get from EmailJS dashboard
-ADMIN_EMAIL=admin@company.com
+EMAILJS_PUBLIC_KEY=OpoSKg71Mm4YSjsqt
+ADMIN_EMAIL=ronaldmoran930@gmail.com
 ```
 
 ### Contract Expiration Notifications
