@@ -300,8 +300,21 @@ function ContractForm() {
           </svg>
           <span>New Contract</span>
         </button>
-        <button onClick={loadContracts} className="p-2 hover:bg-[#eaebef] rounded-full transition-colors text-[#5f6368]">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <button 
+          onClick={loadContracts} 
+          disabled={loading}
+          className="p-2 hover:bg-[#eaebef] rounded-full transition-colors text-[#5f6368] disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Refresh contracts"
+        >
+          <svg 
+            width="20" 
+            height="20" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2"
+            className={loading ? 'animate-spin' : ''}
+          >
             <path d="M23 4v6h-6M1 20v-6h6" />
             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
           </svg>
@@ -477,7 +490,7 @@ function ContractForm() {
 
                    <div className="flex items-center gap-4 ml-auto">
                       <div className="w-24 text-right font-bold text-[#202124]">
-                        ${contractTotalSalary.toLocaleString()}
+                        ₱{contractTotalSalary.toLocaleString()}
                       </div>
                       <div className="w-24 text-right text-sm text-[#5f6368]">
                         {getExpirationDateDisplay()}
@@ -665,6 +678,48 @@ function ContractForm() {
                       className="w-full bg-[#f8f9fa] rounded px-3 py-2 outline-none focus:ring-1 focus:ring-[#1a73e8]"
                     />
                   </Field>
+               </div>
+               
+               <div className="grid grid-cols-2 gap-4 pt-2">
+                  <Field label="Attendance Bonus (%)">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={form.attendanceBonusPercent}
+                        onChange={(e) => updateField('attendanceBonusPercent', e.target.value)}
+                        placeholder="0"
+                        className="flex-1 bg-[#f8f9fa] rounded px-3 py-2 outline-none focus:ring-1 focus:ring-[#1a73e8]"
+                      />
+                      <div className="text-sm text-[#5f6368] min-w-[80px]">
+                        = ₱{attendanceBonusAmount.toFixed(2)}
+                      </div>
+                    </div>
+                  </Field>
+                  <Field label="Perfect Attendance (%)">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={form.perfectAttendancePercent}
+                        onChange={(e) => updateField('perfectAttendancePercent', e.target.value)}
+                        placeholder="0"
+                        className="flex-1 bg-[#f8f9fa] rounded px-3 py-2 outline-none focus:ring-1 focus:ring-[#1a73e8]"
+                      />
+                      <div className="text-sm text-[#5f6368] min-w-[80px]">
+                        = ₱{perfectAttendanceAmount.toFixed(2)}
+                      </div>
+                    </div>
+                  </Field>
+               </div>
+               
+               <div className="pt-2">
+                  <div className="rounded-lg border border-[#e8f0fe] bg-[#e8f0fe] px-4 py-3">
+                    <p className="text-xs uppercase tracking-wider text-[#1a73e8] font-medium mb-1">Total Salary</p>
+                    <p className="text-2xl font-bold text-[#1a73e8]">₱{totalSalary.toFixed(2)}</p>
+                  </div>
                </div>
             </div>
 
