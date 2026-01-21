@@ -1,9 +1,33 @@
 const { addContract, listContracts } = require('../models/contractStore');
-const { checkAndNotifyExpiringContracts } = require('../services/notificationService');
+const { checkAndNotifyExpiringContracts, getContractsExpiringInDays } = require('../services/notificationService');
 const { sendContractExpirationNotification } = require('../services/emailService');
 
-function createContract(req, res) {
+async function createContract(req, res) {
   const contract = addContract(req.body);
+  
+  // Check if this contract expires in 7 days and send notification immediately
+  if (contract.expirationDate) {
+    try {
+      const expirationDate = new Date(contract.expirationDate);
+      const today = new Date();
+      const targetDate = new Date(today);
+      targetDate.setDate(today.getDate() + 7);
+      
+      // Normalize dates to compare only dates (ignore time)
+      expirationDate.setHours(0, 0, 0, 0);
+      today.setHours(0, 0, 0, 0);
+      targetDate.setHours(0, 0, 0, 0);
+      
+      if (expirationDate.getTime() === targetDate.getTime()) {
+        console.log(`\n✓ New contract expires in exactly 7 days. Sending notification...`);
+        await sendContractExpirationNotification(contract);
+      }
+    } catch (error) {
+      // Don't fail contract creation if notification fails
+      console.error('Failed to send expiration notification for new contract:', error);
+    }
+  }
+  
   res.status(201).json(contract);
 }
 

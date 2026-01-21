@@ -62,6 +62,7 @@ Please review and take necessary action before the contract expires.
 
     const templateParams = {
       to_email: config.adminEmail,
+      from_name: 'ThyHrSystem',
       subject: subject,
       message: message,
       // Also include individual fields in case template uses them
