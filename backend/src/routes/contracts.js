@@ -7,6 +7,7 @@ const {
   getContractById,
   updateContract,
   deleteContract,
+  getExpiringContracts,
   testExpirationNotifications,
   testDirectEmail,
 } = require('../controllers/contractsController');
@@ -32,6 +33,9 @@ router.post('/', validateCreateContract, createContract);
 
 // Get all contracts
 router.get('/', getAllContracts);
+
+// Get expiring contracts
+router.get('/expiring', getExpiringContracts);
 
 // Get contract by ID
 router.get('/:id', validateId, getContractById);

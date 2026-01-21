@@ -49,9 +49,23 @@ function ContractForm({ searchQuery = '' }) {
       setErrors({});
     };
 
+    const handleOpenEditModal = async (event) => {
+      const { contractId } = event.detail;
+      if (contractId) {
+        const loaded = await loadContractForEdit(contractId);
+        if (loaded) {
+          setOpen(true);
+        }
+      }
+    };
+
     window.addEventListener('openContractModal', handleOpenModal);
-    return () => window.removeEventListener('openContractModal', handleOpenModal);
-  }, [reset, setEditingContractId, setStatus, setErrors]);
+    window.addEventListener('openContractEditModal', handleOpenEditModal);
+    return () => {
+      window.removeEventListener('openContractModal', handleOpenModal);
+      window.removeEventListener('openContractEditModal', handleOpenEditModal);
+    };
+  }, [reset, setEditingContractId, setStatus, setErrors, loadContractForEdit]);
 
   const handleNewContract = () => {
     reset();

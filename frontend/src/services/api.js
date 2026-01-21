@@ -84,6 +84,38 @@ export async function deleteContract(id) {
 }
 
 /**
+ * Fetch contracts expiring within specified days
+ * @param {number} days - Number of days (default: 7)
+ * @returns {Promise<Array>} - Array of expiring contracts
+ */
+export async function fetchExpiringContracts(days = 7) {
+  const res = await fetch(`${API_BASE}/api/contracts/expiring?days=${days}`);
+  return handleResponse(res);
+}
+
+/**
+ * Test expiration notifications
+ * @returns {Promise<Object>} - Test result with found and sent counts
+ */
+export async function testExpirationNotifications() {
+  const res = await fetch(`${API_BASE}/api/contracts/test-expiration-notifications`, {
+    method: 'POST',
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Test direct email sending
+ * @returns {Promise<Object>} - Test result
+ */
+export async function testDirectEmail() {
+  const res = await fetch(`${API_BASE}/api/contracts/test-email`, {
+    method: 'POST',
+  });
+  return handleResponse(res);
+}
+
+/**
  * Fetch GitHub profile (legacy)
  */
 export async function fetchGithubProfile(username) {

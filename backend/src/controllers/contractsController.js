@@ -4,6 +4,7 @@ const {
   getContractById,
   updateContract,
   deleteContract,
+  getContractsExpiringInDays,
 } = require('../models/contractStore');
 const { checkAndNotifyExpiringContracts } = require('../services/notificationService');
 const { sendContractExpirationNotification } = require('../services/emailService');
@@ -178,12 +179,27 @@ async function testDirectEmail(_req, res, next) {
   }
 }
 
+/**
+ * GET /api/contracts/expiring
+ * Get contracts expiring within 7 days
+ */
+async function getExpiringContractsHandler(req, res, next) {
+  try {
+    const days = parseInt(req.query.days) || 7;
+    const contracts = await getContractsExpiringInDays(days);
+    return sendSuccess(res, contracts, 200);
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   createContract: createContractHandler,
   getAllContracts: getAllContractsHandler,
   getContractById: getContractByIdHandler,
   updateContract: updateContractHandler,
   deleteContract: deleteContractHandler,
+  getExpiringContracts: getExpiringContractsHandler,
   testExpirationNotifications,
   testDirectEmail,
   // Legacy exports for backward compatibility
