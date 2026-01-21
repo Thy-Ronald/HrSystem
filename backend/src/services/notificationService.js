@@ -25,20 +25,31 @@ function getContractsExpiringInDays(days = 7) {
 
 async function checkAndNotifyExpiringContracts() {
   try {
+    console.log('\n=== Starting expiration check ===');
     const expiringContracts = getContractsExpiringInDays(7);
 
     if (expiringContracts.length === 0) {
       console.log('No contracts expiring in 7 days.');
-      return;
+      console.log('=== Expiration check completed ===\n');
+      return { found: 0, sent: 0 };
     }
 
-    console.log(`Found ${expiringContracts.length} contract(s) expiring in 7 days.`);
+    console.log(`Found ${expiringContracts.length} contract(s) expiring in 7 days:`);
+    expiringContracts.forEach((c, i) => {
+      console.log(`  ${i + 1}. ${c.employeeName} - Expires: ${c.expirationDate}`);
+    });
 
+    let sentCount = 0;
     for (const contract of expiringContracts) {
-      await sendContractExpirationNotification(contract);
+      const result = await sendContractExpirationNotification(contract);
+      if (result) sentCount++;
     }
+
+    console.log(`=== Expiration check completed: ${sentCount}/${expiringContracts.length} emails sent ===\n`);
+    return { found: expiringContracts.length, sent: sentCount };
   } catch (error) {
     console.error('Error checking expiring contracts:', error);
+    throw error;
   }
 }
 

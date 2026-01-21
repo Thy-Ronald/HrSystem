@@ -12,15 +12,16 @@ function getEmailJSConfig() {
 
 function initializeEmailJS() {
   const config = getEmailJSConfig();
-  if (!config.serviceId || !config.templateId || !config.privateKey) {
+  if (!config.serviceId || !config.templateId || !config.publicKey || !config.privateKey) {
     console.warn(
       'EmailJS configuration missing. Contract expiration notifications will be disabled.'
     );
-    console.warn('Required: EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PRIVATE_KEY');
-    console.warn('Note: Use Private Key (not Public Key) for server-side API calls');
+    console.warn('Required: EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY, EMAILJS_PRIVATE_KEY');
+    console.warn('Note: BOTH Public Key and Private Key are required for server-side API calls');
     console.warn('Current values:', {
       serviceId: config.serviceId ? '✓' : '✗',
       templateId: config.templateId ? '✓' : '✗',
+      publicKey: config.publicKey ? '✓' : '✗',
       privateKey: config.privateKey ? '✓' : '✗',
       adminEmail: config.adminEmail,
     });
@@ -32,7 +33,7 @@ function initializeEmailJS() {
 
 async function sendContractExpirationNotification(contract) {
   const config = getEmailJSConfig();
-  if (!config.serviceId || !config.templateId || !config.privateKey) {
+  if (!config.serviceId || !config.templateId || !config.publicKey || !config.privateKey) {
     console.warn('EmailJS not configured. Skipping notification.');
     return false;
   }
@@ -71,20 +72,53 @@ Please review and take necessary action before the contract expires.
       days_until_expiration: '7',
     };
 
-    await emailjs.send(
+    console.log('Sending email notification...');
+    console.log('Using Service ID:', config.serviceId);
+    console.log('Using Template ID:', config.templateId);
+    console.log('Template params:', JSON.stringify(templateParams, null, 2));
+
+    // For server-side, BOTH publicKey and privateKey are required
+    if (!config.publicKey) {
+      throw new Error('EMAILJS_PUBLIC_KEY is required. Check your .env file.');
+    }
+    if (!config.privateKey) {
+      throw new Error('EMAILJS_PRIVATE_KEY is required. Check your .env file.');
+    }
+    if (!config.templateId) {
+      throw new Error('EMAILJS_TEMPLATE_ID is required. Check your .env file.');
+    }
+
+    const response = await emailjs.send(
       config.serviceId,
       config.templateId,
       templateParams,
       {
-        publicKey: config.publicKey,
+        publicKey: config.publicKey,   // Required
         privateKey: config.privateKey, // Required for server-side calls
       }
     );
 
-    console.log(`Contract expiration notification sent for: ${contract.employeeName}`);
+    console.log('✓ EmailJS response status:', response.status);
+    console.log(`✓ Contract expiration notification sent for: ${contract.employeeName}`);
+    console.log(`✓ Email sent to: ${config.adminEmail}`);
     return true;
   } catch (error) {
-    console.error('Failed to send email notification:', error);
+    console.error('✗ Failed to send email notification:');
+    console.error('Error details:', {
+      status: error.status,
+      text: error.text,
+      message: error.message,
+    });
+    
+    if (error.status === 403 && error.text?.includes('non-browser')) {
+      console.error('\n⚠️  IMPORTANT: Server-side API calls are disabled!');
+      console.error('To fix this:');
+      console.error('1. Go to EmailJS Dashboard → Account → Security');
+      console.error('2. Enable "Allow server-side API calls" or "Allow non-browser applications"');
+      console.error('3. Save settings and restart your backend server');
+    }
+    
+    console.error('Full error:', error);
     return false;
   }
 }
