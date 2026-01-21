@@ -28,6 +28,8 @@ function ContractForm() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const {
     form,
@@ -180,7 +182,18 @@ function ContractForm() {
     const { contractId } = deleteConfirm;
     try {
       await deleteContract(contractId);
-      await loadContracts();
+      const data = await fetchContracts();
+      const updatedContractsList = Array.isArray(data) ? data : [];
+      setContracts(updatedContractsList);
+      
+      // Adjust page if current page becomes empty after deletion
+      const totalPages = Math.ceil(updatedContractsList.length / itemsPerPage);
+      if (currentPage > totalPages && totalPages > 0) {
+        setCurrentPage(totalPages);
+      } else if (updatedContractsList.length === 0) {
+        setCurrentPage(1);
+      }
+      
       setDeleteConfirm({ open: false, contractId: null, contractName: '' });
       setStatus({ state: 'success', message: 'Contract deleted successfully!' });
       setTimeout(() => setStatus({ state: 'idle', message: '' }), 2000);
@@ -234,6 +247,9 @@ function ContractForm() {
       
       // Reload contracts list
       await loadContracts();
+      
+      // Reset to first page after reload
+      setCurrentPage(1);
       
       // Close modal after short delay
       setTimeout(() => {
@@ -299,7 +315,12 @@ function ContractForm() {
         </button>
 
         <div className="ml-auto flex items-center gap-1 text-xs text-[#5f6368]">
-          <span>1-50 of {contracts.length}</span>
+          <span>
+            {contracts.length > 0 
+              ? `${(currentPage - 1) * itemsPerPage + 1}-${Math.min(currentPage * itemsPerPage, contracts.length)} of ${contracts.length}`
+              : `0-0 of 0`
+            }
+          </span>
           <button className="p-2 hover:bg-[#eaebef] rounded-full">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="m15 18-6-6 6-6" />
@@ -340,7 +361,15 @@ function ContractForm() {
               </div>
             </div>
             
-            {contracts.map((contract) => {
+            {(() => {
+              const totalPages = Math.ceil(contracts.length / itemsPerPage);
+              const startIndex = (currentPage - 1) * itemsPerPage;
+              const endIndex = startIndex + itemsPerPage;
+              const paginatedContracts = contracts.slice(startIndex, endIndex);
+              
+              return (
+                <>
+                  {paginatedContracts.map((contract) => {
                const contractTotalSalary = 
                (contract.basicSalary || 0) +
                (contract.allowance || 0) +
@@ -483,7 +512,77 @@ function ContractForm() {
                    </div>
                  </div>
                );
-            })}
+                  })}
+                  
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-[#f1f3f4] bg-[#f8f9fa]">
+                      <div className="text-sm text-[#5f6368]">
+                        Showing {startIndex + 1}-{Math.min(endIndex, contracts.length)} of {contracts.length} contracts
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                          className="p-2 hover:bg-[#eaebef] rounded-full text-[#5f6368] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Previous page"
+                        >
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="m15 18-6-6 6-6" />
+                          </svg>
+                        </button>
+                        
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                            // Show first page, last page, current page, and pages around current
+                            if (
+                              page === 1 ||
+                              page === totalPages ||
+                              (page >= currentPage - 1 && page <= currentPage + 1)
+                            ) {
+                              return (
+                                <button
+                                  key={page}
+                                  onClick={() => setCurrentPage(page)}
+                                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                                    currentPage === page
+                                      ? 'bg-[#1a73e8] text-white'
+                                      : 'text-[#5f6368] hover:bg-[#eaebef]'
+                                  }`}
+                                >
+                                  {page}
+                                </button>
+                              );
+                            } else if (
+                              page === currentPage - 2 ||
+                              page === currentPage + 2
+                            ) {
+                              return (
+                                <span key={page} className="px-1 text-[#5f6368]">
+                                  ...
+                                </span>
+                              );
+                            }
+                            return null;
+                          })}
+                        </div>
+                        
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                          className="p-2 hover:bg-[#eaebef] rounded-full text-[#5f6368] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Next page"
+                        >
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="m9 18 6-6-6-6" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
       </div>
