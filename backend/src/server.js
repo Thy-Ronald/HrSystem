@@ -4,6 +4,8 @@ const dotenv = require('dotenv');
 const githubRouter = require('./routes/github');
 const contractRouter = require('./routes/contracts');
 const { errorHandler } = require('./middlewares/errorHandler');
+const { initializeEmailJS } = require('./services/emailService');
+const { startContractExpirationJob } = require('./jobs/contractExpirationJob');
 
 dotenv.config();
 
@@ -24,5 +26,11 @@ app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Backend listening on port ${PORT}`);
+  
+  if (initializeEmailJS()) {
+    startContractExpirationJob();
+  } else {
+    console.log('Contract expiration notifications disabled due to missing EmailJS configuration.');
+  }
 });
 

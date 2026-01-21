@@ -34,7 +34,31 @@ Optional: create `.env` in `backend/`:
 ```
 PORT=4000
 GITHUB_TOKEN=your_pat   # improves rate limits
+
+# EmailJS Configuration (for contract expiration notifications)
+EMAILJS_SERVICE_ID=service_xre2ekc
+EMAILJS_TEMPLATE_ID=template_jfkytol
+EMAILJS_PUBLIC_KEY=your_public_key  # Get from EmailJS dashboard
+ADMIN_EMAIL=admin@company.com
 ```
+
+### Contract Expiration Notifications
+
+The system automatically checks for contracts expiring in 7 days and sends email notifications to the admin via EmailJS. The job runs daily at 9:00 AM.
+
+**Setup EmailJS:**
+1. Sign up at [EmailJS](https://www.emailjs.com/)
+2. Create an email service (Gmail, Outlook, etc.)
+3. Create an email template with these variables:
+   - `{{to_email}}` - Admin email address
+   - `{{employee_name}}` - Employee name
+   - `{{position}}` - Employee position
+   - `{{contract_type}}` - Contract type
+   - `{{expiration_date}}` - Contract expiration date
+   - `{{days_until_expiration}}` - Days until expiration (always "7")
+4. Add your EmailJS credentials to `.env`
+
+**Test endpoint:** `POST /api/contracts/test-expiration-notifications` - Manually trigger expiration check
 
 ## Frontend
 - Responsive, HR-styled layout

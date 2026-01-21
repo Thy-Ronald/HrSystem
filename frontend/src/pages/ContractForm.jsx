@@ -164,7 +164,7 @@ function ContractForm() {
 
       <Modal open={open} onClose={() => setOpen(false)} title="Create Contract">
         <form className="space-y-6" onSubmit={handleSubmit}>
-          <SectionCard title="Employee Contract" description="Fill out all sections below.">
+          <SectionCard showKicker={false}>
             <div className="space-y-6">
               <div className="space-y-3">
                 <p className="text-sm font-medium text-slate-800">Employee Info</p>
