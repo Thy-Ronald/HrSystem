@@ -36,231 +36,165 @@ function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen px-4 py-10">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6">
-        <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.25em] text-brand-600">HR System</p>
-            <h1 className="text-3xl font-bold text-slate-900">Employee Console</h1>
-            <p className="text-sm text-slate-600">
-              Manage agreements and review GitHub signal in one workspace.
-            </p>
+    <div className="flex flex-col h-full bg-white">
+      <div className="flex-1 overflow-auto p-8">
+        <div className="max-w-4xl mx-auto space-y-12">
+          {/* Header Section */}
+          <div className="text-center space-y-4">
+            <h1 className="text-4xl text-[#202124] font-normal">Employee Dashboard</h1>
+            <p className="text-[#5f6368]">Review metrics and signals from the HR ecosystem</p>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm shadow-sm ring-1 ring-slate-200">
-            <span className="size-2 rounded-full bg-emerald-500" />
-            Backend on <code>http://localhost:4000</code>
+
+          {/* Stat Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+             <div className="p-6 border border-[#dadce0] rounded-2xl hover:bg-[#f8f9fa] transition-colors cursor-pointer group">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-[#e8f0fe] rounded-lg text-[#1a73e8]">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                  </div>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5f6368" strokeWidth="2" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </div>
+                <h3 className="text-[#202124] font-medium mb-1">Active Staff</h3>
+                <p className="text-2xl font-bold text-[#1a73e8]">42</p>
+             </div>
+
+             <div className="p-6 border border-[#dadce0] rounded-2xl hover:bg-[#f8f9fa] transition-colors cursor-pointer group">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-[#e6f4ea] rounded-lg text-[#1e8e3e]">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                    </svg>
+                  </div>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5f6368" strokeWidth="2" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </div>
+                <h3 className="text-[#202124] font-medium mb-1">Total Payroll</h3>
+                <p className="text-2xl font-bold text-[#1e8e3e]">$1.2M</p>
+             </div>
+
+             <div className="p-6 border border-[#dadce0] rounded-2xl hover:bg-[#f8f9fa] transition-colors cursor-pointer group">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-[#fef7e0] rounded-lg text-[#f9ab00]">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                  </div>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5f6368" strokeWidth="2" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </div>
+                <h3 className="text-[#202124] font-medium mb-1">Pending Reviews</h3>
+                <p className="text-2xl font-bold text-[#f9ab00]">8</p>
+             </div>
           </div>
-        </header>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <SectionCard
-            title="Employee Contract"
-            description="Capture essential employment details with quick validation."
-            action={
-              contractState.status === 'success' && (
-                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-                  Saved
-                </span>
-              )
-            }
-          >
-            <form className="grid grid-cols-1 gap-4" onSubmit={submitContractForm}>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <label className="space-y-1 text-sm">
-                  <span className="text-slate-700">Full name</span>
+          {/* GitHub Section */}
+          <div className="border border-[#dadce0] rounded-2xl overflow-hidden">
+             <div className="p-6 bg-[#f8f9fa] border-b border-[#dadce0] flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl text-[#202124]">GitHub Intelligence</h2>
+                  <p className="text-sm text-[#5f6368]">Validate engineering signals via public data</p>
+                </div>
+                <div className="flex items-center gap-2 bg-white border border-[#dadce0] rounded-lg px-3 py-1.5 focus-within:ring-2 focus-within:ring-[#1a73e8] focus-within:border-transparent transition-all">
                   <input
-                    required
-                    value={contractForm.fullName}
-                    onChange={(e) => handleContractChange('fullName', e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                    placeholder="Alex Johnson"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="GitHub username"
+                    className="outline-none text-sm w-32"
                   />
-                </label>
-
-                <label className="space-y-1 text-sm">
-                  <span className="text-slate-700">Role / Title</span>
-                  <input
-                    required
-                    value={contractForm.role}
-                    onChange={(e) => handleContractChange('role', e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                    placeholder="Senior Engineer"
-                  />
-                </label>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <label className="space-y-1 text-sm">
-                  <span className="text-slate-700">Start date</span>
-                  <input
-                    type="date"
-                    required
-                    value={contractForm.startDate}
-                    onChange={(e) => handleContractChange('startDate', e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                  />
-                </label>
-
-                <label className="space-y-1 text-sm">
-                  <span className="text-slate-700">Employment type</span>
-                  <select
-                    value={contractForm.employmentType}
-                    onChange={(e) => handleContractChange('employmentType', e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                  <button 
+                    onClick={fetchProfile}
+                    className="text-[#1a73e8] font-medium text-sm hover:underline"
                   >
-                    {EmploymentTypes.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="space-y-1 text-sm">
-                  <span className="text-slate-700">Annual salary (USD)</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={contractForm.salary}
-                    onChange={(e) => handleContractChange('salary', e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                    placeholder="140000"
-                  />
-                </label>
-              </div>
-
-              <label className="space-y-1 text-sm">
-                <span className="text-slate-700">Notes / Clauses</span>
-                <textarea
-                  rows="3"
-                  value={contractForm.notes}
-                  onChange={(e) => handleContractChange('notes', e.target.value)}
-                  className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                  placeholder="Include probation period, equipment details, and onboarding notes."
-                />
-              </label>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="submit"
-                  className="inline-flex items-center justify-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-200"
-                  disabled={contractState.status === 'loading'}
-                >
-                  {contractState.status === 'loading' ? 'Saving...' : 'Save Contract'}
-                </button>
-                {contractState.status !== 'idle' && (
-                  <span
-                    className={`text-sm ${
-                      contractState.status === 'error' ? 'text-rose-600' : 'text-emerald-600'
-                    }`}
-                  >
-                    {contractState.message}
-                  </span>
+                    Fetch
+                  </button>
+                </div>
+             </div>
+             
+             <div className="p-8">
+                {loading && <div className="text-center text-[#5f6368]">Analyzing profile...</div>}
+                {error && <div className="text-center text-rose-600">{error}</div>}
+                {!data && !loading && !error && (
+                  <div className="text-center py-12 text-[#5f6368]">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="mx-auto mb-4 opacity-20">
+                      <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
+                    </svg>
+                    <p>Enter a username above to pull real-time engineering signal</p>
+                  </div>
                 )}
-              </div>
-            </form>
-          </SectionCard>
 
-          <SectionCard
-            title="GitHub Statistics"
-            description="Validate engineering signal with public GitHub data."
-            action={
-              <div className="flex items-center gap-2">
-                <input
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="octocat"
-                  className="w-36 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                />
-                <button
-                  type="button"
-                  onClick={fetchProfile}
-                  className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                  disabled={loading}
-                >
-                  {loading ? 'Loading...' : 'Fetch'}
-                </button>
-              </div>
-            }
-          >
-            {error && <p className="mb-3 text-sm text-rose-600">{error}</p>}
-
-            {!data && !error && (
-              <p className="text-sm text-slate-600">
-                Enter a GitHub username to see profile, repos, and language distribution.
-              </p>
-            )}
-
-            {data && (
-              <div className="space-y-6">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={data.profile.avatarUrl}
-                      alt={data.profile.login}
-                      className="h-14 w-14 rounded-full border border-slate-200 object-cover"
-                    />
-                    <div>
-                      <p className="text-sm text-slate-500">{data.profile.login}</p>
-                      <p className="text-lg font-semibold text-slate-900">
-                        {data.profile.name || 'No name provided'}
-                      </p>
-                      <p className="text-sm text-slate-600">{data.profile.bio}</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <StatTile label="Repos" value={data.profile.publicRepos} />
-                    <StatTile label="Followers" value={data.profile.followers} />
-                    <StatTile label="Following" value={data.profile.following} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="space-y-3">
-                    <p className="text-sm font-medium text-slate-700">Top Languages</p>
-                    <div className="space-y-3">
-                      {topLanguages.length === 0 && (
-                        <p className="text-sm text-slate-500">No language data available.</p>
-                      )}
-                      {topLanguages.map(([lang, count]) => (
-                        <LanguageBar key={lang} language={lang} count={count} max={topLanguages[0][1]} />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <p className="text-sm font-medium text-slate-700">Recent Repositories</p>
-                    <div className="space-y-3">
-                      {data.repos.slice(0, 5).map((repo) => (
-                        <a
-                          key={repo.id}
-                          href={repo.htmlUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="block rounded-lg border border-slate-100 bg-slate-50 px-4 py-3 hover:border-brand-200 hover:bg-white"
-                        >
-                          <div className="flex items-center justify-between">
-                            <p className="font-medium text-slate-900">{repo.name}</p>
-                            {repo.language && (
-                              <span className="rounded-full bg-white px-2 py-1 text-xs text-slate-600 ring-1 ring-slate-200">
-                                {repo.language}
-                              </span>
-                            )}
+                {data && (
+                  <div className="space-y-8">
+                    <div className="flex items-start gap-6">
+                      <img src={data.profile.avatarUrl} alt="" className="w-24 h-24 rounded-full border border-[#dadce0]" />
+                      <div className="flex-1">
+                        <h3 className="text-2xl text-[#202124]">{data.profile.name || data.profile.login}</h3>
+                        <p className="text-[#5f6368] mb-4">@{data.profile.login} • {data.profile.bio}</p>
+                        <div className="flex gap-4">
+                          <div className="text-center px-4 py-2 bg-[#f8f9fa] rounded-lg">
+                            <p className="text-sm text-[#5f6368]">Repos</p>
+                            <p className="font-bold">{data.profile.publicRepos}</p>
                           </div>
-                          <p className="text-sm text-slate-600">{repo.description}</p>
-                          <div className="mt-2 flex items-center gap-3 text-xs text-slate-500">
-                            <span>★ {repo.stars}</span>
-                            <span>⎇ {repo.forks}</span>
-                            <span>Updated {formatDate(repo.updatedAt)}</span>
+                          <div className="text-center px-4 py-2 bg-[#f8f9fa] rounded-lg">
+                            <p className="text-sm text-[#5f6368]">Followers</p>
+                            <p className="font-bold">{data.profile.followers}</p>
                           </div>
-                        </a>
-                      ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div>
+                        <h4 className="text-sm font-bold text-[#202124] uppercase tracking-wider mb-4">Top Languages</h4>
+                        <div className="space-y-3">
+                          {topLanguages.map(([lang, count]) => (
+                            <div key={lang} className="space-y-1">
+                              <div className="flex justify-between text-xs text-[#5f6368]">
+                                <span>{lang}</span>
+                                <span>{Math.round((count / topLanguages[0][1]) * 100)}%</span>
+                              </div>
+                              <div className="h-1.5 bg-[#e8f0fe] rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-[#1a73e8] rounded-full" 
+                                  style={{ width: `${(count / topLanguages[0][1]) * 100}%` }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="text-sm font-bold text-[#202124] uppercase tracking-wider mb-4">Latest Projects</h4>
+                        <div className="space-y-2">
+                          {data.repos.slice(0, 3).map(repo => (
+                            <a key={repo.id} href={repo.htmlUrl} target="_blank" className="block p-3 border border-[#dadce0] rounded-lg hover:bg-[#f8f9fa] transition-colors">
+                              <div className="flex justify-between items-start">
+                                <span className="text-[#1a73e8] font-medium">{repo.name}</span>
+                                <span className="text-[10px] bg-[#e8f0fe] text-[#1a73e8] px-2 py-0.5 rounded-full uppercase font-bold">
+                                  {repo.language || 'Text'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-[#5f6368] mt-1 line-clamp-1">{repo.description}</p>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
-          </SectionCard>
+                )}
+             </div>
+          </div>
         </div>
       </div>
     </div>

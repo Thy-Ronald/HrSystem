@@ -39,6 +39,18 @@ function ContractForm() {
     loadContracts();
   }, []);
 
+  // Listen for modal open event from Layout
+  useEffect(() => {
+    const handleOpenModal = () => {
+      setOpen(true);
+      setStatus({ state: 'idle', message: '' });
+      setErrors({});
+    };
+
+    window.addEventListener('openContractModal', handleOpenModal);
+    return () => window.removeEventListener('openContractModal', handleOpenModal);
+  }, []);
+
   const loadContracts = async () => {
     setLoading(true);
     setLoadError('');
@@ -174,301 +186,217 @@ function ContractForm() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-10">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6">
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.25em] text-brand-600">HR System</p>
-            <h1 className="text-3xl font-bold text-slate-900">Employee Contract Form</h1>
-            <p className="text-sm text-slate-600">
-              Create and review employee contracts with real-time salary breakdowns.
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              setOpen(true);
-              setStatus({ state: 'idle', message: '' });
-              setErrors({});
-            }}
-            className="w-fit rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-200"
-          >
-            New Contract
+    <div className="flex flex-col h-full">
+      {/* Gmail-style toolbar */}
+      <div className="flex items-center gap-2 p-2 border-b border-[#f1f3f4]">
+        <div className="flex items-center px-2 py-2 hover:bg-[#eaebef] rounded cursor-pointer">
+          <input type="checkbox" className="w-4 h-4 border-[#5f6368] rounded-sm" />
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5f6368" strokeWidth="2" className="ml-1">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </div>
+        <button 
+          onClick={() => {
+            setOpen(true);
+            setStatus({ state: 'idle', message: '' });
+            setErrors({});
+          }}
+          className="flex items-center gap-2 px-4 py-2 bg-[#c2e7ff] hover:bg-[#a8d8f0] text-[#001d35] rounded-full font-medium transition-colors shadow-sm"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          <span>New Contract</span>
+        </button>
+        <button onClick={loadContracts} className="p-2 hover:bg-[#eaebef] rounded-full transition-colors text-[#5f6368]">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M23 4v6h-6M1 20v-6h6" />
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+          </svg>
+        </button>
+        <button className="p-2 hover:bg-[#eaebef] rounded-full transition-colors text-[#5f6368]">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="1" />
+            <circle cx="12" cy="5" r="1" />
+            <circle cx="12" cy="19" r="1" />
+          </svg>
+        </button>
+
+        <div className="ml-auto flex items-center gap-1 text-xs text-[#5f6368]">
+          <span>1-50 of {contracts.length}</span>
+          <button className="p-2 hover:bg-[#eaebef] rounded-full">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
           </button>
-        </header>
+          <button className="p-2 hover:bg-[#eaebef] rounded-full">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </button>
+        </div>
+      </div>
 
-        <SectionCard title="Employee List" description="All employee contracts.">
-          {loading && <p className="mb-3 text-sm text-slate-600">Loading contracts...</p>}
-          {loadError && <p className="mb-3 text-sm text-rose-600">{loadError}</p>}
-          {!loading && contracts.length === 0 && !loadError && (
-            <p className="text-sm text-slate-600">No contracts yet. Create your first contract above.</p>
-          )}
-          {!loading && contracts.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50">
-                    <th className="px-4 py-3 font-semibold text-slate-700">Employee Name</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Position</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Assessment Date</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Term (Months)</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Expiration Date</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700 text-right">Basic Salary</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700 text-right">Total Salary</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {contracts.map((contract) => {
-                    // Calculate total salary from contract data
-                    const contractTotalSalary = 
-                      (contract.basicSalary || 0) +
-                      (contract.allowance || 0) +
-                      (contract.attendanceBonus || 0) +
-                      (contract.fullAttendanceBonus || 0) +
-                      (Number(contract.signingBonus) || 0);
+      <div className="flex-1 overflow-auto">
+        {loading && <div className="p-4 text-center text-[#5f6368]">Loading...</div>}
+        {loadError && <div className="p-4 text-center text-rose-600">{loadError}</div>}
+        
+        {!loading && contracts.length === 0 && !loadError && (
+          <div className="p-8 text-center text-[#5f6368]">
+            <p className="text-lg">Your contract list is empty</p>
+            <p className="text-sm">Click "New Contract" to get started.</p>
+          </div>
+        )}
 
-                    return (
-                      <tr
-                        key={contract.id}
-                        className="border-b border-slate-100 transition hover:bg-slate-50"
-                      >
-                        <td className="px-4 py-3 font-medium text-slate-900">{contract.name}</td>
-                        <td className="px-4 py-3 text-slate-600">{contract.position}</td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {formatDate(contract.assessmentDate)}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">{contract.termMonths} months</td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {contract.expirationDate ? formatDate(contract.expirationDate) : 'N/A'}
-                        </td>
-                        <td className="px-4 py-3 text-right text-slate-600">
-                          {Number(contract.basicSalary || 0).toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold text-emerald-700">
-                          {contractTotalSalary.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 text-slate-500">
-                          {formatDate(contract.createdDate)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </SectionCard>
+        {!loading && contracts.length > 0 && (
+          <div className="w-full">
+            {contracts.map((contract) => {
+               const contractTotalSalary = 
+               (contract.basicSalary || 0) +
+               (contract.allowance || 0) +
+               (contract.attendanceBonus || 0) +
+               (contract.fullAttendanceBonus || 0) +
+               (Number(contract.signingBonus) || 0);
+
+               return (
+                 <div 
+                   key={contract.id}
+                   className="flex items-center gap-4 px-4 py-3 border-b border-[#f1f3f4] hover:shadow-[inset_1px_0_0_#dadce0,inset_-1px_0_0_#dadce0,0_1px_2px_0_rgba(60,64,67,.3),0_1px_3px_1px_rgba(60,64,67,.15)] hover:z-10 cursor-pointer group"
+                 >
+                   <div className="flex items-center gap-3">
+                     <input type="checkbox" className="w-4 h-4 border-[#dadce0] rounded-sm" />
+                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dadce0" strokeWidth="2" className="group-hover:stroke-[#5f6368]">
+                       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                     </svg>
+                   </div>
+
+                   <div className="w-48 font-bold text-[#202124] truncate">
+                     {contract.name}
+                   </div>
+
+                   <div className="flex-1 flex items-center gap-2 overflow-hidden">
+                     <span className="text-[#202124] font-medium">{contract.position}</span>
+                     <span className="text-[#5f6368]">—</span>
+                     <span className="text-[#5f6368] truncate">
+                       {contract.termMonths} months • {formatDate(contract.assessmentDate)}
+                     </span>
+                   </div>
+
+                   <div className="flex items-center gap-4 ml-auto">
+                      <div className="hidden group-hover:flex items-center gap-2">
+                        <button className="p-2 hover:bg-[#eaebef] rounded-full text-[#5f6368]">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          </svg>
+                        </button>
+                        <button className="p-2 hover:bg-[#eaebef] rounded-full text-[#5f6368]">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+                            <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+                          </svg>
+                        </button>
+                      </div>
+                      <div className="w-24 text-right font-bold text-[#202124]">
+                        ${contractTotalSalary.toLocaleString()}
+                      </div>
+                      <div className="w-20 text-right text-xs text-[#5f6368]">
+                        {formatDate(contract.createdDate)}
+                      </div>
+                   </div>
+                 </div>
+               );
+            })}
+          </div>
+        )}
       </div>
 
       <Modal open={open} onClose={() => {
         setOpen(false);
         setStatus({ state: 'idle', message: '' });
         setErrors({});
-      }} title="Create Contract">
-        <form className="space-y-6" onSubmit={handleSubmit}>
-          <SectionCard showKicker={false}>
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-slate-800">Employee Info</p>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="Employee Name" required>
-                    <input
-                      required
-                      value={form.employeeName}
-                      onChange={(e) => updateField('employeeName', e.target.value)}
-                      placeholder="John Doe"
-                      className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 ${
-                        errors.employeeName
-                          ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100'
-                          : 'border-slate-200 focus:border-brand-500 focus:ring-brand-100'
-                      }`}
-                    />
-                    {errors.employeeName && (
-                      <span className="mt-1 text-xs text-rose-600">{errors.employeeName}</span>
-                    )}
-                  </Field>
-                  <Field label="Position" required>
-                    <input
-                      required
-                      value={form.position}
-                      onChange={(e) => updateField('position', e.target.value)}
-                      placeholder="Software Engineer"
-                      className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 ${
-                        errors.position
-                          ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100'
-                          : 'border-slate-200 focus:border-brand-500 focus:ring-brand-100'
-                      }`}
-                    />
-                    {errors.position && (
-                      <span className="mt-1 text-xs text-rose-600">{errors.position}</span>
-                    )}
-                  </Field>
-                </div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="Assessment Date" required>
-                    <input
-                      type="date"
-                      required
-                      value={form.assessmentDate}
-                      onChange={(e) => updateField('assessmentDate', e.target.value)}
-                      className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 ${
-                        errors.assessmentDate
-                          ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100'
-                          : 'border-slate-200 focus:border-brand-500 focus:ring-brand-100'
-                      }`}
-                    />
-                    {errors.assessmentDate && (
-                      <span className="mt-1 text-xs text-rose-600">{errors.assessmentDate}</span>
-                    )}
-                  </Field>
-                  <Field label="Term (Months)" required>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      value={form.term}
-                      onChange={(e) => updateField('term', e.target.value)}
-                      placeholder="12"
-                      className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 ${
-                        errors.term
-                          ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100'
-                          : 'border-slate-200 focus:border-brand-500 focus:ring-brand-100'
-                      }`}
-                    />
-                    {errors.term && (
-                      <span className="mt-1 text-xs text-rose-600">{errors.term}</span>
-                    )}
-                  </Field>
-                </div>
-              </div>
+      }} title="New Contract">
+        <form className="p-4 space-y-4" onSubmit={handleSubmit}>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Employee Name" required>
+                <input
+                  required
+                  value={form.employeeName}
+                  onChange={(e) => updateField('employeeName', e.target.value)}
+                  placeholder="Recipient"
+                  className="w-full border-b border-[#f1f3f4] py-2 focus:border-[#1a73e8] outline-none transition-colors"
+                />
+              </Field>
+              <Field label="Position" required>
+                <input
+                  required
+                  value={form.position}
+                  onChange={(e) => updateField('position', e.target.value)}
+                  placeholder="Subject"
+                  className="w-full border-b border-[#f1f3f4] py-2 focus:border-[#1a73e8] outline-none transition-colors"
+                />
+              </Field>
+            </div>
 
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-slate-800">Salary Breakdown</p>
-                <div className="grid grid-cols-1 gap-4">
-                  <Field label="Basic Salary" required>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Assessment Date" required>
+                <input
+                  type="date"
+                  required
+                  value={form.assessmentDate}
+                  onChange={(e) => updateField('assessmentDate', e.target.value)}
+                  className="w-full border-b border-[#f1f3f4] py-2 focus:border-[#1a73e8] outline-none transition-colors"
+                />
+              </Field>
+              <Field label="Term (Months)" required>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={form.term}
+                  onChange={(e) => updateField('term', e.target.value)}
+                  className="w-full border-b border-[#f1f3f4] py-2 focus:border-[#1a73e8] outline-none transition-colors"
+                />
+              </Field>
+            </div>
+
+            <div className="space-y-4 pt-4 border-t border-[#f1f3f4]">
+               <p className="text-sm font-medium text-[#5f6368]">Financials</p>
+               <div className="grid grid-cols-3 gap-4">
+                  <Field label="Basic Salary">
                     <input
                       type="number"
-                      min="0"
-                      required
                       value={form.basicSalary}
                       onChange={(e) => updateField('basicSalary', e.target.value)}
-                      placeholder="0"
-                      className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 ${
-                        errors.basicSalary
-                          ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100'
-                          : 'border-slate-200 focus:border-brand-500 focus:ring-brand-100'
-                      }`}
+                      className="w-full bg-[#f8f9fa] rounded px-3 py-2 outline-none focus:ring-1 focus:ring-[#1a73e8]"
                     />
-                    {errors.basicSalary && (
-                      <span className="mt-1 text-xs text-rose-600">{errors.basicSalary}</span>
-                    )}
                   </Field>
                   <Field label="Allowance">
                     <input
                       type="number"
-                      min="0"
                       value={form.allowance}
                       onChange={(e) => updateField('allowance', e.target.value)}
-                      placeholder="0"
-                      className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 ${
-                        errors.allowance
-                          ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100'
-                          : 'border-slate-200 focus:border-brand-500 focus:ring-brand-100'
-                      }`}
+                      className="w-full bg-[#f8f9fa] rounded px-3 py-2 outline-none focus:ring-1 focus:ring-[#1a73e8]"
                     />
-                    {errors.allowance && (
-                      <span className="mt-1 text-xs text-rose-600">{errors.allowance}</span>
-                    )}
                   </Field>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field label="Attendance Bonus (%)">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={form.attendanceBonusPercent}
-                        onChange={(e) => updateField('attendanceBonusPercent', e.target.value)}
-                        placeholder="0"
-                        className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 ${
-                          errors.attendanceBonusPercent
-                            ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100'
-                            : 'border-slate-200 focus:border-brand-500 focus:ring-brand-100'
-                        }`}
-                      />
-                      {errors.attendanceBonusPercent && (
-                        <span className="mt-1 text-xs text-rose-600">{errors.attendanceBonusPercent}</span>
-                      )}
-                    </Field>
-                    <Field label="Attendance Bonus Amount">
-                      <input
-                        readOnly
-                        value={attendanceBonusAmount.toFixed(2)}
-                        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700"
-                      />
-                    </Field>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field label="Perfect Attendance (%)">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={form.perfectAttendancePercent}
-                        onChange={(e) => updateField('perfectAttendancePercent', e.target.value)}
-                        placeholder="0"
-                        className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 ${
-                          errors.perfectAttendancePercent
-                            ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100'
-                            : 'border-slate-200 focus:border-brand-500 focus:ring-brand-100'
-                        }`}
-                      />
-                      {errors.perfectAttendancePercent && (
-                        <span className="mt-1 text-xs text-rose-600">{errors.perfectAttendancePercent}</span>
-                      )}
-                    </Field>
-                    <Field label="Perfect Attendance Amount">
-                      <input
-                        readOnly
-                        value={perfectAttendanceAmount.toFixed(2)}
-                        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700"
-                      />
-                    </Field>
-                  </div>
-
                   <Field label="Signing Bonus">
                     <input
                       type="number"
-                      min="0"
                       value={form.signingBonus}
                       onChange={(e) => updateField('signingBonus', e.target.value)}
-                      placeholder="0"
-                      className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 ${
-                        errors.signingBonus
-                          ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-100'
-                          : 'border-slate-200 focus:border-brand-500 focus:ring-brand-100'
-                      }`}
+                      className="w-full bg-[#f8f9fa] rounded px-3 py-2 outline-none focus:ring-1 focus:ring-[#1a73e8]"
                     />
-                    {errors.signingBonus && (
-                      <span className="mt-1 text-xs text-rose-600">{errors.signingBonus}</span>
-                    )}
                   </Field>
+               </div>
+            </div>
 
-                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
-                    <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">Total Salary</p>
-                    <p className="text-2xl font-bold text-emerald-900">{totalSalary.toFixed(2)}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center justify-between pt-6">
+              <div className="flex items-center gap-2">
                 <button
                   type="submit"
                   disabled={status.state === 'loading'}
-                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-[#1a73e8] hover:bg-[#1b66c9] text-white px-6 py-2 rounded-full font-medium transition-colors shadow-sm disabled:opacity-50"
                 >
-                  {status.state === 'loading' ? 'Saving...' : 'Save Contract'}
+                  {status.state === 'loading' ? 'Sending...' : 'Send Contract'}
                 </button>
                 <button
                   type="button"
@@ -476,22 +404,20 @@ function ContractForm() {
                     reset();
                     setErrors({});
                   }}
-                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                  className="p-2 hover:bg-[#f1f3f4] rounded-full transition-colors"
                 >
-                  Clear
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5f6368" strokeWidth="2">
+                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
                 </button>
-                {status.state !== 'idle' && (
-                  <span
-                    className={`text-sm font-medium ${
-                      status.state === 'error' ? 'text-rose-600' : 'text-emerald-700'
-                    }`}
-                  >
-                    {status.message}
-                  </span>
-                )}
               </div>
+
+              {status.state !== 'idle' && (
+                <span className={`text-sm ${status.state === 'error' ? 'text-rose-600' : 'text-[#1a73e8]'}`}>
+                  {status.message}
+                </span>
+              )}
             </div>
-          </SectionCard>
         </form>
       </Modal>
     </div>
