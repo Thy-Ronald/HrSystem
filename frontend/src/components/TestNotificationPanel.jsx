@@ -1,40 +1,14 @@
 import { useState } from 'react';
-import { testExpirationNotifications, testDirectEmail, submitContract } from '../services/api';
+import { testDirectEmail, submitContract } from '../services/api';
 
 /**
  * Test panel for notification and email features
  */
 export function TestNotificationPanel({ onNotificationRefresh }) {
-  const [testingNotifications, setTestingNotifications] = useState(false);
   const [testingEmail, setTestingEmail] = useState(false);
   const [creatingDummy, setCreatingDummy] = useState(false);
-  const [notificationResult, setNotificationResult] = useState(null);
   const [emailResult, setEmailResult] = useState(null);
   const [dummyResult, setDummyResult] = useState(null);
-
-  const handleTestNotifications = async () => {
-    setTestingNotifications(true);
-    setNotificationResult(null);
-    try {
-      const result = await testExpirationNotifications();
-      setNotificationResult({
-        success: true,
-        message: `Found ${result.found || 0} expiring contract(s), sent ${result.sent || 0} email(s)`,
-        data: result,
-      });
-      // Refresh notifications if callback provided
-      if (onNotificationRefresh) {
-        onNotificationRefresh();
-      }
-    } catch (error) {
-      setNotificationResult({
-        success: false,
-        message: error.message || 'Failed to test notifications',
-      });
-    } finally {
-      setTestingNotifications(false);
-    }
-  };
 
   const handleTestEmail = async () => {
     setTestingEmail(true);
@@ -112,71 +86,6 @@ export function TestNotificationPanel({ onNotificationRefresh }) {
       <h2 className="text-xl font-semibold text-[#202124] mb-4">Test Features</h2>
       
       <div className="space-y-4">
-        {/* Notification Test */}
-        <div className="border border-[#dadce0] rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-base font-medium text-[#202124]">Notification System</h3>
-              <p className="text-sm text-[#5f6368] mt-1">
-                Test checking for contracts expiring within 7 days
-              </p>
-            </div>
-            <button
-              onClick={handleTestNotifications}
-              disabled={testingNotifications}
-              className="px-4 py-2 bg-[#1a73e8] text-white rounded-lg hover:bg-[#1557b0] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm"
-            >
-              {testingNotifications ? (
-                <span className="flex items-center gap-2">
-                  <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
-                  Testing...
-                </span>
-              ) : (
-                'Test Notifications'
-              )}
-            </button>
-          </div>
-          
-          {notificationResult && (
-            <div
-              className={`mt-3 p-3 rounded-lg ${
-                notificationResult.success
-                  ? 'bg-[#e6f4ea] border border-[#1e8e3e]'
-                  : 'bg-[#fce8e6] border border-[#c5221f]'
-              }`}
-            >
-              <div className="flex items-start gap-2">
-                {notificationResult.success ? (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1e8e3e" strokeWidth="2">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                    <polyline points="22 4 12 14.01 9 11.01" />
-                  </svg>
-                ) : (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c5221f" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                )}
-                <div className="flex-1">
-                  <p
-                    className={`text-sm font-medium ${
-                      notificationResult.success ? 'text-[#1e8e3e]' : 'text-[#c5221f]'
-                    }`}
-                  >
-                    {notificationResult.message}
-                  </p>
-                  {notificationResult.data && (
-                    <p className="text-xs text-[#5f6368] mt-1">
-                      Found: {notificationResult.data.found || 0} | Sent: {notificationResult.data.sent || 0}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Email Test */}
         <div className="border border-[#dadce0] rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
@@ -299,13 +208,6 @@ export function TestNotificationPanel({ onNotificationRefresh }) {
             </div>
           )}
         </div>
-      </div>
-
-      <div className="mt-4 p-3 bg-[#f8f9fa] rounded-lg border border-[#dadce0]">
-        <p className="text-xs text-[#5f6368]">
-          <strong>Note:</strong> These tests will check for expiring contracts and send actual emails if configured. 
-          Check the browser console and backend logs for detailed information.
-        </p>
       </div>
     </div>
   );
