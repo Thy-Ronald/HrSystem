@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NotificationDropdown } from './NotificationDropdown';
 import { useNotifications } from '../hooks/useNotifications';
+import logo from '../assets/logo.png';
 
 const Layout = ({ children, currentPath, onNavigate }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -22,30 +23,35 @@ const Layout = ({ children, currentPath, onNavigate }) => {
             </svg>
           </button>
           <div className="flex items-center gap-2">
-            <div className="bg-[#ea4335] p-1.5 rounded-lg">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
-              </svg>
+            <div className="bg-[#dadce0] p-1.5 rounded-full flex items-center justify-center w-11 h-11">
+              <img 
+                src={logo} 
+                alt="HR System Logo" 
+                className="h-8 w-auto"
+              />
             </div>
             <span className="text-xl text-[#5f6368] font-medium tracking-tight">HR System</span>
           </div>
         </div>
 
-        <div className="flex-1 flex justify-center px-8">
-          <div className="gmail-search-bar">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5f6368" strokeWidth="2" className="mr-3">
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
-            <input 
-              type="text" 
-              placeholder={currentPath === 'contract-form' ? "Search Employee" : "Search in HR..."} 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none w-full text-base placeholder:text-[#5f6368]"
-            />
+        {currentPath !== 'dashboard' && (
+          <div className="flex-1 flex justify-center px-8">
+            <div className="gmail-search-bar">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5f6368" strokeWidth="2" className="mr-3">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+              <input 
+                type="text" 
+                placeholder={currentPath === 'contract-form' ? "Search Employee" : "Search in HR..."} 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-transparent border-none outline-none w-full text-base placeholder:text-[#5f6368]"
+              />
+            </div>
           </div>
-        </div>
+        )}
+        {currentPath === 'dashboard' && <div className="flex-1"></div>}
 
         <div className="flex items-center gap-2 relative">
           <button 
@@ -117,7 +123,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
                 <line x1="16" y1="17" x2="8" y2="17" />
                 <polyline points="10 9 9 9 8 9" />
               </svg>
-              {sidebarOpen && <span>Contracts</span>}
+              {sidebarOpen && <span>Employees</span>}
             </div>
           </nav>
         </aside>
