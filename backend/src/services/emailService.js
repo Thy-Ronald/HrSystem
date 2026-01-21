@@ -36,12 +36,36 @@ async function sendContractExpirationNotification(contract) {
   }
 
   try {
+    const employeeName = contract.employeeName || 'Unknown';
+    const position = contract.position || 'N/A';
+    const contractType = contract.contractType || 'N/A';
+    const expirationDate = contract.expirationDate || 'N/A';
+
+    // Format subject line
+    const subject = `Contract Expiration Alert: ${employeeName} - ${contractType}`;
+
+    // Format message body
+    const message = `
+Contract Expiration Notification
+
+Employee Name: ${employeeName}
+Position: ${position}
+Contract Type: ${contractType}
+Expiration Date: ${expirationDate}
+Days Until Expiration: 7
+
+Please review and take necessary action before the contract expires.
+    `.trim();
+
     const templateParams = {
       to_email: config.adminEmail,
-      employee_name: contract.employeeName || 'Unknown',
-      position: contract.position || 'N/A',
-      contract_type: contract.contractType || 'N/A',
-      expiration_date: contract.expirationDate || 'N/A',
+      subject: subject,
+      message: message,
+      // Also include individual fields in case template uses them
+      employee_name: employeeName,
+      position: position,
+      contract_type: contractType,
+      expiration_date: expirationDate,
       days_until_expiration: '7',
     };
 
