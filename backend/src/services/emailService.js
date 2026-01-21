@@ -5,21 +5,23 @@ function getEmailJSConfig() {
     serviceId: process.env.EMAILJS_SERVICE_ID,
     templateId: process.env.EMAILJS_TEMPLATE_ID,
     publicKey: process.env.EMAILJS_PUBLIC_KEY,
+    privateKey: process.env.EMAILJS_PRIVATE_KEY, // Required for server-side calls
     adminEmail: process.env.ADMIN_EMAIL || 'admin@company.com',
   };
 }
 
 function initializeEmailJS() {
   const config = getEmailJSConfig();
-  if (!config.serviceId || !config.templateId || !config.publicKey) {
+  if (!config.serviceId || !config.templateId || !config.privateKey) {
     console.warn(
       'EmailJS configuration missing. Contract expiration notifications will be disabled.'
     );
-    console.warn('Required: EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY');
+    console.warn('Required: EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PRIVATE_KEY');
+    console.warn('Note: Use Private Key (not Public Key) for server-side API calls');
     console.warn('Current values:', {
       serviceId: config.serviceId ? '✓' : '✗',
       templateId: config.templateId ? '✓' : '✗',
-      publicKey: config.publicKey ? '✓' : '✗',
+      privateKey: config.privateKey ? '✓' : '✗',
       adminEmail: config.adminEmail,
     });
     return false;
@@ -30,7 +32,7 @@ function initializeEmailJS() {
 
 async function sendContractExpirationNotification(contract) {
   const config = getEmailJSConfig();
-  if (!config.serviceId || !config.templateId || !config.publicKey) {
+  if (!config.serviceId || !config.templateId || !config.privateKey) {
     console.warn('EmailJS not configured. Skipping notification.');
     return false;
   }
@@ -75,6 +77,7 @@ Please review and take necessary action before the contract expires.
       templateParams,
       {
         publicKey: config.publicKey,
+        privateKey: config.privateKey, // Required for server-side calls
       }
     );
 

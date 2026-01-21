@@ -133,30 +133,43 @@ function ContractForm() {
           </button>
         </header>
 
-        <SectionCard title="Contracts" description="Recently created contracts.">
+        <SectionCard title="Employee List" description="All employee contracts.">
           {loadError && <p className="mb-3 text-sm text-rose-600">{loadError}</p>}
           {contracts.length === 0 ? (
             <p className="text-sm text-slate-600">No contracts yet.</p>
           ) : (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {contracts.map((contract) => (
-                <div
-                  key={contract.id}
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="font-semibold text-slate-900">{contract.employeeName}</p>
-                    <span className="text-xs text-slate-500">{formatDate(contract.createdAt)}</span>
-                  </div>
-                  <p className="text-sm text-slate-600">{contract.position}</p>
-                  <p className="text-sm text-slate-600">
-                    {contract.contractType} • {contract.term}
-                  </p>
-                  <p className="text-sm font-semibold text-emerald-700">
-                    {Number(contract.totalSalary || 0).toFixed(2)}
-                  </p>
-                </div>
-              ))}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50">
+                    <th className="px-4 py-3 font-semibold text-slate-700">Employee Name</th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">Position</th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">Contract Type</th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">Term</th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">Expiration Date</th>
+                    <th className="px-4 py-3 font-semibold text-slate-700 text-right">Total Salary</th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {contracts.map((contract) => (
+                    <tr
+                      key={contract.id}
+                      className="border-b border-slate-100 transition hover:bg-slate-50"
+                    >
+                      <td className="px-4 py-3 font-medium text-slate-900">{contract.employeeName}</td>
+                      <td className="px-4 py-3 text-slate-600">{contract.position}</td>
+                      <td className="px-4 py-3 text-slate-600">{contract.contractType}</td>
+                      <td className="px-4 py-3 text-slate-600">{contract.term}</td>
+                      <td className="px-4 py-3 text-slate-600">{formatDate(contract.expirationDate)}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-emerald-700">
+                        {Number(contract.totalSalary || 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">{formatDate(contract.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </SectionCard>

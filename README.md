@@ -39,6 +39,7 @@ GITHUB_TOKEN=your_pat   # improves rate limits
 EMAILJS_SERVICE_ID=service_xre2ekc
 EMAILJS_TEMPLATE_ID=template_jfkytol
 EMAILJS_PUBLIC_KEY=OpoSKg71Mm4YSjsqt
+EMAILJS_PRIVATE_KEY=your_private_key  # Get from EmailJS Account > API Keys (Private Key)
 ADMIN_EMAIL=ronaldmoran930@gmail.com
 ```
 
