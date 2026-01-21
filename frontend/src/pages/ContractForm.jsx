@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import SectionCard from '../components/SectionCard';
-import { submitContract, fetchContracts } from '../services/api';
+import { submitContract, fetchContracts, deleteContract, updateContract, fetchContractById } from '../services/api';
 import { useContractCalculator } from '../hooks/useContractCalculator';
 import { formatDate } from '../utils/format';
 import Modal from '../components/Modal';
@@ -21,9 +21,13 @@ function ContractForm() {
   const [status, setStatus] = useState({ state: 'idle', message: '' });
   const [contracts, setContracts] = useState([]);
   const [open, setOpen] = useState(false);
+  const [editingContractId, setEditingContractId] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, contractId: null, contractName: '' });
   const [errors, setErrors] = useState({});
   const [loadError, setLoadError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   const {
     form,
@@ -39,9 +43,20 @@ function ContractForm() {
     loadContracts();
   }, []);
 
+  // Update current time every minute to trigger status recalculation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
+
   // Listen for modal open event from Layout
   useEffect(() => {
     const handleOpenModal = () => {
+      reset();
+      setEditingContractId(null);
       setOpen(true);
       setStatus({ state: 'idle', message: '' });
       setErrors({});
@@ -123,6 +138,59 @@ function ContractForm() {
     return Object.keys(next).length === 0;
   };
 
+  const loadContractForEdit = async (contractId) => {
+    try {
+      const contract = await fetchContractById(contractId);
+      
+      // Map contract data to form format
+      updateField('employeeName', contract.name || '');
+      updateField('position', contract.position || '');
+      updateField('assessmentDate', contract.assessmentDate ? contract.assessmentDate.split('T')[0] : '');
+      updateField('term', contract.termMonths?.toString() || '');
+      updateField('basicSalary', contract.basicSalary?.toString() || '');
+      updateField('allowance', contract.allowance?.toString() || '');
+      updateField('signingBonus', contract.signingBonus?.toString() || '');
+      
+      // Calculate percentages from bonus amounts if needed
+      if (contract.attendanceBonus && contract.basicSalary) {
+        const percent = ((contract.attendanceBonus / contract.basicSalary) * 100).toFixed(2);
+        updateField('attendanceBonusPercent', percent);
+      }
+      
+      if (contract.fullAttendanceBonus && contract.basicSalary) {
+        const percent = ((contract.fullAttendanceBonus / contract.basicSalary) * 100).toFixed(2);
+        updateField('perfectAttendancePercent', percent);
+      }
+      
+      setEditingContractId(contractId);
+      setOpen(true);
+      setStatus({ state: 'idle', message: '' });
+      setErrors({});
+    } catch (err) {
+      console.error('Error loading contract:', err);
+      setStatus({ state: 'error', message: 'Unable to load contract for editing.' });
+    }
+  };
+
+  const handleDeleteClick = (contractId, contractName) => {
+    setDeleteConfirm({ open: true, contractId, contractName });
+  };
+
+  const handleDeleteConfirm = async () => {
+    const { contractId } = deleteConfirm;
+    try {
+      await deleteContract(contractId);
+      await loadContracts();
+      setDeleteConfirm({ open: false, contractId: null, contractName: '' });
+      setStatus({ state: 'success', message: 'Contract deleted successfully!' });
+      setTimeout(() => setStatus({ state: 'idle', message: '' }), 2000);
+    } catch (err) {
+      console.error('Error deleting contract:', err);
+      setDeleteConfirm({ open: false, contractId: null, contractName: '' });
+      setStatus({ state: 'error', message: 'Unable to delete contract. Please try again.' });
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) {
@@ -130,7 +198,8 @@ function ContractForm() {
       return;
     }
 
-    setStatus({ state: 'loading', message: 'Saving contract...' });
+    setStatus({ state: 'loading', message: editingContractId ? 'Updating contract...' : 'Saving contract...' });
+    setSaving(true);
     setErrors({});
 
     try {
@@ -148,9 +217,19 @@ function ContractForm() {
         resignationDate: form.resignationNote ? new Date().toISOString() : null,
       };
 
-      await submitContract(contractData);
-      setStatus({ state: 'success', message: 'Contract saved successfully!' });
+      if (editingContractId) {
+        // Update existing contract
+        await updateContract(editingContractId, contractData);
+        setStatus({ state: 'success', message: 'Contract updated successfully!' });
+      } else {
+        // Create new contract
+        await submitContract(contractData);
+        setStatus({ state: 'success', message: 'Contract saved successfully!' });
+      }
+      
+      setSaving(false);
       reset();
+      setEditingContractId(null);
       setErrors({});
       
       // Reload contracts list
@@ -162,6 +241,7 @@ function ContractForm() {
         setStatus({ state: 'idle', message: '' });
       }, 1500);
     } catch (err) {
+      setSaving(false);
       console.error('Error submitting contract:', err);
       
       // Handle validation errors from API
@@ -189,14 +269,10 @@ function ContractForm() {
     <div className="flex flex-col h-full">
       {/* Gmail-style toolbar */}
       <div className="flex items-center gap-2 p-2 border-b border-[#f1f3f4]">
-        <div className="flex items-center px-2 py-2 hover:bg-[#eaebef] rounded cursor-pointer">
-          <input type="checkbox" className="w-4 h-4 border-[#5f6368] rounded-sm" />
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5f6368" strokeWidth="2" className="ml-1">
-            <path d="m6 9 6 6 6-6" />
-          </svg>
-        </div>
         <button 
           onClick={() => {
+            reset();
+            setEditingContractId(null);
             setOpen(true);
             setStatus({ state: 'idle', message: '' });
             setErrors({});
@@ -250,6 +326,20 @@ function ContractForm() {
 
         {!loading && contracts.length > 0 && (
           <div className="w-full">
+            {/* Column Headers */}
+            <div className="flex items-center gap-4 px-4 py-2 border-b border-[#dadce0] bg-[#f8f9fa] text-xs font-medium text-[#5f6368] uppercase tracking-wider">
+              <div className="w-40">Name</div>
+              <div className="w-36">Position</div>
+              <div className="w-20">Term</div>
+              <div className="w-24">Assessment</div>
+              <div className="flex-1">Status</div>
+              <div className="flex items-center gap-4 ml-auto">
+                <div className="w-24 text-right">Salary</div>
+                <div className="w-24 text-right">Expiration</div>
+                <div className="w-20 text-center">Actions</div>
+              </div>
+            </div>
+            
             {contracts.map((contract) => {
                const contractTotalSalary = 
                (contract.basicSalary || 0) +
@@ -258,49 +348,137 @@ function ContractForm() {
                (contract.fullAttendanceBonus || 0) +
                (Number(contract.signingBonus) || 0);
 
+               // Determine label based on contract status (recalculates in real-time)
+               const getLabel = () => {
+                 if (contract.resignationDate) {
+                   return { text: 'Terminated', color: 'bg-[#fce8e6] text-[#c5221f]' };
+                 }
+                 
+                 // Always calculate expiration date from assessmentDate + termMonths for accuracy
+                 // This ensures status updates correctly when assessment date changes in database
+                 let expirationDate;
+                 if (contract.assessmentDate && contract.termMonths) {
+                   // Parse assessment date (handle both ISO string and date object)
+                   const assessmentDateStr = contract.assessmentDate;
+                   let assessmentDate;
+                   if (typeof assessmentDateStr === 'string') {
+                     // Handle ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)
+                     assessmentDate = new Date(assessmentDateStr.includes('T') 
+                       ? assessmentDateStr 
+                       : assessmentDateStr + 'T00:00:00');
+                   } else {
+                     assessmentDate = new Date(assessmentDateStr);
+                   }
+                   
+                   // Calculate expiration: assessment date + term months
+                   expirationDate = new Date(assessmentDate);
+                   expirationDate.setMonth(expirationDate.getMonth() + parseInt(contract.termMonths));
+                 } else if (contract.expirationDate) {
+                   // Fallback to stored expiration date if calculation not possible
+                   expirationDate = new Date(contract.expirationDate);
+                 } else {
+                   // No expiration date available, default to Active
+                   return { text: 'Active', color: 'bg-[#e6f4ea] text-[#1e8e3e]' };
+                 }
+                 
+                 // Normalize dates to midnight for accurate day comparison
+                 const today = new Date(currentTime);
+                 today.setHours(0, 0, 0, 0);
+                 const expiry = new Date(expirationDate);
+                 expiry.setHours(0, 0, 0, 0);
+                 
+                 const daysUntilExpiry = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+                 
+                 if (daysUntilExpiry < 0) {
+                   return { text: 'Expired', color: 'bg-[#fce8e6] text-[#c5221f]' };
+                 }
+                 if (daysUntilExpiry <= 30) {
+                   return { text: 'Expiring Soon', color: 'bg-[#fef7e0] text-[#ea8600]' };
+                 }
+                 return { text: 'Active', color: 'bg-[#e6f4ea] text-[#1e8e3e]' };
+               };
+
+               const label = getLabel();
+
+               // Calculate expiration date for display
+               const getExpirationDateDisplay = () => {
+                 if (contract.assessmentDate && contract.termMonths) {
+                   const assessmentDateStr = contract.assessmentDate;
+                   let assessmentDate;
+                   if (typeof assessmentDateStr === 'string') {
+                     assessmentDate = new Date(assessmentDateStr.includes('T') 
+                       ? assessmentDateStr 
+                       : assessmentDateStr + 'T00:00:00');
+                   } else {
+                     assessmentDate = new Date(assessmentDateStr);
+                   }
+                   const expirationDate = new Date(assessmentDate);
+                   expirationDate.setMonth(expirationDate.getMonth() + parseInt(contract.termMonths));
+                   return formatDate(expirationDate);
+                 }
+                 return contract.expirationDate ? formatDate(contract.expirationDate) : 'N/A';
+               };
+
                return (
                  <div 
                    key={contract.id}
                    className="flex items-center gap-4 px-4 py-3 border-b border-[#f1f3f4] hover:shadow-[inset_1px_0_0_#dadce0,inset_-1px_0_0_#dadce0,0_1px_2px_0_rgba(60,64,67,.3),0_1px_3px_1px_rgba(60,64,67,.15)] hover:z-10 cursor-pointer group"
                  >
-                   <div className="flex items-center gap-3">
-                     <input type="checkbox" className="w-4 h-4 border-[#dadce0] rounded-sm" />
-                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dadce0" strokeWidth="2" className="group-hover:stroke-[#5f6368]">
-                       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                     </svg>
-                   </div>
-
-                   <div className="w-48 font-bold text-[#202124] truncate">
+                   <div className="w-40 font-bold text-[#202124] truncate">
                      {contract.name}
                    </div>
 
-                   <div className="flex-1 flex items-center gap-2 overflow-hidden">
-                     <span className="text-[#202124] font-medium">{contract.position}</span>
-                     <span className="text-[#5f6368]">—</span>
-                     <span className="text-[#5f6368] truncate">
-                       {contract.termMonths} months • {formatDate(contract.assessmentDate)}
+                   <div className="w-36 text-[#202124] truncate">
+                     {contract.position}
+                   </div>
+
+                   <div className="w-20 text-[#5f6368]">
+                     {contract.termMonths} mo
+                   </div>
+
+                   <div className="w-24 text-[#5f6368] text-sm">
+                     {formatDate(contract.assessmentDate)}
+                   </div>
+
+                   <div className="flex-1">
+                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${label.color}`}>
+                       {label.text}
                      </span>
                    </div>
 
                    <div className="flex items-center gap-4 ml-auto">
-                      <div className="hidden group-hover:flex items-center gap-2">
-                        <button className="p-2 hover:bg-[#eaebef] rounded-full text-[#5f6368]">
+                      <div className="w-24 text-right font-bold text-[#202124]">
+                        ${contractTotalSalary.toLocaleString()}
+                      </div>
+                      <div className="w-24 text-right text-sm text-[#5f6368]">
+                        {getExpirationDateDisplay()}
+                      </div>
+                      <div className="w-20 flex items-center justify-center gap-1">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            loadContractForEdit(contract.id);
+                          }}
+                          className="p-2 hover:bg-[#eaebef] rounded-full text-[#5f6368] transition-colors"
+                          title="Edit Contract"
+                        >
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                          </svg>
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(contract.id, contract.name);
+                          }}
+                          className="p-2 hover:bg-[#eaebef] rounded-full text-[#5f6368] transition-colors"
+                          title="Delete Contract"
+                        >
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                           </svg>
                         </button>
-                        <button className="p-2 hover:bg-[#eaebef] rounded-full text-[#5f6368]">
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
-                            <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
-                          </svg>
-                        </button>
-                      </div>
-                      <div className="w-24 text-right font-bold text-[#202124]">
-                        ${contractTotalSalary.toLocaleString()}
-                      </div>
-                      <div className="w-20 text-right text-xs text-[#5f6368]">
-                        {formatDate(contract.createdDate)}
                       </div>
                    </div>
                  </div>
@@ -312,9 +490,11 @@ function ContractForm() {
 
       <Modal open={open} onClose={() => {
         setOpen(false);
+        setEditingContractId(null);
+        reset();
         setStatus({ state: 'idle', message: '' });
         setErrors({});
-      }} title="New Contract">
+      }} title={editingContractId ? "Edit Contract" : "New Contract"}>
         <form className="p-4 space-y-4" onSubmit={handleSubmit}>
             <div className="grid grid-cols-2 gap-4">
               <Field label="Employee Name" required>
@@ -393,22 +573,31 @@ function ContractForm() {
               <div className="flex items-center gap-2">
                 <button
                   type="submit"
-                  disabled={status.state === 'loading'}
-                  className="bg-[#1a73e8] hover:bg-[#1b66c9] text-white px-6 py-2 rounded-full font-medium transition-colors shadow-sm disabled:opacity-50"
+                  disabled={saving}
+                  className="bg-[#1a73e8] hover:bg-[#1b66c9] text-white px-6 py-2 rounded-full font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
                 >
-                  {status.state === 'loading' ? 'Sending...' : 'Send Contract'}
+                  {saving && (
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  {saving 
+                    ? (editingContractId ? 'Updating...' : 'Saving...') 
+                    : (editingContractId ? 'Update Contract' : 'Send Contract')}
                 </button>
                 <button
                   type="button"
                   onClick={() => {
+                    setOpen(false);
+                    setEditingContractId(null);
                     reset();
                     setErrors({});
+                    setStatus({ state: 'idle', message: '' });
                   }}
-                  className="p-2 hover:bg-[#f1f3f4] rounded-full transition-colors"
+                  className="px-4 py-2 border border-[#dadce0] hover:bg-[#f8f9fa] text-[#5f6368] rounded-full font-medium transition-colors"
                 >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5f6368" strokeWidth="2">
-                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  </svg>
+                  Cancel
                 </button>
               </div>
 
@@ -419,6 +608,34 @@ function ContractForm() {
               )}
             </div>
         </form>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal 
+        open={deleteConfirm.open} 
+        onClose={() => setDeleteConfirm({ open: false, contractId: null, contractName: '' })} 
+        title="Delete Contract"
+      >
+        <div className="p-6">
+          <p className="text-[#202124] mb-6">
+            Are you sure you want to delete the contract for <strong>{deleteConfirm.contractName}</strong>? 
+            This action cannot be undone.
+          </p>
+          <div className="flex items-center justify-end gap-3">
+            <button
+              onClick={() => setDeleteConfirm({ open: false, contractId: null, contractName: '' })}
+              className="px-4 py-2 border border-[#dadce0] hover:bg-[#f8f9fa] text-[#5f6368] rounded-full font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteConfirm}
+              className="px-4 py-2 bg-[#ea4335] hover:bg-[#d33b2c] text-white rounded-full font-medium transition-colors shadow-sm"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
