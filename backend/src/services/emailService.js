@@ -39,9 +39,12 @@ async function sendContractExpirationNotification(contract) {
   }
 
   try {
-    const employeeName = contract.employeeName || 'Unknown';
+    // Support both new schema (name) and old schema (employeeName) for backward compatibility
+    const employeeName = contract.name || contract.employeeName || 'Unknown';
     const position = contract.position || 'N/A';
-    const contractType = contract.contractType || 'N/A';
+    // contractType is not in new schema, use termMonths or term if available
+    const contractType = contract.contractType || 
+                         (contract.termMonths ? `${contract.termMonths} months` : 'N/A');
     const expirationDate = contract.expirationDate || 'N/A';
 
     // Format subject line
@@ -100,7 +103,8 @@ Please review and take necessary action before the contract expires.
     );
 
     console.log('✓ EmailJS response status:', response.status);
-    console.log(`✓ Contract expiration notification sent for: ${contract.employeeName}`);
+    const employeeName = contract.name || contract.employeeName || 'Unknown';
+    console.log(`✓ Contract expiration notification sent for: ${employeeName}`);
     console.log(`✓ Email sent to: ${config.adminEmail}`);
     return true;
   } catch (error) {

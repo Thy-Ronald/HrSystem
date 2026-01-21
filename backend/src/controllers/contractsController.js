@@ -1,78 +1,200 @@
-const { addContract, listContracts } = require('../models/contractStore');
-const { checkAndNotifyExpiringContracts, getContractsExpiringInDays } = require('../services/notificationService');
+const {
+  createContract,
+  getAllContracts,
+  getContractById,
+  updateContract,
+  deleteContract,
+} = require('../models/contractStore');
+const { checkAndNotifyExpiringContracts } = require('../services/notificationService');
 const { sendContractExpirationNotification } = require('../services/emailService');
 
-async function createContract(req, res) {
-  const contract = addContract(req.body);
-  
-  // Check if this contract expires in 7 days and send notification immediately
-  if (contract.expirationDate) {
-    try {
-      const expirationDate = new Date(contract.expirationDate);
-      const today = new Date();
-      const targetDate = new Date(today);
-      targetDate.setDate(today.getDate() + 7);
-      
-      // Normalize dates to compare only dates (ignore time)
-      expirationDate.setHours(0, 0, 0, 0);
-      today.setHours(0, 0, 0, 0);
-      targetDate.setHours(0, 0, 0, 0);
-      
-      if (expirationDate.getTime() === targetDate.getTime()) {
-        console.log(`\n✓ New contract expires in exactly 7 days. Sending notification...`);
-        await sendContractExpirationNotification(contract);
-      }
-    } catch (error) {
-      // Don't fail contract creation if notification fails
-      console.error('Failed to send expiration notification for new contract:', error);
-    }
+/**
+ * Standard JSON response format
+ */
+function sendSuccess(res, data, statusCode = 200, message = null) {
+  const response = {
+    success: true,
+    data,
+  };
+  if (message) {
+    response.message = message;
   }
-  
-  res.status(201).json(contract);
+  return res.status(statusCode).json(response);
 }
 
-function getContracts(_req, res) {
-  res.json(listContracts());
+/**
+ * POST /api/contracts
+ * Create a new contract
+ */
+async function createContractHandler(req, res, next) {
+  try {
+    const contract = await createContract(req.body);
+
+    // Calculate expiration date from assessment_date + term_months
+    // Check if this contract expires in 7 days and send notification immediately
+    if (contract.assessmentDate && contract.termMonths) {
+      try {
+        const assessmentDate = new Date(contract.assessmentDate);
+        const expirationDate = new Date(assessmentDate);
+        expirationDate.setMonth(expirationDate.getMonth() + contract.termMonths);
+
+        const today = new Date();
+        const targetDate = new Date(today);
+        targetDate.setDate(today.getDate() + 7);
+
+        // Normalize dates to compare only dates (ignore time)
+        expirationDate.setHours(0, 0, 0, 0);
+        today.setHours(0, 0, 0, 0);
+        targetDate.setHours(0, 0, 0, 0);
+
+        if (expirationDate.getTime() === targetDate.getTime()) {
+          console.log(`\n✓ New contract expires in exactly 7 days. Sending notification...`);
+          // Add calculated expirationDate to contract for notification
+          const contractWithExpiration = {
+            ...contract,
+            expirationDate: expirationDate.toISOString().split('T')[0],
+          };
+          await sendContractExpirationNotification(contractWithExpiration);
+        }
+      } catch (error) {
+        // Don't fail contract creation if notification fails
+        console.error('Failed to send expiration notification for new contract:', error);
+      }
+    }
+
+    return sendSuccess(res, contract, 201, 'Contract created successfully');
+  } catch (error) {
+    // Pass error to error handler middleware
+    next(error);
+  }
 }
 
-async function testExpirationNotifications(_req, res) {
+/**
+ * GET /api/contracts
+ * Get all contracts
+ */
+async function getAllContractsHandler(_req, res, next) {
+  try {
+    const contracts = await getAllContracts();
+    return sendSuccess(res, contracts, 200);
+  } catch (error) {
+    // Pass error to error handler middleware
+    next(error);
+  }
+}
+
+/**
+ * GET /api/contracts/:id
+ * Get a contract by ID
+ */
+async function getContractByIdHandler(req, res, next) {
+  try {
+    const contract = await getContractById(req.params.id);
+
+    if (!contract) {
+      const error = new Error(`Contract not found with ID ${req.params.id}`);
+      error.status = 404;
+      return next(error);
+    }
+
+    return sendSuccess(res, contract, 200);
+  } catch (error) {
+    // Pass error to error handler middleware
+    next(error);
+  }
+}
+
+/**
+ * PUT /api/contracts/:id
+ * Update a contract by ID
+ */
+async function updateContractHandler(req, res, next) {
+  try {
+    const contract = await updateContract(req.params.id, req.body);
+
+    if (!contract) {
+      const error = new Error(`Contract not found with ID ${req.params.id}`);
+      error.status = 404;
+      return next(error);
+    }
+
+    return sendSuccess(res, contract, 200, 'Contract updated successfully');
+  } catch (error) {
+    // Pass error to error handler middleware
+    next(error);
+  }
+}
+
+/**
+ * DELETE /api/contracts/:id
+ * Delete a contract by ID
+ */
+async function deleteContractHandler(req, res, next) {
+  try {
+    const deleted = await deleteContract(req.params.id);
+
+    if (!deleted) {
+      const error = new Error(`Contract not found with ID ${req.params.id}`);
+      error.status = 404;
+      return next(error);
+    }
+
+    return sendSuccess(res, null, 200, 'Contract deleted successfully');
+  } catch (error) {
+    // Pass error to error handler middleware
+    next(error);
+  }
+}
+
+/**
+ * POST /api/contracts/test-expiration-notifications
+ * Test expiration notifications (legacy endpoint)
+ */
+async function testExpirationNotifications(_req, res, next) {
   try {
     const result = await checkAndNotifyExpiringContracts();
-    res.json({ 
-      message: 'Expiration check completed. Check logs for details.',
+    return sendSuccess(res, {
       found: result.found || 0,
       sent: result.sent || 0,
-    });
+    }, 200, 'Expiration check completed. Check logs for details.');
   } catch (error) {
-    console.error('Test expiration error:', error);
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 }
 
-async function testDirectEmail(_req, res) {
+/**
+ * POST /api/contracts/test-email
+ * Test direct email (legacy endpoint)
+ */
+async function testDirectEmail(_req, res, next) {
   try {
     console.log('\n=== Testing direct email send ===');
     const testContract = {
-      employeeName: 'TEST EMPLOYEE',
+      name: 'TEST EMPLOYEE',
       position: 'Test Position',
-      contractType: 'Test Contract',
+      termMonths: 12,
       expirationDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     };
-    
+
     const result = await sendContractExpirationNotification(testContract);
-    res.json({ 
+    return sendSuccess(res, {
       success: result,
-      message: result 
-        ? 'Test email sent successfully! Check your inbox.' 
-        : 'Failed to send email. Check backend logs for details.',
-    });
+    }, 200, result
+      ? 'Test email sent successfully! Check your inbox.'
+      : 'Failed to send email. Check backend logs for details.');
   } catch (error) {
-    console.error('Direct email test error:', error);
-    res.status(500).json({ 
-      error: error.message,
-      details: error.text || error.status,
-    });
+    next(error);
   }
 }
 
-module.exports = { createContract, getContracts, testExpirationNotifications, testDirectEmail };
+module.exports = {
+  createContract: createContractHandler,
+  getAllContracts: getAllContractsHandler,
+  getContractById: getContractByIdHandler,
+  updateContract: updateContractHandler,
+  deleteContract: deleteContractHandler,
+  testExpirationNotifications,
+  testDirectEmail,
+  // Legacy exports for backward compatibility
+  getContracts: getAllContractsHandler,
+};
