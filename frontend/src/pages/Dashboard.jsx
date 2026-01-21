@@ -7,7 +7,7 @@ import { submitContract } from '../services/api';
 import { EmploymentTypes } from '../types';
 import { formatDate } from '../utils/format';
 
-function Dashboard() {
+function Dashboard({ searchQuery }) {
   const [contractForm, setContractForm] = useState({
     fullName: '',
     role: '',

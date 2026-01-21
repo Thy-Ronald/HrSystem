@@ -5,7 +5,7 @@ import { useContractCalculator } from '../hooks/useContractCalculator';
 import { formatDate } from '../utils/format';
 import Modal from '../components/Modal';
 
-function Field({ label, children, required }) {
+function Field({ label, children, required, error }) {
   return (
     <label className="flex flex-col gap-1 text-sm">
       <span className="text-slate-700">
@@ -13,11 +13,12 @@ function Field({ label, children, required }) {
         {required && <span className="text-rose-500"> *</span>}
       </span>
       {children}
+      {error && <span className="text-xs text-rose-600 mt-1">{error}</span>}
     </label>
   );
 }
 
-function ContractForm() {
+function ContractForm({ searchQuery = '' }) {
   const [status, setStatus] = useState({ state: 'idle', message: '' });
   const [contracts, setContracts] = useState([]);
   const [open, setOpen] = useState(false);
@@ -53,6 +54,11 @@ function ContractForm() {
 
     return () => clearInterval(interval);
   }, []);
+
+  // Reset to page 1 when search query changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   // Listen for modal open event from Layout
   useEffect(() => {
@@ -329,10 +335,26 @@ function ContractForm() {
 
         <div className="ml-auto flex items-center gap-1 text-xs text-[#5f6368]">
           <span>
-            {contracts.length > 0 
-              ? `${(currentPage - 1) * itemsPerPage + 1}-${Math.min(currentPage * itemsPerPage, contracts.length)} of ${contracts.length}`
-              : `0-0 of 0`
-            }
+            {(() => {
+              const filteredContracts = contracts.filter((contract) => {
+                if (!searchQuery.trim()) return true;
+                const query = searchQuery.toLowerCase();
+                return (
+                  contract.name?.toLowerCase().includes(query) ||
+                  contract.position?.toLowerCase().includes(query) ||
+                  contract.termMonths?.toString().includes(query) ||
+                  formatDate(contract.assessmentDate)?.toLowerCase().includes(query)
+                );
+              });
+              const filteredLength = filteredContracts.length;
+              const totalPages = Math.ceil(filteredLength / itemsPerPage);
+              const startIndex = (currentPage - 1) * itemsPerPage;
+              const endIndex = startIndex + itemsPerPage;
+              
+              return filteredLength > 0 
+                ? `${startIndex + 1}-${Math.min(endIndex, filteredLength)} of ${filteredLength}`
+                : `0-0 of 0`;
+            })()}
           </span>
           <button className="p-2 hover:bg-[#eaebef] rounded-full">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -375,10 +397,36 @@ function ContractForm() {
             </div>
             
             {(() => {
-              const totalPages = Math.ceil(contracts.length / itemsPerPage);
+              // Filter contracts based on search query
+              const filteredContracts = contracts.filter((contract) => {
+                if (!searchQuery.trim()) return true;
+                const query = searchQuery.toLowerCase();
+                return (
+                  contract.name?.toLowerCase().includes(query) ||
+                  contract.position?.toLowerCase().includes(query) ||
+                  contract.termMonths?.toString().includes(query) ||
+                  formatDate(contract.assessmentDate)?.toLowerCase().includes(query)
+                );
+              });
+              
+              if (filteredContracts.length === 0 && searchQuery.trim()) {
+                return (
+                  <div className="p-8 text-center text-[#5f6368]">
+                    <p className="text-lg">No contracts found</p>
+                    <p className="text-sm">Try adjusting your search query.</p>
+                  </div>
+                );
+              }
+              
+              const totalPages = Math.ceil(filteredContracts.length / itemsPerPage);
               const startIndex = (currentPage - 1) * itemsPerPage;
               const endIndex = startIndex + itemsPerPage;
-              const paginatedContracts = contracts.slice(startIndex, endIndex);
+              const paginatedContracts = filteredContracts.slice(startIndex, endIndex);
+              
+              // Reset to page 1 if current page is out of bounds after filtering
+              if (currentPage > totalPages && totalPages > 0) {
+                setCurrentPage(1);
+              }
               
               return (
                 <>
@@ -531,7 +579,7 @@ function ContractForm() {
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between px-4 py-3 border-t border-[#f1f3f4] bg-[#f8f9fa]">
                       <div className="text-sm text-[#5f6368]">
-                        Showing {startIndex + 1}-{Math.min(endIndex, contracts.length)} of {contracts.length} contracts
+                        Showing {startIndex + 1}-{Math.min(endIndex, filteredContracts.length)} of {filteredContracts.length} {searchQuery ? 'filtered ' : ''}contracts
                       </div>
                       <div className="flex items-center gap-2">
                         <button
@@ -609,44 +657,60 @@ function ContractForm() {
       }} title={editingContractId ? "Edit Contract" : "New Contract"}>
         <form className="p-4 space-y-4" onSubmit={handleSubmit}>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Employee Name" required>
+              <Field label="Employee Name" required error={errors.employeeName}>
                 <input
                   required
                   value={form.employeeName}
                   onChange={(e) => updateField('employeeName', e.target.value)}
                   placeholder="Recipient"
-                  className="w-full border-b border-[#f1f3f4] py-2 focus:border-[#1a73e8] outline-none transition-colors"
+                  className={`w-full border-b py-2 focus:outline-none transition-colors ${
+                    errors.employeeName 
+                      ? 'border-rose-500 focus:border-rose-500' 
+                      : 'border-[#f1f3f4] focus:border-[#1a73e8]'
+                  }`}
                 />
               </Field>
-              <Field label="Position" required>
+              <Field label="Position" required error={errors.position}>
                 <input
                   required
                   value={form.position}
                   onChange={(e) => updateField('position', e.target.value)}
                   placeholder="Subject"
-                  className="w-full border-b border-[#f1f3f4] py-2 focus:border-[#1a73e8] outline-none transition-colors"
+                  className={`w-full border-b py-2 focus:outline-none transition-colors ${
+                    errors.position 
+                      ? 'border-rose-500 focus:border-rose-500' 
+                      : 'border-[#f1f3f4] focus:border-[#1a73e8]'
+                  }`}
                 />
               </Field>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Assessment Date" required>
+              <Field label="Assessment Date" required error={errors.assessmentDate}>
                 <input
                   type="date"
                   required
                   value={form.assessmentDate}
                   onChange={(e) => updateField('assessmentDate', e.target.value)}
-                  className="w-full border-b border-[#f1f3f4] py-2 focus:border-[#1a73e8] outline-none transition-colors"
+                  className={`w-full border-b py-2 focus:outline-none transition-colors ${
+                    errors.assessmentDate 
+                      ? 'border-rose-500 focus:border-rose-500' 
+                      : 'border-[#f1f3f4] focus:border-[#1a73e8]'
+                  }`}
                 />
               </Field>
-              <Field label="Term (Months)" required>
+              <Field label="Term (Months)" required error={errors.term}>
                 <input
                   type="number"
                   min="1"
                   required
                   value={form.term}
                   onChange={(e) => updateField('term', e.target.value)}
-                  className="w-full border-b border-[#f1f3f4] py-2 focus:border-[#1a73e8] outline-none transition-colors"
+                  className={`w-full border-b py-2 focus:outline-none transition-colors ${
+                    errors.term 
+                      ? 'border-rose-500 focus:border-rose-500' 
+                      : 'border-[#f1f3f4] focus:border-[#1a73e8]'
+                  }`}
                 />
               </Field>
             </div>
@@ -654,34 +718,46 @@ function ContractForm() {
             <div className="space-y-4 pt-4 border-t border-[#f1f3f4]">
                <p className="text-sm font-medium text-[#5f6368]">Financials</p>
                <div className="grid grid-cols-3 gap-4">
-                  <Field label="Basic Salary">
+                  <Field label="Basic Salary" error={errors.basicSalary}>
                     <input
                       type="number"
                       value={form.basicSalary}
                       onChange={(e) => updateField('basicSalary', e.target.value)}
-                      className="w-full bg-[#f8f9fa] rounded px-3 py-2 outline-none focus:ring-1 focus:ring-[#1a73e8]"
+                      className={`w-full bg-[#f8f9fa] rounded px-3 py-2 outline-none focus:ring-1 ${
+                        errors.basicSalary 
+                          ? 'border border-rose-500 focus:ring-rose-500' 
+                          : 'focus:ring-[#1a73e8]'
+                      }`}
                     />
                   </Field>
-                  <Field label="Allowance">
+                  <Field label="Allowance" error={errors.allowance}>
                     <input
                       type="number"
                       value={form.allowance}
                       onChange={(e) => updateField('allowance', e.target.value)}
-                      className="w-full bg-[#f8f9fa] rounded px-3 py-2 outline-none focus:ring-1 focus:ring-[#1a73e8]"
+                      className={`w-full bg-[#f8f9fa] rounded px-3 py-2 outline-none focus:ring-1 ${
+                        errors.allowance 
+                          ? 'border border-rose-500 focus:ring-rose-500' 
+                          : 'focus:ring-[#1a73e8]'
+                      }`}
                     />
                   </Field>
-                  <Field label="Signing Bonus">
+                  <Field label="Signing Bonus" error={errors.signingBonus}>
                     <input
                       type="number"
                       value={form.signingBonus}
                       onChange={(e) => updateField('signingBonus', e.target.value)}
-                      className="w-full bg-[#f8f9fa] rounded px-3 py-2 outline-none focus:ring-1 focus:ring-[#1a73e8]"
+                      className={`w-full bg-[#f8f9fa] rounded px-3 py-2 outline-none focus:ring-1 ${
+                        errors.signingBonus 
+                          ? 'border border-rose-500 focus:ring-rose-500' 
+                          : 'focus:ring-[#1a73e8]'
+                      }`}
                     />
                   </Field>
                </div>
                
                <div className="grid grid-cols-2 gap-4 pt-2">
-                  <Field label="Attendance Bonus (%)">
+                  <Field label="Attendance Bonus (%)" error={errors.attendanceBonusPercent}>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
@@ -690,14 +766,18 @@ function ContractForm() {
                         value={form.attendanceBonusPercent}
                         onChange={(e) => updateField('attendanceBonusPercent', e.target.value)}
                         placeholder="0"
-                        className="flex-1 bg-[#f8f9fa] rounded px-3 py-2 outline-none focus:ring-1 focus:ring-[#1a73e8]"
+                        className={`flex-1 bg-[#f8f9fa] rounded px-3 py-2 outline-none focus:ring-1 ${
+                          errors.attendanceBonusPercent 
+                            ? 'border border-rose-500 focus:ring-rose-500' 
+                            : 'focus:ring-[#1a73e8]'
+                        }`}
                       />
                       <div className="text-sm text-[#5f6368] min-w-[80px]">
                         = ₱{attendanceBonusAmount.toFixed(2)}
                       </div>
                     </div>
                   </Field>
-                  <Field label="Perfect Attendance (%)">
+                  <Field label="Perfect Attendance (%)" error={errors.perfectAttendancePercent}>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
@@ -706,7 +786,11 @@ function ContractForm() {
                         value={form.perfectAttendancePercent}
                         onChange={(e) => updateField('perfectAttendancePercent', e.target.value)}
                         placeholder="0"
-                        className="flex-1 bg-[#f8f9fa] rounded px-3 py-2 outline-none focus:ring-1 focus:ring-[#1a73e8]"
+                        className={`flex-1 bg-[#f8f9fa] rounded px-3 py-2 outline-none focus:ring-1 ${
+                          errors.perfectAttendancePercent 
+                            ? 'border border-rose-500 focus:ring-rose-500' 
+                            : 'focus:ring-[#1a73e8]'
+                        }`}
                       />
                       <div className="text-sm text-[#5f6368] min-w-[80px]">
                         = ₱{perfectAttendanceAmount.toFixed(2)}
@@ -738,7 +822,7 @@ function ContractForm() {
                   )}
                   {saving 
                     ? (editingContractId ? 'Updating...' : 'Saving...') 
-                    : (editingContractId ? 'Update Contract' : 'Send Contract')}
+                    : (editingContractId ? 'Update Contract' : 'Add Contract')}
                 </button>
                 <button
                   type="button"

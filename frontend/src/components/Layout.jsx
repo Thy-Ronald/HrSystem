@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 
 const Layout = ({ children, currentPath, onNavigate }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   return (
     <div className="flex flex-col h-screen bg-[#f6f8fc]">
@@ -35,6 +36,8 @@ const Layout = ({ children, currentPath, onNavigate }) => {
             <input 
               type="text" 
               placeholder="Search in HR..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="bg-transparent border-none outline-none w-full text-base placeholder:text-[#5f6368]"
             />
           </div>
@@ -115,7 +118,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
 
         {/* Main Content */}
         <main className="flex-1 overflow-auto bg-white rounded-3xl mr-4 mb-4 shadow-sm border border-[#eaf1fb] transition-all duration-300">
-          {children}
+          {React.isValidElement(children) ? React.cloneElement(children, { searchQuery }) : children}
         </main>
       </div>
     </div>
