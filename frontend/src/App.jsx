@@ -1,7 +1,7 @@
-import Dashboard from './pages/Dashboard';
+import ContractForm from './pages/ContractForm';
 
 function App() {
-  return <Dashboard />;
+  return <ContractForm />;
 }
 
 export default App;

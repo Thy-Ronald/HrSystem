@@ -21,3 +21,11 @@ export async function fetchGithubProfile(username) {
   }
   return res.json();
 }
+
+export async function fetchContracts() {
+  const res = await fetch(`${API_BASE}/api/contracts`);
+  if (!res.ok) {
+    throw new Error('Unable to load contracts');
+  }
+  return res.json();
+}

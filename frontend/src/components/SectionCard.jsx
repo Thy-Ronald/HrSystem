@@ -1,5 +1,7 @@
-const SectionCard = ({ title, description, action, children }) => (
-  <section className="rounded-2xl border border-slate-200 bg-white/70 p-6 shadow-sm backdrop-blur-sm">
+const SectionCard = ({ title, description, action, children, className = '' }) => (
+  <section
+    className={`rounded-2xl border border-slate-200 bg-white/70 p-6 shadow-sm backdrop-blur-sm ${className}`}
+  >
     <div className="mb-4 flex items-start justify-between gap-4">
       <div>
         <p className="text-xs uppercase tracking-[0.2em] text-brand-600">HR Ops</p>
