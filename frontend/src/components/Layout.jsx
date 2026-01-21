@@ -39,7 +39,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
             </svg>
             <input 
               type="text" 
-              placeholder="Search in HR..." 
+              placeholder={currentPath === 'contract-form' ? "Search Employee" : "Search in HR..."} 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="bg-transparent border-none outline-none w-full text-base placeholder:text-[#5f6368]"
