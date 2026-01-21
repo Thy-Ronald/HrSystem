@@ -145,6 +145,7 @@ function validateContractData(data) {
     fullAttendanceBonus: validateFloat(data.fullAttendanceBonus, 0) || null,
     signingBonus: validateString(data.signingBonus, 255) || null,
     termMonths: validateRequiredInteger(data.termMonths || data.term, 'Term (months)', 1),
+    expirationDate: validateDateTime(data.expirationDate) || null,
     resignationDate: validateDateTime(data.resignationDate) || null,
   };
 }
@@ -184,6 +185,9 @@ function validateContractUpdateData(data) {
   }
   if (data.termMonths !== undefined || data.term !== undefined) {
     validated.termMonths = validateRequiredInteger(data.termMonths || data.term, 'Term (months)', 1);
+  }
+  if (data.expirationDate !== undefined) {
+    validated.expirationDate = validateDateTime(data.expirationDate) || null;
   }
   if (data.resignationDate !== undefined) {
     validated.resignationDate = validateDateTime(data.resignationDate) || null;

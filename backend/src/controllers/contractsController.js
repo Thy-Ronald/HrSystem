@@ -30,14 +30,10 @@ async function createContractHandler(req, res, next) {
   try {
     const contract = await createContract(req.body);
 
-    // Calculate expiration date from assessment_date + term_months
     // Check if this contract expires in 7 days and send notification immediately
-    if (contract.assessmentDate && contract.termMonths) {
+    if (contract.expirationDate) {
       try {
-        const assessmentDate = new Date(contract.assessmentDate);
-        const expirationDate = new Date(assessmentDate);
-        expirationDate.setMonth(expirationDate.getMonth() + contract.termMonths);
-
+        const expirationDate = new Date(contract.expirationDate);
         const today = new Date();
         const targetDate = new Date(today);
         targetDate.setDate(today.getDate() + 7);
@@ -49,12 +45,7 @@ async function createContractHandler(req, res, next) {
 
         if (expirationDate.getTime() === targetDate.getTime()) {
           console.log(`\n✓ New contract expires in exactly 7 days. Sending notification...`);
-          // Add calculated expirationDate to contract for notification
-          const contractWithExpiration = {
-            ...contract,
-            expirationDate: expirationDate.toISOString().split('T')[0],
-          };
-          await sendContractExpirationNotification(contractWithExpiration);
+          await sendContractExpirationNotification(contract);
         }
       } catch (error) {
         // Don't fail contract creation if notification fails

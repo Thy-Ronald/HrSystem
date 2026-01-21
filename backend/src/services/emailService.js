@@ -45,7 +45,33 @@ async function sendContractExpirationNotification(contract) {
     // contractType is not in new schema, use termMonths or term if available
     const contractType = contract.contractType || 
                          (contract.termMonths ? `${contract.termMonths} months` : 'N/A');
-    const expirationDate = contract.expirationDate || 'N/A';
+    
+    // Get expiration date (use calculatedExpirationDate if expirationDate is null)
+    let expirationDate = contract.expirationDate || contract.calculatedExpirationDate || 'N/A';
+    
+    // Format expiration date for display
+    if (expirationDate && expirationDate !== 'N/A') {
+      const expDate = new Date(expirationDate);
+      if (!isNaN(expDate.getTime())) {
+        expirationDate = expDate.toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        });
+      }
+    }
+    
+    // Calculate days until expiration
+    let daysUntilExpiration = 'N/A';
+    if (contract.expirationDate || contract.calculatedExpirationDate) {
+      const expDate = new Date(contract.expirationDate || contract.calculatedExpirationDate);
+      const today = new Date();
+      const diffTime = expDate - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (!isNaN(diffDays)) {
+        daysUntilExpiration = diffDays.toString();
+      }
+    }
 
     // Format subject line
     const subject = `Contract Expiration Alert: ${employeeName} - ${contractType}`;
@@ -58,9 +84,9 @@ Employee Name: ${employeeName}
 Position: ${position}
 Contract Type: ${contractType}
 Expiration Date: ${expirationDate}
-Days Until Expiration: 7
+Days Until Expiration: ${daysUntilExpiration}
 
-Please review and take necessary action before the contract expires.
+⚠️ This contract expires in ${daysUntilExpiration} day(s). Please review and take necessary action before the contract expires.
     `.trim();
 
     const templateParams = {
@@ -73,7 +99,7 @@ Please review and take necessary action before the contract expires.
       position: position,
       contract_type: contractType,
       expiration_date: expirationDate,
-      days_until_expiration: '7',
+      days_until_expiration: daysUntilExpiration,
     };
 
     console.log('Sending email notification...');
@@ -103,7 +129,6 @@ Please review and take necessary action before the contract expires.
     );
 
     console.log('✓ EmailJS response status:', response.status);
-    const employeeName = contract.name || contract.employeeName || 'Unknown';
     console.log(`✓ Contract expiration notification sent for: ${employeeName}`);
     console.log(`✓ Email sent to: ${config.adminEmail}`);
     return true;

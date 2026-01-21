@@ -162,6 +162,14 @@ function validateContract(req, res, next, isUpdate = false) {
     }
   }
 
+  // Validate expirationDate (if provided)
+  const expirationDate = data.expirationDate || data.expiration_date;
+  if (expirationDate !== undefined && expirationDate !== null) {
+    if (!isValidDate(expirationDate)) {
+      errors.push('expiration_date must be a valid date');
+    }
+  }
+
   // Validate resignationDate (if provided)
   const resignationDate = data.resignationDate || data.resignation_date;
   if (resignationDate !== undefined && resignationDate !== null) {

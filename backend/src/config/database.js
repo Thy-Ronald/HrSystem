@@ -55,8 +55,6 @@ function createPool() {
       
       // Timeout settings
       connectTimeout: 10000,
-      acquireTimeout: 10000,
-      timeout: 60000,
       
       // Character set
       charset: 'utf8mb4',

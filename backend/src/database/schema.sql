@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS staff_contract (
   attendance_bonus FLOAT NULL DEFAULT NULL COMMENT 'Attendance bonus amount',
   full_attendance_bonus FLOAT NULL DEFAULT NULL COMMENT 'Perfect attendance bonus amount',
   signing_bonus VARCHAR(255) NULL DEFAULT NULL COMMENT 'Signing bonus notes or value',
+  expiration_date DATETIME NULL DEFAULT NULL COMMENT 'Contract expiration date (calculated from assessment_date + term_months if not provided)',
   resignation_date DATETIME NULL DEFAULT NULL COMMENT 'Resignation date',
   
   -- Timestamps with auto-update
@@ -39,6 +40,7 @@ CREATE TABLE IF NOT EXISTS staff_contract (
   INDEX idx_name (name),
   INDEX idx_position (position),
   INDEX idx_assessment_date (assessment_date),
+  INDEX idx_expiration_date (expiration_date),
   INDEX idx_created_date (created_date),
   INDEX idx_resignation_date (resignation_date),
   INDEX idx_term_months (term_months),
@@ -49,6 +51,7 @@ CREATE TABLE IF NOT EXISTS staff_contract (
   CONSTRAINT chk_attendance_bonus CHECK (attendance_bonus IS NULL OR attendance_bonus >= 0),
   CONSTRAINT chk_full_attendance_bonus CHECK (full_attendance_bonus IS NULL OR full_attendance_bonus >= 0),
   CONSTRAINT chk_term_months CHECK (term_months > 0),
+  CONSTRAINT chk_expiration_date CHECK (expiration_date IS NULL OR expiration_date >= assessment_date),
   CONSTRAINT chk_resignation_date CHECK (resignation_date IS NULL OR resignation_date >= assessment_date)
 ) 
 ENGINE=InnoDB 

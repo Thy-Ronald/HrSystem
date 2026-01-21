@@ -16,6 +16,15 @@ async function createContract(data) {
   // Validate and sanitize input
   const validatedData = validateContractData(data);
 
+  // Calculate expiration_date if not provided (assessment_date + term_months)
+  let expirationDate = validatedData.expirationDate;
+  if (!expirationDate && validatedData.assessmentDate && validatedData.termMonths) {
+    const assessmentDate = new Date(validatedData.assessmentDate);
+    const calculatedExpiration = new Date(assessmentDate);
+    calculatedExpiration.setMonth(calculatedExpiration.getMonth() + validatedData.termMonths);
+    expirationDate = calculatedExpiration.toISOString().slice(0, 19).replace('T', ' ');
+  }
+
   // Use prepared statement to prevent SQL injection
   const sql = `
     INSERT INTO staff_contract (
@@ -28,8 +37,9 @@ async function createContract(data) {
       full_attendance_bonus,
       signing_bonus,
       term_months,
+      expiration_date,
       resignation_date
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   const params = [
@@ -42,6 +52,7 @@ async function createContract(data) {
     validatedData.fullAttendanceBonus,
     validatedData.signingBonus,
     validatedData.termMonths,
+    expirationDate,
     validatedData.resignationDate,
   ];
 
@@ -74,6 +85,7 @@ async function getAllContracts() {
       full_attendance_bonus as fullAttendanceBonus,
       signing_bonus as signingBonus,
       term_months as termMonths,
+      expiration_date as expirationDate,
       resignation_date as resignationDate,
       created_date as createdDate,
       updated_date as updatedDate
@@ -115,6 +127,7 @@ async function getContractById(id) {
       full_attendance_bonus as fullAttendanceBonus,
       signing_bonus as signingBonus,
       term_months as termMonths,
+      expiration_date as expirationDate,
       resignation_date as resignationDate,
       created_date as createdDate,
       updated_date as updatedDate
@@ -188,6 +201,22 @@ async function updateContract(id, data) {
   if (validatedData.termMonths !== undefined) {
     fields.push('term_months = ?');
     params.push(validatedData.termMonths);
+    // Recalculate expiration_date if term_months changes
+    if (!data.expirationDate) {
+      // Get current assessment_date to recalculate
+      const current = await getContractById(contractId);
+      if (current && current.assessmentDate) {
+        const assessmentDate = new Date(current.assessmentDate);
+        const calculatedExpiration = new Date(assessmentDate);
+        calculatedExpiration.setMonth(calculatedExpiration.getMonth() + validatedData.termMonths);
+        fields.push('expiration_date = ?');
+        params.push(calculatedExpiration.toISOString().slice(0, 19).replace('T', ' '));
+      }
+    }
+  }
+  if (validatedData.expirationDate !== undefined) {
+    fields.push('expiration_date = ?');
+    params.push(validatedData.expirationDate);
   }
   if (validatedData.resignationDate !== undefined) {
     fields.push('resignation_date = ?');
@@ -256,7 +285,7 @@ async function deleteContract(id) {
 
 /**
  * Get contracts expiring within a specific number of days
- * Note: This function calculates expiration based on assessment_date + term_months
+ * Uses expiration_date field (or calculates from assessment_date + term_months if null)
  * @param {number} days - Number of days from today (default: 7)
  * @returns {Promise<Array>} - Array of expiring contracts
  */
@@ -273,21 +302,26 @@ async function getContractsExpiringInDays(days = 7) {
       full_attendance_bonus as fullAttendanceBonus,
       signing_bonus as signingBonus,
       term_months as termMonths,
+      expiration_date as expirationDate,
       resignation_date as resignationDate,
       created_date as createdDate,
       updated_date as updatedDate,
-      DATE_ADD(assessment_date, INTERVAL term_months MONTH) as expirationDate
+      COALESCE(expiration_date, DATE_ADD(assessment_date, INTERVAL term_months MONTH)) as calculatedExpirationDate
     FROM staff_contract
     WHERE resignation_date IS NULL
-      AND DATE_ADD(assessment_date, INTERVAL term_months MONTH) 
+      AND COALESCE(expiration_date, DATE_ADD(assessment_date, INTERVAL term_months MONTH)) 
           BETWEEN CURDATE() 
           AND DATE_ADD(CURDATE(), INTERVAL ? DAY)
-    ORDER BY expirationDate ASC
+    ORDER BY calculatedExpirationDate ASC
   `;
 
   try {
     const contracts = await query(sql, [days]);
-    return contracts;
+    // Ensure expirationDate is set for all contracts
+    return contracts.map(contract => ({
+      ...contract,
+      expirationDate: contract.expirationDate || contract.calculatedExpirationDate,
+    }));
   } catch (error) {
     console.error('Error getting expiring contracts:', error);
     throw error;

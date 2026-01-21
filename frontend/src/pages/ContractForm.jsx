@@ -211,6 +211,7 @@ function ContractForm() {
                     <th className="px-4 py-3 font-semibold text-slate-700">Position</th>
                     <th className="px-4 py-3 font-semibold text-slate-700">Assessment Date</th>
                     <th className="px-4 py-3 font-semibold text-slate-700">Term (Months)</th>
+                    <th className="px-4 py-3 font-semibold text-slate-700">Expiration Date</th>
                     <th className="px-4 py-3 font-semibold text-slate-700 text-right">Basic Salary</th>
                     <th className="px-4 py-3 font-semibold text-slate-700 text-right">Total Salary</th>
                     <th className="px-4 py-3 font-semibold text-slate-700">Created</th>
@@ -237,6 +238,9 @@ function ContractForm() {
                           {formatDate(contract.assessmentDate)}
                         </td>
                         <td className="px-4 py-3 text-slate-600">{contract.termMonths} months</td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {contract.expirationDate ? formatDate(contract.expirationDate) : 'N/A'}
+                        </td>
                         <td className="px-4 py-3 text-right text-slate-600">
                           {Number(contract.basicSalary || 0).toLocaleString()}
                         </td>
