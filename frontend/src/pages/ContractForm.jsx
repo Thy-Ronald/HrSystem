@@ -120,31 +120,15 @@ function ContractForm({ searchQuery = '' }) {
     setErrors({});
   };
 
-  // Calculate filtered contracts count for toolbar
-  const filteredContracts = contracts.filter((contract) => {
-    if (!searchQuery.trim()) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      contract.name?.toLowerCase().includes(query) ||
-      contract.position?.toLowerCase().includes(query) ||
-      contract.termMonths?.toString().includes(query) ||
-      contract.assessmentDate?.toLowerCase().includes(query)
-    );
-  });
-
   return (
     <div className="flex flex-col h-full">
       <ContractToolbar
         onNewContract={handleNewContract}
         onRefresh={refresh}
         loading={loading}
-        currentPage={currentPage}
-        itemsPerPage={ITEMS_PER_PAGE}
-        totalItems={filteredContracts.length}
-        searchQuery={searchQuery}
       />
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {loading && <div className="p-4 text-center text-[#5f6368]">Loading...</div>}
         {loadError && <div className="p-4 text-center text-rose-600">{loadError}</div>}
         
@@ -156,16 +140,18 @@ function ContractForm({ searchQuery = '' }) {
         )}
 
         {!loading && contracts.length > 0 && (
-          <ContractList
-            contracts={contracts}
-            searchQuery={searchQuery}
-            currentPage={currentPage}
-            itemsPerPage={ITEMS_PER_PAGE}
-            currentTime={currentTime}
-            onPageChange={setCurrentPage}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <ContractList
+              contracts={contracts}
+              searchQuery={searchQuery}
+              currentPage={currentPage}
+              itemsPerPage={ITEMS_PER_PAGE}
+              currentTime={currentTime}
+              onPageChange={setCurrentPage}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
+          </div>
         )}
       </div>
 

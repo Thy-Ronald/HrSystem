@@ -44,18 +44,20 @@ export function ContractList({
   const paginatedContracts = filteredContracts.slice(startIndex, endIndex);
 
   return (
-    <div className="w-full">
-      <ContractListHeader />
-      
-      {paginatedContracts.map((contract) => (
-        <ContractListItem
-          key={contract.id}
-          contract={contract}
-          currentTime={currentTime}
-          onEdit={onEdit}
-          onDelete={onDelete}
-        />
-      ))}
+    <div className="w-full flex flex-col h-full">
+      <div className="flex-1 overflow-auto">
+        <ContractListHeader />
+        
+        {paginatedContracts.map((contract) => (
+          <ContractListItem
+            key={contract.id}
+            contract={contract}
+            currentTime={currentTime}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        ))}
+      </div>
       
       <ContractPagination
         currentPage={currentPage}

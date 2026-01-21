@@ -44,15 +44,14 @@ const Layout = ({ children, currentPath, onNavigate }) => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button className="p-2 hover:bg-[#eaebef] rounded-full transition-colors text-[#5f6368]">
+          <button className="p-2 hover:bg-[#eaebef] rounded-full transition-colors text-[#5f6368] relative">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v4m0 4h.01" />
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
           </button>
-          <div className="w-8 h-8 rounded-full bg-[#1a73e8] flex items-center justify-center text-white text-sm font-medium ml-2">
-            A
-          </div>
         </div>
+
       </header>
 
       <div className="flex flex-1 overflow-hidden">
