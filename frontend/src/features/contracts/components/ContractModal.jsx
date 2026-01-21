@@ -24,7 +24,7 @@ export function ContractModal({
       onClose={onCancel} 
       title={editingContractId ? "Edit Contract" : "New Contract"}
     >
-      <form className="p-4 space-y-4" onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
+      <form className="p-6" onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
         <ContractFormFields
           form={form}
           updateField={updateField}
