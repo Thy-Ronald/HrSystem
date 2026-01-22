@@ -140,6 +140,8 @@ function ContractForm({ searchQuery = '' }) {
         onNewContract={handleNewContract}
         onRefresh={refresh}
         loading={loading}
+        contracts={contracts}
+        currentTime={currentTime}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
