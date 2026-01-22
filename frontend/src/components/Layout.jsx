@@ -43,7 +43,13 @@ const Layout = ({ children, currentPath, onNavigate }) => {
               </svg>
               <input 
                 type="text" 
-                placeholder={currentPath === 'contract-form' ? "Search Employee" : "Search in HR..."} 
+                placeholder={
+                  currentPath === 'contract-form' 
+                    ? "Search Employee" 
+                    : currentPath === 'staff-ranking'
+                    ? "Search Rankings..."
+                    : "Search in HR..."
+                } 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="bg-transparent border-none outline-none w-full text-base placeholder:text-[#5f6368]"
@@ -124,6 +130,22 @@ const Layout = ({ children, currentPath, onNavigate }) => {
                 <polyline points="10 9 9 9 8 9" />
               </svg>
               {sidebarOpen && <span>Employees</span>}
+            </div>
+            
+            <div 
+              onClick={() => onNavigate('staff-ranking')}
+              className={`${
+                sidebarOpen 
+                  ? `gmail-sidebar-item ${currentPath === 'staff-ranking' ? 'active' : ''}`
+                  : `flex items-center justify-center w-14 h-11 mx-auto mb-1 rounded-r-full cursor-pointer transition-colors ${
+                      currentPath === 'staff-ranking' ? 'bg-[#d3e3fd] text-[#041e49] font-medium' : 'hover:bg-[#eaebef]'
+                    }`
+              }`}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+              </svg>
+              {sidebarOpen && <span>Staff Ranking</span>}
             </div>
           </nav>
         </aside>
