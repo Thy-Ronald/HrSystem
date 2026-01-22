@@ -30,7 +30,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
                 className="h-8 w-auto"
               />
             </div>
-            <span className="text-xl text-[#5f6368] font-medium tracking-tight">HR System</span>
+            <span className="text-xl text-[#5f6368] font-medium tracking-widest">THY</span>
           </div>
         </div>
 
