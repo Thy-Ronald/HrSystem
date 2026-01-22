@@ -77,8 +77,8 @@ function SortIcon() {
 
 function RankingHeader({ viewMode, onViewChange }) {
   return (
-    <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-      <h1 className="text-2xl font-normal text-[#202124]">Ranking</h1>
+    <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <h1 className="text-xl font-normal text-[#202124]">Ranking</h1>
       <nav className="flex items-center gap-1 bg-[#f1f3f4] p-1 rounded-full" aria-label="View mode selection">
         <ViewToggleButton
           label="Rank"
@@ -95,7 +95,7 @@ function RankingHeader({ viewMode, onViewChange }) {
   );
 }
 
-function RankingFilters({ activeQuickFilter, onQuickFilterChange, onUpdate }) {
+function RankingFilters({ activeQuickFilter, onQuickFilterChange }) {
   const quickFilters = [
     { value: 'today', label: 'Today' },
     { value: 'yesterday', label: 'Yesterday' },
@@ -106,7 +106,7 @@ function RankingFilters({ activeQuickFilter, onQuickFilterChange, onUpdate }) {
 
   return (
     <section className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-8 pb-8 border-b border-[#e8eaed]">
-      <nav className="flex flex-wrap items-center gap-2" aria-label="Quick date filters">
+      <nav className="flex flex-nowrap items-center gap-2 overflow-x-auto" aria-label="Quick date filters">
         {quickFilters.map((filter) => (
           <QuickFilterButton
             key={filter.value}
@@ -117,16 +117,8 @@ function RankingFilters({ activeQuickFilter, onQuickFilterChange, onUpdate }) {
         ))}
       </nav>
 
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 w-full sm:w-auto">
+      <div className="flex items-end">
         <DateInput label="Start Date" id="start-date" />
-        <DateInput label="End Date" id="end-date" />
-        <button
-          onClick={onUpdate}
-          type="button"
-          className="px-6 py-2 text-sm font-medium text-white bg-[#1a73e8] rounded-full hover:bg-[#185abc] shadow-sm active:shadow-none whitespace-nowrap"
-        >
-          Update
-        </button>
       </div>
     </section>
   );
@@ -218,10 +210,6 @@ function RankingPage() {
   const [viewMode, setViewMode] = useState('rank');
   const rankingData = [];
 
-  const handleUpdate = () => {
-    // Update functionality placeholder
-  };
-
   return (
     <main className="flex flex-col h-full bg-[#ffffff]">
       <div className="flex-1 overflow-auto p-4 sm:p-6 md:p-10">
@@ -235,7 +223,6 @@ function RankingPage() {
             <RankingFilters
               activeQuickFilter={activeQuickFilter}
               onQuickFilterChange={setActiveQuickFilter}
-              onUpdate={handleUpdate}
             />
 
             <RankingTable columns={TABLE_COLUMNS} data={rankingData} />
