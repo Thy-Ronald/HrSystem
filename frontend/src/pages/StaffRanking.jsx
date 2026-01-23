@@ -125,15 +125,15 @@ export default function StaffRanking() {
           onRefresh={handleManualRefresh}
           isRefreshing={isRefreshing}
           refreshError={refreshError}
-          repositories={repositories}
-          selectedRepo={selectedRepo}
-          onRepoChange={handleRepoChange}
-          reposLoading={reposLoading}
         />
 
         <RankingFilters
           activeQuickFilter={activeQuickFilter}
           onQuickFilterChange={handleQuickFilterChange}
+          repositories={repositories}
+          selectedRepo={selectedRepo}
+          onRepoChange={handleRepoChange}
+          reposLoading={reposLoading}
         />
 
         {viewMode === VIEW_MODES.RANK ? (

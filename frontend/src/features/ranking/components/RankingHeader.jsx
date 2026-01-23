@@ -5,18 +5,13 @@
 
 import { RefreshButton } from './RefreshButton';
 import { ViewModeSelector } from './ViewModeSelector';
-import { RepositorySelect } from './RepositorySelect';
 
 export function RankingHeader({ 
   viewMode, 
   onViewChange, 
   onRefresh, 
   isRefreshing, 
-  refreshError, 
-  repositories, 
-  selectedRepo, 
-  onRepoChange, 
-  reposLoading,
+  refreshError,
 }) {
   return (
     <header className="flex flex-col gap-4 mb-6">
@@ -37,14 +32,6 @@ export function RankingHeader({
             onViewChange={onViewChange}
           />
         </div>
-      </div>
-      <div className="flex items-center">
-        <RepositorySelect
-          repositories={repositories}
-          selectedRepo={selectedRepo}
-          onRepoChange={onRepoChange}
-          loading={reposLoading}
-        />
       </div>
     </header>
   );

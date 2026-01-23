@@ -12,3 +12,4 @@ export { RankingFilters } from './RankingFilters';
 export { EmptyState } from './EmptyState';
 export { TableSkeleton } from './TableSkeleton';
 export { RankingTable } from './RankingTable';
+export { UserAvatar } from './UserAvatar';

@@ -5,6 +5,7 @@
 
 import { TableSkeleton } from './TableSkeleton';
 import { EmptyState } from './EmptyState';
+import { UserAvatar } from './UserAvatar';
 
 function SortIcon() {
   return (
@@ -76,7 +77,11 @@ export function RankingTable({ columns, data, loading, error }) {
                       column.key === 'id' ? 'text-left font-medium' : 'text-center'
                     }`}
                   >
-                    {row[column.key] ?? '-'}
+                    {column.key === 'id' && row[column.key] ? (
+                      <UserAvatar username={row[column.key]} size={32} />
+                    ) : (
+                      row[column.key] ?? '-'
+                    )}
                   </td>
                 ))}
               </tr>
