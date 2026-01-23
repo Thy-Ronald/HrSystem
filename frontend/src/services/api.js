@@ -147,3 +147,27 @@ export async function fetchIssuesByPeriod(repo, filter = 'today') {
   const res = await fetch(`${API_BASE}/api/github/issues?${params}`);
   return handleResponse(res);
 }
+
+/**
+ * Lightweight cache status check - does NOT call GitHub API
+ * @param {string} repo - Repository full name (owner/repo)
+ * @param {string} filter - Filter type
+ * @returns {Promise<Object>} Cache info with valid, timestamp, hash
+ */
+export async function checkCacheStatus(repo, filter = 'today') {
+  const params = new URLSearchParams({ repo, filter });
+  const res = await fetch(`${API_BASE}/api/github/cache-check?${params}`);
+  return handleResponse(res);
+}
+
+/**
+ * Check if repository has changes using GitHub's ETag (conditional request)
+ * 304 responses DON'T count against GitHub rate limit - allows frequent polling!
+ * @param {string} repo - Repository full name (owner/repo)
+ * @returns {Promise<Object>} { changed: boolean }
+ */
+export async function checkRepoChanges(repo) {
+  const params = new URLSearchParams({ repo });
+  const res = await fetch(`${API_BASE}/api/github/has-changes?${params}`);
+  return handleResponse(res);
+}

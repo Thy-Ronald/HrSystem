@@ -21,7 +21,7 @@ app.get('/api/health', async (_req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    database: dbStatus ? 'connected' : 'disconnected'
+    database: dbStatus ? 'connected' : 'disconnected',
   });
 });
 
@@ -71,4 +71,3 @@ startServer().catch((error) => {
   console.error('Failed to start server:', error);
   process.exit(1);
 });
-

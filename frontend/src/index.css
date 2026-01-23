@@ -37,3 +37,19 @@ body {
 .gmail-search-bar {
   @apply flex items-center bg-[#eaf1fb] px-4 py-3 rounded-full w-full max-w-3xl focus-within:bg-white focus-within:shadow-md transition-all;
 }
+
+/* Real-time update notification animation */
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out forwards;
+}

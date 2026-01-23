@@ -16,7 +16,8 @@ const githubGraphQLClient = axios.create({
 
 // Simple in-memory cache for GitHub API responses
 const cache = new Map();
-const CACHE_TTL = 30000; // 30 seconds for issues (increased from 15)
+const etagCache = new Map(); // Store ETags for conditional requests
+const CACHE_TTL = 10000; // 10 seconds - shorter TTL since we use ETags
 const REPO_CACHE_TTL = 300000; // 5 minutes for repos
 
 function getCached(key, ttl = CACHE_TTL) {
@@ -24,18 +25,119 @@ function getCached(key, ttl = CACHE_TTL) {
   if (entry && Date.now() - entry.timestamp < ttl) {
     return entry.data;
   }
-  cache.delete(key);
+  // Don't delete - keep for ETag comparison
   return null;
 }
 
-function setCache(key, data, ttl = CACHE_TTL) {
-  cache.set(key, { data, timestamp: Date.now(), ttl });
+function setCache(key, data, etag = null) {
+  // Generate a simple hash of the data for change detection
+  const hash = JSON.stringify(data).length + '_' + (data.length || 0);
+  cache.set(key, { data, timestamp: Date.now(), hash, etag });
+  if (etag) {
+    etagCache.set(key, etag);
+  }
+}
+
+function getEtag(key) {
+  return etagCache.get(key) || null;
+}
+
+/**
+ * Get cache metadata for change detection (lightweight check)
+ * @param {string} key - Cache key
+ * @returns {Object|null} - { timestamp, hash, valid } or null if not cached
+ */
+function getCacheInfo(key, ttl = CACHE_TTL) {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  
+  const valid = Date.now() - entry.timestamp < ttl;
+  return {
+    timestamp: entry.timestamp,
+    hash: entry.hash,
+    valid,
+    age: Date.now() - entry.timestamp,
+    etag: entry.etag,
+  };
+}
+
+/**
+ * Clear cache entries for a specific repository
+ * Called when webhook receives updates for a repo
+ * @param {string} repoFullName - Full name of the repository (owner/repo)
+ */
+function clearCacheForRepo(repoFullName) {
+  const filters = ['today', 'yesterday', 'this-week', 'last-week', 'this-month'];
+  let clearedCount = 0;
+  
+  for (const filter of filters) {
+    const cacheKey = `issues_${repoFullName}_${filter}`;
+    if (cache.has(cacheKey)) {
+      cache.delete(cacheKey);
+      clearedCount++;
+    }
+  }
+  
+  console.log(`[Cache] Cleared ${clearedCount} entries for repo: ${repoFullName}`);
 }
 
 const withAuth = () => {
   const token = process.env.GITHUB_TOKEN;
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
+
+/**
+ * Check if repository issues have changed using GitHub's conditional request (ETag)
+ * Returns 304 if unchanged (doesn't count against rate limit!)
+ * @param {string} repoFullName - Repository full name (owner/repo)
+ * @returns {Promise<Object>} { changed: boolean, etag: string }
+ */
+async function checkRepoChanges(repoFullName) {
+  const [owner, repo] = repoFullName.split('/');
+  const cacheKey = `etag_${repoFullName}`;
+  const storedEtag = getEtag(cacheKey);
+  
+  try {
+    const headers = {
+      ...withAuth(),
+      Accept: 'application/vnd.github+json',
+    };
+    
+    // Add If-None-Match header if we have a stored ETag
+    if (storedEtag) {
+      headers['If-None-Match'] = storedEtag;
+    }
+    
+    // Use issues endpoint with minimal data (just check for changes)
+    const response = await githubClient.get(`/repos/${owner}/${repo}/issues`, {
+      headers,
+      params: {
+        state: 'all',
+        per_page: 1, // Minimal request
+        sort: 'updated',
+        direction: 'desc',
+      },
+      validateStatus: (status) => status === 200 || status === 304,
+    });
+    
+    if (response.status === 304) {
+      // Not modified - no changes, doesn't count against rate limit!
+      return { changed: false, etag: storedEtag };
+    }
+    
+    // Data changed - store new ETag
+    const newEtag = response.headers.etag;
+    if (newEtag) {
+      etagCache.set(cacheKey, newEtag);
+    }
+    
+    return { changed: true, etag: newEtag };
+  } catch (error) {
+    console.error('[ETag Check] Error:', error.message);
+    // On error, assume changed to trigger refresh
+    return { changed: true, etag: null };
+  }
+}
 
 /**
  * Fetch all repositories accessible via the GitHub token
@@ -263,7 +365,6 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
   }
 
   const { startDate, endDate } = getDateRange(filter);
-  const issuesByUser = new Map();
   let hasNextPage = true;
   let cursor = null;
   let pageCount = 0;
@@ -273,18 +374,65 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
   const cutoffDate = new Date(startDate);
   cutoffDate.setDate(cutoffDate.getDate() - 7); // Check issues updated in last 7 days before start date
 
+  // Track stats per user: { assigned, inProgress, done, reviewed, devDeployed, devChecked }
+  const userStats = new Map();
+
+  const initUserStats = () => ({
+    assigned: 0,
+    inProgress: 0,
+    done: 0,
+    reviewed: 0,
+    devDeployed: 0,
+    devChecked: 0,
+  });
+
+  /**
+   * Labels that indicate issue status (case-insensitive matching)
+   * 
+   * Status Priority Order (highest to lowest):
+   * 1. Dev Checked - checked first (only "5:Dev Checked" label)
+   * 2. Dev Deployed - checked second (only "4:Dev Deployed" label)
+   * 3. Reviewed - checked third (only "2.5 Review" label)
+   * 4. Done - checked fourth (only "3:Local Done" label)
+   * 5. In Progress - checked fifth (only "2:In Progress" label)
+   * 6. Assigned - default if no status labels match
+   * 
+   * For detailed documentation on how statuses are determined, see:
+   * ISSUE_STATUS_DOCUMENTATION.md
+   */
+  const statusLabels = {
+    devChecked: ['5:dev checked'], // Only exact match for "5:Dev Checked" label
+    devDeployed: ['4:dev deployed'], // Only exact match for "4:Dev Deployed" label
+    reviewed: ['2.5 review'], // Only exact match for "2.5 Review" label
+    done: ['3:local done'], // Only exact match for "3:Local Done" label
+    inProgress: ['2:in progress'], // Only exact match for "2:In Progress" label
+  };
+
+  const getStatusFromLabels = (labels) => {
+    const labelNames = labels.map((l) => l.name.toLowerCase());
+    
+    for (const name of labelNames) {
+      // Check in priority order: devChecked > devDeployed > reviewed > done > inProgress
+      if (statusLabels.devChecked.includes(name)) return 'devChecked';
+      if (statusLabels.devDeployed.includes(name)) return 'devDeployed';
+      if (statusLabels.reviewed.includes(name)) return 'reviewed';
+      if (statusLabels.done.includes(name)) return 'done';
+      if (statusLabels.inProgress.includes(name)) return 'inProgress';
+    }
+    return 'assigned'; // Default to assigned if no status label
+  };
+
   try {
     while (hasNextPage && pageCount < maxPages) {
       pageCount++;
       
-      // Optimized query: reduced timeline items from 50 to 20 (most repos won't have 50 assignments per issue)
+      // Enhanced query: includes labels and both OPEN/CLOSED states
       const query = `
         query GetIssues($owner: String!, $repo: String!, $cursor: String) {
           repository(owner: $owner, name: $repo) {
             issues(
               first: 100
               after: $cursor
-              states: [OPEN]
               orderBy: { field: UPDATED_AT, direction: DESC }
             ) {
               pageInfo {
@@ -294,7 +442,13 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
               nodes {
                 id
                 number
+                state
                 updatedAt
+                labels(first: 10) {
+                  nodes {
+                    name
+                  }
+                }
                 assignees(first: 10) {
                   nodes {
                     login
@@ -348,9 +502,22 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
           (issue.assignees?.nodes || []).map((a) => a.login)
         );
 
-        // Only process timeline if issue has assignees
+        // Only process if issue has assignees
         if (currentAssignees.size > 0) {
           const timelineNodes = issue.timelineItems?.nodes || [];
+          const labels = issue.labels?.nodes || [];
+          const isClosed = issue.state === 'CLOSED';
+          
+          /**
+           * Determine issue status from labels
+           * 
+           * Logic:
+           * 1. Check labels for status keywords (reviewed > done > inProgress)
+           * 2. Done status requires exact "3:Local Done" label match
+           * 
+           * See ISSUE_STATUS_DOCUMENTATION.md for complete details
+           */
+          let status = getStatusFromLabels(labels);
           
           // Find most recent assignment event for each user
           const userLastAssignment = new Map();
@@ -366,10 +533,17 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
             }
           }
 
-          // Count users assigned within date range who are still assigned
+          // Count users assigned within date range
           for (const [username, assignmentDate] of userLastAssignment.entries()) {
             if (assignmentDate >= startDate && assignmentDate <= endDate && currentAssignees.has(username)) {
-              issuesByUser.set(username, (issuesByUser.get(username) || 0) + 1);
+              // Initialize user stats if not exists
+              if (!userStats.has(username)) {
+                userStats.set(username, initUserStats());
+              }
+              const stats = userStats.get(username);
+              
+              // Increment the appropriate counter
+              stats[status]++;
             }
           }
         }
@@ -384,10 +558,19 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
       }
     }
 
-    // Convert Map to sorted Array
-    const result = Array.from(issuesByUser.entries())
-      .map(([username, issueCount]) => ({ username, issueCount }))
-      .sort((a, b) => b.issueCount - a.issueCount || a.username.localeCompare(b.username));
+    // Convert Map to sorted Array with all stats
+    const result = Array.from(userStats.entries())
+      .map(([username, stats]) => ({
+        username,
+        assigned: stats.assigned,
+        inProgress: stats.inProgress,
+        done: stats.done,
+        reviewed: stats.reviewed,
+        devDeployed: stats.devDeployed,
+        devChecked: stats.devChecked,
+        total: stats.assigned + stats.inProgress + stats.done + stats.reviewed + stats.devDeployed + stats.devChecked,
+      }))
+      .sort((a, b) => b.total - a.total || a.username.localeCompare(b.username));
 
     // Cache the result
     setCache(cacheKey, result);
@@ -416,5 +599,16 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
   }
 }
 
-module.exports = { getGithubProfileWithRepos, getIssuesByUserForPeriod, getAccessibleRepositories };
+/**
+ * Check cache status for a repo/filter combination
+ * @param {string} repoFullName - Repository full name
+ * @param {string} filter - Filter type
+ * @returns {Object} - Cache info with valid, timestamp, hash
+ */
+function checkCacheStatus(repoFullName, filter) {
+  const cacheKey = `issues_${repoFullName}_${filter}`;
+  return getCacheInfo(cacheKey) || { valid: false, timestamp: null, hash: null };
+}
+
+module.exports = { getGithubProfileWithRepos, getIssuesByUserForPeriod, getAccessibleRepositories, clearCacheForRepo, checkCacheStatus, checkRepoChanges };
 

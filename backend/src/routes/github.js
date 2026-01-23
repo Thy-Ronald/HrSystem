@@ -1,5 +1,5 @@
 const express = require('express');
-const { handleGithubLookup, handleIssuesByPeriod, handleGetRepositories } = require('../controllers/githubController');
+const { handleGithubLookup, handleIssuesByPeriod, handleGetRepositories, handleCacheCheck, handleRepoChanges } = require('../controllers/githubController');
 
 const router = express.Router();
 
@@ -8,6 +8,12 @@ router.get('/repos', handleGetRepositories);
 
 // GET /api/github/issues?repo=owner/name&filter=today|yesterday|this-week|last-week|this-month
 router.get('/issues', handleIssuesByPeriod);
+
+// GET /api/github/cache-check?repo=owner/name&filter=today - Lightweight cache status check
+router.get('/cache-check', handleCacheCheck);
+
+// GET /api/github/has-changes?repo=owner/name - Check if repo has changes using ETag (FREE - 304 doesn't count!)
+router.get('/has-changes', handleRepoChanges);
 
 router.get('/:username', handleGithubLookup);
 

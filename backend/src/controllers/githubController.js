@@ -1,4 +1,4 @@
-const { getGithubProfileWithRepos, getIssuesByUserForPeriod, getAccessibleRepositories } = require('../services/githubService');
+const { getGithubProfileWithRepos, getIssuesByUserForPeriod, getAccessibleRepositories, checkCacheStatus, checkRepoChanges } = require('../services/githubService');
 
 async function handleGithubLookup(req, res, next) {
   try {
@@ -51,4 +51,56 @@ async function handleIssuesByPeriod(req, res, next) {
   }
 }
 
-module.exports = { handleGithubLookup, handleIssuesByPeriod, handleGetRepositories };
+/**
+ * Lightweight endpoint to check if cache has changed
+ * Returns cache status without fetching data from GitHub
+ */
+async function handleCacheCheck(req, res, next) {
+  try {
+    const { repo, filter = 'today' } = req.query;
+    
+    if (!repo) {
+      const error = new Error('Repository is required. Use ?repo=owner/name');
+      error.status = 400;
+      throw error;
+    }
+    
+    const cacheInfo = checkCacheStatus(repo, filter);
+    res.json({
+      success: true,
+      cache: cacheInfo,
+      repo,
+      filter,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Check if repository has changes using GitHub's ETag (conditional request)
+ * Returns 304 responses DON'T count against rate limit!
+ * This allows for very frequent polling without wasting API calls.
+ */
+async function handleRepoChanges(req, res, next) {
+  try {
+    const { repo } = req.query;
+    
+    if (!repo) {
+      const error = new Error('Repository is required. Use ?repo=owner/name');
+      error.status = 400;
+      throw error;
+    }
+    
+    const result = await checkRepoChanges(repo);
+    res.json({
+      success: true,
+      changed: result.changed,
+      repo,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = { handleGithubLookup, handleIssuesByPeriod, handleGetRepositories, handleCacheCheck, handleRepoChanges };
