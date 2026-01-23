@@ -3,9 +3,11 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const githubRouter = require('./routes/github');
 const contractRouter = require('./routes/contracts');
+const issuesRouter = require('./routes/issues');
 const { errorHandler } = require('./middlewares/errorHandler');
 const { initializeEmailJS } = require('./services/emailService');
 const { startContractExpirationJob } = require('./jobs/contractExpirationJob');
+const { startCacheRefreshJob, stopCacheRefreshJob } = require('./jobs/cacheRefreshJob');
 const { testConnection } = require('./config/database');
 
 dotenv.config();
@@ -27,6 +29,7 @@ app.get('/api/health', async (_req, res) => {
 
 app.use('/api/github', githubRouter);
 app.use('/api/contracts', contractRouter);
+app.use('/api/issues', issuesRouter);
 
 app.use(errorHandler);
 
@@ -49,12 +52,21 @@ async function startServer() {
     } else {
       console.log('Contract expiration notifications disabled due to missing EmailJS configuration.');
     }
+
+    // Start GitHub issues cache refresh job (runs every 30 minutes)
+    if (dbConnected) {
+      startCacheRefreshJob();
+      console.log('GitHub issues cache refresh job started.');
+    } else {
+      console.log('Cache refresh job disabled - database not connected.');
+    }
   });
 }
 
 // Handle graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully...');
+  stopCacheRefreshJob();
   const { closePool } = require('./config/database');
   await closePool();
   process.exit(0);
@@ -62,6 +74,7 @@ process.on('SIGTERM', async () => {
 
 process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down gracefully...');
+  stopCacheRefreshJob();
   const { closePool } = require('./config/database');
   await closePool();
   process.exit(0);

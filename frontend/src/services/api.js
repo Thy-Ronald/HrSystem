@@ -171,3 +171,108 @@ export async function checkRepoChanges(repo) {
   const res = await fetch(`${API_BASE}/api/github/has-changes?${params}`);
   return handleResponse(res);
 }
+
+// =============================================================================
+// INCREMENTAL CACHING API - MySQL-backed cache with selective refresh
+// =============================================================================
+
+/**
+ * Fetch cached issues for a repo with optional user filtering
+ * 
+ * CACHING STRATEGY:
+ * - First call for a repo triggers cache population
+ * - Subsequent calls return cached data (fast)
+ * - Background job refreshes cache every 30 minutes using `updated_since`
+ * - forceRefresh=true triggers immediate incremental refresh
+ * 
+ * @param {string} repo - Repository full name (owner/repo)
+ * @param {string} filter - Filter: today|yesterday|this-week|last-week|this-month
+ * @param {Object} options - Additional options
+ * @param {string} options.user - Optional: filter by specific username
+ * @param {boolean} options.forceRefresh - Force cache refresh
+ * @returns {Promise<Object>} { data, cache: { wasRefreshed, lastFetchedAt } }
+ */
+export async function fetchCachedIssues(repo, filter = 'today', options = {}) {
+  const params = new URLSearchParams({ repo, filter });
+  
+  if (options.user) {
+    params.set('user', options.user);
+  }
+  if (options.forceRefresh) {
+    params.set('forceRefresh', 'true');
+  }
+
+  const res = await fetch(`${API_BASE}/api/issues?${params}`);
+  return handleResponse(res);
+}
+
+/**
+ * Check cache status for a repository (lightweight, no data transfer)
+ * 
+ * Use this for smart polling: check status frequently, only fetch full data
+ * when cache has been refreshed.
+ * 
+ * @param {string} repo - Repository full name
+ * @returns {Promise<Object>} { isCached, lastFetchedAt, needsRefresh, totalIssues }
+ */
+export async function getCachedIssuesStatus(repo) {
+  const params = new URLSearchParams({ repo });
+  const res = await fetch(`${API_BASE}/api/issues/cache-status?${params}`);
+  const result = await handleResponse(res);
+  return result.cache || result;
+}
+
+/**
+ * Check if issues have changed since a timestamp (for smart polling)
+ * 
+ * SMART POLLING STRATEGY:
+ * 1. Frontend polls this endpoint every 30-60 seconds
+ * 2. Returns quickly with hasChanges boolean
+ * 3. Only fetch full data when hasChanges=true
+ * 
+ * @param {string} repo - Repository full name
+ * @param {string} since - ISO timestamp from last fetch
+ * @returns {Promise<Object>} { hasChanges, lastFetchedAt, needsRefresh }
+ */
+export async function checkCachedIssuesChanges(repo, since = null) {
+  const params = new URLSearchParams({ repo });
+  if (since) {
+    params.set('since', since);
+  }
+  const res = await fetch(`${API_BASE}/api/issues/changes?${params}`);
+  return handleResponse(res);
+}
+
+/**
+ * Force refresh cache for a repository
+ * 
+ * Triggers an incremental refresh (fetches only issues updated since last fetch).
+ * For a full refresh (re-fetch all issues), set fullRefresh=true.
+ * 
+ * @param {string} repo - Repository full name
+ * @param {boolean} fullRefresh - Force full refresh (default: false for incremental)
+ * @returns {Promise<Object>} Refresh result with stats
+ */
+export async function refreshCachedIssues(repo, fullRefresh = false) {
+  const res = await fetch(`${API_BASE}/api/issues/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ repo, fullRefresh }),
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Get background job status and tracked repositories
+ * 
+ * Useful for admin/debugging UI to see:
+ * - Is the background job running?
+ * - Which repos are being tracked?
+ * - When were they last refreshed?
+ * 
+ * @returns {Promise<Object>} { job, trackedRepos, repos }
+ */
+export async function getCacheJobStatus() {
+  const res = await fetch(`${API_BASE}/api/issues/job-status`);
+  return handleResponse(res);
+}

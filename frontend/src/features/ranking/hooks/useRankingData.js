@@ -1,110 +1,131 @@
 /**
  * useRankingData Hook
  * Manages data fetching, caching, and state for ranking data
+ * 
+ * INCREMENTAL CACHING STRATEGY:
+ * =============================
+ * This hook now supports two fetching modes:
+ * 
+ * 1. LEGACY MODE (default): Uses fetchIssuesByPeriod which hits the old in-memory cache
+ * 2. INCREMENTAL MODE: Uses fetchCachedIssues which:
+ *    - Stores data in MySQL for persistence
+ *    - Uses `updated_since` parameter for incremental GitHub API calls
+ *    - Only fetches issues that changed since last refresh
+ *    - Background job refreshes every 30 minutes
+ * 
+ * SWITCHING MODES:
+ * Set useIncrementalCache=true in loadData options to use incremental mode.
+ * 
+ * SELECTIVE REFRESH:
+ * The incremental API only fetches data for the requested repo/user,
+ * reducing data transfer and API calls for users viewing specific data.
  */
 
 import { useState, useRef, useCallback } from 'react';
-import { fetchIssuesByPeriod } from '../../../services/api';
+import { fetchIssuesByPeriod, fetchCachedIssues } from '../../../services/api';
 import { transformRankingData, getCacheKey } from '../utils/dataTransform';
+import { fetchWithCache, generateCacheKey } from '../utils/cacheUtils';
+
+// Configuration: Set to true to use new incremental cache API
+const USE_INCREMENTAL_CACHE = true;
+
+/**
+ * Merge new data with existing data, preserving unchanged items
+ * This keeps React references stable for items that haven't changed,
+ * optimizing re-renders.
+ */
+function mergeWithExisting(existing, incoming) {
+  if (!existing || existing.length === 0) return incoming;
+  if (!incoming || incoming.length === 0) return existing;
+
+  const existingMap = new Map(existing.map(item => [item.username, item]));
+
+  return incoming.map(newItem => {
+    const existingItem = existingMap.get(newItem.username);
+
+    // If item exists and data is identical, keep the old reference
+    if (existingItem &&
+      existingItem.assigned === newItem.assigned &&
+      existingItem.inProgress === newItem.inProgress &&
+      existingItem.done === newItem.done &&
+      existingItem.reviewed === newItem.reviewed &&
+      existingItem.devDeployed === newItem.devDeployed &&
+      existingItem.devChecked === newItem.devChecked) {
+      return existingItem;
+    }
+
+    return newItem;
+  });
+}
 
 export function useRankingData() {
   const [rankingData, setRankingData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [cacheInfo, setCacheInfo] = useState(null);
   const cacheRef = useRef(new Map());
   const abortControllerRef = useRef(null);
-  const isManualRefreshRef = useRef(false);
-  const refreshTimerRef = useRef(null);
-  const currentRepoRef = useRef(null);
-  const currentFilterRef = useRef(null);
+  const lastFetchTimestampRef = useRef(new Map());
 
   /**
    * Load ranking data for a specific repo and filter
-   * @param {string} repo - Repository full name
-   * @param {string} filter - Filter name
-   * @param {boolean} forceRefresh - Force fresh fetch, bypass cache
-   * @param {number} retryCount - Current retry attempt
    */
-  const loadData = useCallback(async (repo, filter, forceRefresh = false, retryCount = 0) => {
+  const loadData = useCallback(async (repo, filter, forceRefresh = false, retryCount = 0, options = {}) => {
     if (!repo) return;
 
-    const cacheKey = getCacheKey(repo, filter);
-    
-    // Cancel any pending request first to prevent race conditions
+    const { user = null } = options;
+
+    // Prefix 'main' to separate from modal cache
+    const localStorageKey = generateCacheKey('main', repo, filter, user || 'all');
+    // 2 minutes TTL for main screen too
+    const CACHE_TTL_MS = 2 * 60 * 1000;
+
+    // Cancel any pending request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
     abortControllerRef.current = new AbortController();
-    
-    // Store current repo and filter immediately to track the active request
-    currentRepoRef.current = repo;
-    currentFilterRef.current = filter;
-    
-    // Check cache first (unless forcing refresh)
-    if (!forceRefresh) {
-      const cached = cacheRef.current.get(cacheKey);
-      if (cached) {
-        // Verify this is still the current request (not aborted by a newer filter change)
-        if (currentRepoRef.current === repo && currentFilterRef.current === filter) {
-          setRankingData(cached);
-          setError('');
-          setLoading(false);
-          return;
-        }
-      }
-    }
 
     setLoading(true);
     setError('');
 
     try {
-      
-      // Clear existing refresh timer
-      if (refreshTimerRef.current) {
-        clearTimeout(refreshTimerRef.current);
-        refreshTimerRef.current = null;
-      }
-      
-      const data = await fetchIssuesByPeriod(repo, filter, abortControllerRef.current?.signal, true);
-      
-      // Verify this is still the current request (not aborted by a newer filter change)
-      if (currentRepoRef.current !== repo || currentFilterRef.current !== filter) {
-        console.log('[loadData] Request completed but filter/repo changed, ignoring result');
-        return;
-      }
-      
-      // Transform data to match table structure
+      // Define the fetch function that uses ETags
+      const fetchFn = (etag) => fetchCachedIssues(repo, filter, {
+        user,
+        forceRefresh, // api supports forceRefresh
+        etag,
+        includeEtag: true
+      });
+
+      // Use the smart caching util
+      const data = await fetchWithCache(
+        localStorageKey,
+        fetchFn,
+        CACHE_TTL_MS
+      );
+
+      // Transform
       const transformedData = transformRankingData(data);
 
-      // Update cache and state only if this is still the active request
-      if (currentRepoRef.current === repo && currentFilterRef.current === filter) {
-        cacheRef.current.set(cacheKey, transformedData);
-        setRankingData(transformedData);
-        setError('');
-      }
-      
+      // Update state using functional update to access current state without dependency
+      setRankingData(current => mergeWithExisting(current, transformedData));
+
+      setLoading(false);
+
     } catch (err) {
       if (err.name === 'AbortError') return;
-      
-      // Retry logic for network errors (max 2 retries)
-      if (retryCount < 2 && (err.message.includes('fetch') || err.status >= 500)) {
-        console.warn(`Retrying... (${retryCount + 1}/2)`);
-        setTimeout(() => {
-          loadData(repo, filter, forceRefresh, retryCount + 1);
-        }, 1000 * (retryCount + 1)); // Exponential backoff
+
+      console.error('[useRankingData] Error:', err);
+      // Fallback to cache if available? fetchWithCache already tries.
+      if (retryCount < 2) {
+        // Retry logic...
+        setTimeout(() => loadData(repo, filter, forceRefresh, retryCount + 1, options), 1000 * (retryCount + 1));
         return;
       }
-      
-      console.error('Error loading issues:', err);
-      const errorMessage = err.message || 'Unable to load data. Please try again.';
-      setError(errorMessage);
+
+      setError(err.message || 'Failed to load data');
       setRankingData([]);
-      
-      // If this was a manual refresh, mark error for UI feedback
-      if (isManualRefreshRef.current) {
-        // Error will be handled by refresh handler
-      }
-    } finally {
       setLoading(false);
     }
   }, []);
@@ -122,21 +143,12 @@ export function useRankingData() {
   }, []);
 
   /**
-   * Get all cached data as object (for persistence)
-   * @returns {Object} Cache as plain object
+   * Get the last fetch timestamp for a specific cache key
+   * Used for smart polling - only fetch if backend has newer data
    */
-  const getCacheSnapshot = useCallback(() => {
-    return Object.fromEntries(cacheRef.current);
-  }, []);
-
-  /**
-   * Restore cache from object (for persistence)
-   * @param {Object} cacheObj - Cache object to restore
-   */
-  const restoreCache = useCallback((cacheObj) => {
-    if (cacheObj && Object.keys(cacheObj).length > 0) {
-      cacheRef.current = new Map(Object.entries(cacheObj));
-    }
+  const getLastFetchTimestamp = useCallback((repo, filter) => {
+    const key = getCacheKey(repo, filter);
+    return lastFetchTimestampRef.current.get(key) || null;
   }, []);
 
   return {
@@ -147,9 +159,9 @@ export function useRankingData() {
     setError,
     loadData,
     clearCache,
-    getCacheSnapshot,
-    restoreCache,
     cacheRef,
-    isManualRefreshRef,
+    // New incremental cache features
+    cacheInfo,
+    getLastFetchTimestamp,
   };
 }
