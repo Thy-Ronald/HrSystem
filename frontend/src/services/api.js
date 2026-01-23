@@ -126,3 +126,24 @@ export async function fetchGithubProfile(username) {
   }
   return res.json();
 }
+
+/**
+ * Fetch all repositories accessible via the GitHub token
+ * @returns {Promise<Array>} Array of { owner, name, fullName }
+ */
+export async function fetchRepositories() {
+  const res = await fetch(`${API_BASE}/api/github/repos`);
+  return handleResponse(res);
+}
+
+/**
+ * Fetch issues from a repository grouped by user for a given period
+ * @param {string} repo - Repository full name (owner/repo)
+ * @param {string} filter - Filter: today, yesterday, this-week, last-week, this-month
+ * @returns {Promise<Array>} Array of objects with username and issueCount
+ */
+export async function fetchIssuesByPeriod(repo, filter = 'today') {
+  const params = new URLSearchParams({ repo, filter });
+  const res = await fetch(`${API_BASE}/api/github/issues?${params}`);
+  return handleResponse(res);
+}
