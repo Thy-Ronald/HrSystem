@@ -54,8 +54,8 @@ export function RepositorySelect({ repositories, selectedRepo, onRepoChange, loa
   const displayValue = isOpen ? search : selectedRepo;
 
   return (
-    <div className="flex flex-col gap-1 relative" ref={dropdownRef}>
-      <label htmlFor="repo-search" className="text-[11px] font-medium text-[#5f6368] uppercase tracking-wider ml-1">
+    <div className="flex items-center gap-2 relative" ref={dropdownRef}>
+      <label htmlFor="repo-search" className="text-sm font-medium text-[#5f6368] whitespace-nowrap">
         Repository
       </label>
       <div className="relative">
@@ -68,7 +68,7 @@ export function RepositorySelect({ repositories, selectedRepo, onRepoChange, loa
           onFocus={handleInputFocus}
           placeholder={loading ? 'Loading...' : 'Search repositories...'}
           disabled={loading}
-          className="w-full px-3 py-1.5 pr-8 text-sm border border-[#dadce0] rounded-lg bg-white text-[#202124] focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:border-[#1a73e8] min-w-[280px] disabled:opacity-50"
+          className="px-3 py-1.5 pr-8 text-sm border border-[#dadce0] rounded-lg bg-white text-[#202124] focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:border-[#1a73e8] min-w-[280px] disabled:opacity-50"
         />
         <button
           type="button"

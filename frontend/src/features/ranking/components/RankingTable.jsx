@@ -74,7 +74,7 @@ export function RankingTable({ columns, data, loading, error }) {
                   <td
                     key={column.key}
                     className={`px-4 py-4 text-sm text-[#202124] ${
-                      column.key === 'id' ? 'text-left font-medium' : 'text-center'
+                      column.key === 'id' ? 'text-left font-medium min-w-[150px] max-w-[250px]' : 'text-center'
                     }`}
                   >
                     {column.key === 'id' && row[column.key] ? (
