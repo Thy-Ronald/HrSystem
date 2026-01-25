@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { fetchIssuesByPeriod, fetchCachedIssues } from '../../../services/api';
 import { transformRankingData, getCacheKey } from '../utils/dataTransform';
-import { fetchWithCache, generateCacheKey } from '../utils/cacheUtils';
+import { fetchWithCache, generateCacheKey, getCached, getRawCache } from '../utils/cacheUtils';
 
 const USE_INCREMENTAL_CACHE = true;
 
