@@ -24,11 +24,6 @@ function SortIcon() {
   );
 }
 
-<<<<<<< HEAD
-=======
-import { memo } from 'react';
-
->>>>>>> da0f46c (feat: Implement ETag-based smart caching and UI decoupling for Ranking modal and Staff Ranking form to optimize performance and reduce API load)
 export const RankingTable = memo(function RankingTable({ columns, data, loading, error }) {
   const isEmpty = !data || data.length === 0;
 
@@ -83,8 +78,8 @@ export const RankingTable = memo(function RankingTable({ columns, data, loading,
                     <td
                       key={column.key}
                       className={`px-2 py-3 text-sm text-[#202124] first:pl-4 last:pr-4 ${column.key === 'id'
-                          ? 'text-left font-medium w-3/12 break-all sm:break-normal'
-                          : 'text-center tabular-nums w-[10%]'
+                        ? 'text-left font-medium w-3/12 break-all sm:break-normal'
+                        : 'text-center tabular-nums w-[10%]'
                         }`}
                     >
                       {column.key === 'id' && row[column.key] ? (
