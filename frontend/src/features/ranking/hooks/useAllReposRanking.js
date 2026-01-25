@@ -60,13 +60,13 @@ function calculateUserTotal(user) {
  * 
  * Includes ETag-based smart caching and automatic 6PM reset logic.
  */
-export function useAllReposRanking(repositories, filter) {
+export function useAllReposRanking() {
   const [rankingData, setRankingData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const abortControllerRef = useRef(null);
 
-  const loadAllReposData = useCallback(async (forceRefresh = false) => {
+  const loadAllReposData = useCallback(async (repositories, filter, forceRefresh = false) => {
     if (!repositories || repositories.length === 0) {
       setRankingData([]);
       return;
@@ -93,7 +93,8 @@ export function useAllReposRanking(repositories, filter) {
 
         // Manual check for 6PM reset repositories
         const shouldReset = RESET_AT_6PM_REPOS.includes(repo.fullName);
-        const raw = JSON.parse(localStorage.getItem(localStorageKey) || "null");
+        const rawString = localStorage.getItem(localStorageKey);
+        const raw = rawString ? JSON.parse(rawString) : null;
         const expiredByReset = shouldReset && isPastResetTime(raw?.timestamp);
 
         if (!forceRefresh && cached && !expiredByReset) {
@@ -187,16 +188,16 @@ export function useAllReposRanking(repositories, filter) {
         setLoading(false);
       }
     }
-  }, [repositories, filter]);
+  }, []);
 
   useEffect(() => {
-    loadAllReposData();
+    // This useEffect is now only for cleanup of the abort controller
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     };
-  }, [loadAllReposData]);
+  }, []); // Empty dependency array as loadAllReposData is no longer called here
 
   const syncCache = useCallback((cacheData) => {
     if (!cacheData || typeof cacheData !== 'object') return;
@@ -212,14 +213,15 @@ export function useAllReposRanking(repositories, filter) {
     sharedCache.clear();
     cacheTimestamps.clear();
     clearCachePattern('allrepos_');
-    loadAllReposData(true);
-  }, [loadAllReposData]);
+    // Note: requires args to reload, but we can't easily do it here without state.
+    // Modal will handle refresh if needed.
+  }, []);
 
   return {
     rankingData,
     loading,
     error,
-    refresh: () => loadAllReposData(true),
+    loadAllReposData,
     syncCache,
     clearAllCache
   };
