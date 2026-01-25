@@ -5,28 +5,20 @@
 
 import { VIEW_MODES } from '../constants';
 
-export function ViewModeSelector({ viewMode, onViewChange }) {
+export function ViewModeSelector({ viewMode, onViewChange, onOpenModal }) {
   return (
     <nav className="flex items-center gap-2" aria-label="View mode selection">
       <button
-        onClick={() => onViewChange(VIEW_MODES.RANK)}
+        onClick={onOpenModal}
         type="button"
-        className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
-          viewMode === VIEW_MODES.RANK
-            ? 'bg-[#c2e7ff] text-[#001d35] shadow-sm'
-            : 'bg-white border border-[#dadce0] text-[#5f6368] hover:bg-[#f8f9fa]'
-        }`}
+        className="px-4 py-2 text-sm font-medium rounded-full bg-white border border-[#dadce0] text-[#5f6368] hover:bg-[#f8f9fa] transition-colors"
       >
         Rank
       </button>
       <button
-        onClick={() => onViewChange(VIEW_MODES.GRAPH)}
         type="button"
-        className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
-          viewMode === VIEW_MODES.GRAPH
-            ? 'bg-[#c2e7ff] text-[#001d35] shadow-sm'
-            : 'bg-white border border-[#dadce0] text-[#5f6368] hover:bg-[#f8f9fa]'
-        }`}
+        className="px-4 py-2 text-sm font-medium rounded-full bg-white border border-[#dadce0] text-[#9aa0a6] cursor-not-allowed"
+        title="Coming soon"
       >
         Graph Ranking
       </button>

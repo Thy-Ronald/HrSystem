@@ -1,23 +1,25 @@
 /**
  * useRepositories Hook
  * Manages repository list loading and selection
+ * 
+ * Only displays timeriver/cnd_chat and timeriver/sacsys009 to reduce API calls
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { fetchRepositories } from '../../../services/api';
-import { loadFromStorage, saveToStorage } from '../utils/storage';
-import { STORAGE_KEYS } from '../constants';
+
+// Allowed repositories - only these will be displayed
+const ALLOWED_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
 
 export function useRepositories() {
   const [repositories, setRepositories] = useState([]);
-  const [selectedRepo, setSelectedRepo] = useState(() => 
-    loadFromStorage(STORAGE_KEYS.SELECTED_REPO, '')
-  );
+  const [selectedRepo, setSelectedRepo] = useState('');
   const [reposLoading, setReposLoading] = useState(true);
   const [error, setError] = useState('');
 
   /**
    * Load repositories from API
+   * Filters to only show allowed repositories
    */
   useEffect(() => {
     let mounted = true;
@@ -25,14 +27,18 @@ export function useRepositories() {
     const loadRepos = async () => {
       setReposLoading(true);
       try {
-        const repos = await fetchRepositories();
+        const allRepos = await fetchRepositories();
         if (mounted) {
-          setRepositories(repos);
+          // Filter to only show allowed repositories
+          const filteredRepos = allRepos.filter(repo => 
+            ALLOWED_REPOS.includes(repo.fullName)
+          );
+          
+          setRepositories(filteredRepos);
           // Auto-select first repo if none selected
-          if (repos.length > 0 && !selectedRepo) {
-            const firstRepo = repos[0].fullName;
+          if (filteredRepos.length > 0 && !selectedRepo) {
+            const firstRepo = filteredRepos[0].fullName;
             setSelectedRepo(firstRepo);
-            saveToStorage(STORAGE_KEYS.SELECTED_REPO, firstRepo);
           }
         }
       } catch (err) {
@@ -57,7 +63,6 @@ export function useRepositories() {
    */
   const handleRepoChange = useCallback((repo) => {
     setSelectedRepo(repo);
-    saveToStorage(STORAGE_KEYS.SELECTED_REPO, repo);
   }, []);
 
   return {

@@ -73,6 +73,7 @@ export function useRankingData() {
   const loadData = useCallback(async (repo, filter, forceRefresh = false, retryCount = 0, options = {}) => {
     if (!repo) return;
 
+<<<<<<< HEAD
     const { user = null } = options;
 
     // Prefix 'main' to separate from modal cache
@@ -80,6 +81,8 @@ export function useRankingData() {
     // 2 minutes TTL for main screen too
     const CACHE_TTL_MS = 2 * 60 * 1000;
 
+=======
+>>>>>>> da0f46c (feat: Implement ETag-based smart caching and UI decoupling for Ranking modal and Staff Ranking form to optimize performance and reduce API load)
     // Cancel any pending request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -89,6 +92,7 @@ export function useRankingData() {
     setLoading(true);
     setError('');
 
+<<<<<<< HEAD
     try {
       // Define the fetch function that uses ETags
       const fetchFn = (etag) => fetchCachedIssues(repo, filter, {
@@ -98,6 +102,32 @@ export function useRankingData() {
         includeEtag: true
       });
 
+=======
+    const { user = null } = options;
+
+    // Prefix 'main' to separate from modal cache
+    const localStorageKey = generateCacheKey('main', repo, filter, user || 'all');
+    // 2 minutes TTL for main screen too
+    const CACHE_TTL_MS = 2 * 60 * 1000;
+
+    try {
+      if (forceRefresh) {
+        // If forcing refresh, we bypass cache check logic in fetchWithCache 
+        // effectively by just calling api directly or we can delete cache first
+        // But fetchWithCache doesn't support "force force".
+        // Simplest: just fetch directly if forceRefresh
+        // Or implement clearCachePattern calls.
+      }
+
+      // Define the fetch function that uses ETags
+      const fetchFn = (etag) => fetchCachedIssues(repo, filter, {
+        user,
+        forceRefresh, // api supports forceRefresh
+        etag,
+        includeEtag: true
+      });
+
+>>>>>>> da0f46c (feat: Implement ETag-based smart caching and UI decoupling for Ranking modal and Staff Ranking form to optimize performance and reduce API load)
       // Use the smart caching util
       const data = await fetchWithCache(
         localStorageKey,
@@ -108,9 +138,14 @@ export function useRankingData() {
       // Transform
       const transformedData = transformRankingData(data);
 
+<<<<<<< HEAD
       // Update state using functional update to access current state without dependency
       setRankingData(current => mergeWithExisting(current, transformedData));
 
+=======
+      // Preserve references
+      setRankingData(current => mergeWithExisting(current, transformedData));
+>>>>>>> da0f46c (feat: Implement ETag-based smart caching and UI decoupling for Ranking modal and Staff Ranking form to optimize performance and reduce API load)
       setLoading(false);
 
     } catch (err) {
@@ -125,7 +160,10 @@ export function useRankingData() {
       }
 
       setError(err.message || 'Failed to load data');
+<<<<<<< HEAD
       setRankingData([]);
+=======
+>>>>>>> da0f46c (feat: Implement ETag-based smart caching and UI decoupling for Ranking modal and Staff Ranking form to optimize performance and reduce API load)
       setLoading(false);
     }
   }, []);

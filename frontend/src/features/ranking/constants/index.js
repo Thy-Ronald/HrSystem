@@ -3,17 +3,12 @@
  * Centralized configuration for the ranking system
  */
 
-// Cache versioning - increment when data structure changes
-export const CURRENT_CACHE_VERSION = 7;
-
-// LocalStorage keys
+// LocalStorage keys (for UI preferences only, not backend data caching)
 export const STORAGE_KEYS = {
   ACTIVE_FILTER: 'ranking_activeFilter',
   VIEW_MODE: 'ranking_viewMode',
-  RANKING_DATA: 'ranking_data',
   SELECTED_REPO: 'ranking_selectedRepo',
-  CACHE: 'ranking_cache',
-  CACHE_VERSION: 'ranking_cacheVersion',
+  SELECTED_REPOS: 'ranking_selectedRepos',
 };
 
 // Filter options

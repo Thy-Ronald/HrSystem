@@ -6,7 +6,7 @@
  * REFRESH STRATEGY:
  * =================
  * 1. Runs every 30 minutes (configurable via CACHE_REFRESH_INTERVAL_MS)
- * 2. Only refreshes repositories that are being actively used (tracked in metadata table)
+ * 2. Only refreshes the two allowed repositories: timeriver/cnd_chat and timeriver/sacsys009
  * 3. Uses incremental refresh (fetches only issues updated since last fetch)
  * 4. Full refresh is done once every 24 hours to catch any edge cases
  * 
@@ -20,19 +20,19 @@
  * ==============
  * - Repos are refreshed sequentially with a small delay between them
  * - This prevents hitting GitHub's rate limit too quickly
- * - For large numbers of repos, consider staggering refresh times
  */
 
 const { 
   refreshRepoCache, 
-  getTrackedRepositories, 
   getCacheStatus,
   CACHE_CONFIG 
 } = require('../services/issueCacheService');
 
+// Only refresh these two specific repositories
+const ALLOWED_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
+
 // Configuration
 const DELAY_BETWEEN_REPOS_MS = 2000; // 2 second delay between repo refreshes
-const MAX_REPOS_PER_RUN = 20; // Limit repos per refresh cycle to prevent timeout
 
 let refreshInterval = null;
 let isRunning = false;
@@ -45,8 +45,9 @@ function sleep(ms) {
 }
 
 /**
- * Refresh all tracked repositories
+ * Refresh only the allowed repositories
  * Called by the scheduled job
+ * Only refreshes timeriver/cnd_chat and timeriver/sacsys009
  */
 async function refreshAllTrackedRepos() {
   if (isRunning) {
@@ -58,46 +59,35 @@ async function refreshAllTrackedRepos() {
   const startTime = Date.now();
   
   console.log('[CacheJob] ====== Starting scheduled cache refresh ======');
+  console.log(`[CacheJob] Only refreshing allowed repositories: ${ALLOWED_REPOS.join(', ')}`);
 
   try {
-    // Get all tracked repositories
-    const repos = await getTrackedRepositories();
-    
-    if (repos.length === 0) {
-      console.log('[CacheJob] No repositories to refresh');
-      return;
-    }
-
-    console.log(`[CacheJob] Found ${repos.length} tracked repositories`);
-
-    // Limit repos per run to prevent timeout
-    const reposToRefresh = repos.slice(0, MAX_REPOS_PER_RUN);
-    
     let refreshed = 0;
     let skipped = 0;
     let failed = 0;
 
-    for (const repo of reposToRefresh) {
+    // Only refresh the two allowed repositories
+    for (const repoFullName of ALLOWED_REPOS) {
       try {
         // Check if this repo actually needs refresh
-        const status = await getCacheStatus(repo.repo_full_name);
+        const status = await getCacheStatus(repoFullName);
         
         if (!status.needsRefresh) {
-          console.log(`[CacheJob] ${repo.repo_full_name} - Cache still valid, skipping`);
+          console.log(`[CacheJob] ${repoFullName} - Cache still valid, skipping`);
           skipped++;
           continue;
         }
 
-        console.log(`[CacheJob] Refreshing ${repo.repo_full_name}...`);
+        console.log(`[CacheJob] Refreshing ${repoFullName}...`);
         
-        const result = await refreshRepoCache(repo.repo_full_name);
+        const result = await refreshRepoCache(repoFullName);
         
         if (result.status === 'success') {
           refreshed++;
-          console.log(`[CacheJob] ${repo.repo_full_name} - Refreshed (${result.issuesFetched} issues)`);
+          console.log(`[CacheJob] ${repoFullName} - Refreshed (${result.issuesFetched} issues)`);
         } else {
           skipped++;
-          console.log(`[CacheJob] ${repo.repo_full_name} - Skipped (${result.reason})`);
+          console.log(`[CacheJob] ${repoFullName} - Skipped (${result.reason})`);
         }
 
         // Add delay between repos to respect rate limits
@@ -105,7 +95,7 @@ async function refreshAllTrackedRepos() {
 
       } catch (error) {
         failed++;
-        console.error(`[CacheJob] ${repo.repo_full_name} - Failed: ${error.message}`);
+        console.error(`[CacheJob] ${repoFullName} - Failed: ${error.message}`);
         // Continue with next repo
       }
     }

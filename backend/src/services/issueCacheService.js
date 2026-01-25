@@ -36,7 +36,7 @@ const GITHUB_GRAPHQL = 'https://api.github.com/graphql';
 
 // Cache configuration
 const CACHE_CONFIG = {
-  REFRESH_INTERVAL_MS: 1 * 60 * 1000, // 1 minute
+  REFRESH_INTERVAL_MS: 15 * 60 * 1000, // 15 minutes (optimized from 1 minute)
   FULL_REFRESH_INTERVAL_MS: 24 * 60 * 60 * 1000, // 24 hours (full refresh once daily)
   MAX_ISSUES_PER_PAGE: 100,
   MAX_PAGES: 10, // Limit pages to prevent excessive API calls
@@ -52,9 +52,9 @@ function getAuthHeaders() {
   const token = process.env.GITHUB_TOKEN;
   return token
     ? {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-      }
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+    }
     : { Accept: 'application/vnd.github+json' };
 }
 
@@ -77,9 +77,9 @@ const STATUS_LABELS = {
  */
 function deriveStatusFromLabels(labels) {
   if (!labels || !Array.isArray(labels)) return 'assigned';
-  
+
   const labelNames = labels.map(l => (l.name || l).toLowerCase());
-  
+
   // Check in priority order
   for (const name of labelNames) {
     if (STATUS_LABELS.devChecked.includes(name)) return 'devChecked';
@@ -88,7 +88,7 @@ function deriveStatusFromLabels(labels) {
     if (STATUS_LABELS.done.includes(name)) return 'done';
     if (STATUS_LABELS.inProgress.includes(name)) return 'inProgress';
   }
-  
+
   return 'assigned';
 }
 
@@ -185,7 +185,7 @@ async function updateCacheMetadata(repoFullName, data) {
       etag = COALESCE(VALUES(etag), etag),
       updated_at = NOW()
   `;
-  
+
   await query(sql, [
     repoFullName,
     data.isFullRefresh ? new Date() : null,
@@ -212,7 +212,7 @@ async function fetchIssuesFromGitHub(repoFullName, since = null) {
 
   // Format since date for GraphQL filter
   const sinceFilter = since ? `since: "${since.toISOString()}"` : '';
-  
+
   console.log(`[IssueCache] Fetching issues for ${repoFullName}${since ? ` (since ${since.toISOString()})` : ' (full refresh)'}`);
 
   while (hasNextPage && pageCount < CACHE_CONFIG.MAX_PAGES) {
@@ -293,12 +293,12 @@ async function fetchIssuesFromGitHub(repoFullName, since = null) {
       for (const issue of issueNodes) {
         const assignees = (issue.assignees?.nodes || []).map(a => a.login);
         const labels = (issue.labels?.nodes || []).map(l => ({ name: l.name, color: l.color }));
-        
+
         // Find most recent assignment event
         let lastAssignedAt = null;
         let lastAssignedUser = null;
         const timelineEvents = issue.timelineItems?.nodes || [];
-        
+
         for (const event of timelineEvents) {
           if (event.assignee?.login && event.createdAt) {
             const eventDate = new Date(event.createdAt);
@@ -441,7 +441,7 @@ async function refreshRepoCache(repoFullName, forceFullRefresh = false) {
   try {
     // Get cache metadata
     const metadata = await getCacheMetadata(repoFullName);
-    
+
     // Determine if we should do incremental or full refresh
     let since = null;
     let isFullRefresh = forceFullRefresh;
@@ -449,7 +449,7 @@ async function refreshRepoCache(repoFullName, forceFullRefresh = false) {
     if (!forceFullRefresh && metadata?.last_fetched_at) {
       const lastFetch = new Date(metadata.last_fetched_at);
       const lastFullRefresh = metadata.last_full_refresh_at ? new Date(metadata.last_full_refresh_at) : null;
-      
+
       // Do full refresh if never done or older than 24 hours
       if (!lastFullRefresh || (Date.now() - lastFullRefresh.getTime()) > CACHE_CONFIG.FULL_REFRESH_INTERVAL_MS) {
         isFullRefresh = true;
@@ -519,7 +519,7 @@ async function refreshRepoCache(repoFullName, forceFullRefresh = false) {
  */
 async function getCachedIssues(repoFullName, filter = 'today', username = null) {
   const { startDate, endDate } = getDateRange(filter);
-  
+
   // Build the query based on whether we're filtering by user
   let sql = `
     SELECT 
@@ -558,10 +558,10 @@ async function getCachedIssues(repoFullName, filter = 'today', username = null) 
 
   try {
     const results = await query(sql, params);
-    
+
     // Aggregate results by user
     const userStats = new Map();
-    
+
     for (const row of results) {
       if (!userStats.has(row.username)) {
         userStats.set(row.username, {
@@ -574,7 +574,7 @@ async function getCachedIssues(repoFullName, filter = 'today', username = null) 
           devChecked: 0,
         });
       }
-      
+
       const stats = userStats.get(row.username);
       stats[row.status] = row.count;
     }
@@ -583,8 +583,8 @@ async function getCachedIssues(repoFullName, filter = 'today', username = null) 
     const result = Array.from(userStats.values())
       .map(stats => ({
         ...stats,
-        total: stats.assigned + stats.inProgress + stats.done + 
-               stats.reviewed + stats.devDeployed + stats.devChecked,
+        total: stats.assigned + stats.inProgress + stats.done +
+          stats.reviewed + stats.devDeployed + stats.devChecked,
       }))
       .sort((a, b) => b.total - a.total || a.username.localeCompare(b.username));
 
@@ -604,7 +604,7 @@ async function getCachedIssues(repoFullName, filter = 'today', username = null) 
  */
 async function getCacheStatus(repoFullName) {
   const metadata = await getCacheMetadata(repoFullName);
-  
+
   if (!metadata) {
     return {
       isCached: false,
@@ -637,7 +637,7 @@ async function getCacheStatus(repoFullName) {
  */
 async function ensureCacheFresh(repoFullName) {
   const status = await getCacheStatus(repoFullName);
-  
+
   if (!status.isCached || status.needsRefresh) {
     const refreshResult = await refreshRepoCache(repoFullName, !status.isCached);
     return {
@@ -666,7 +666,7 @@ async function ensureCacheFresh(repoFullName) {
 async function getIssuesWithCache(repoFullName, filter = 'today', username = null, forceRefresh = false) {
   try {
     // Ensure cache is fresh (will refresh if needed)
-    const cacheResult = forceRefresh 
+    const cacheResult = forceRefresh
       ? await refreshRepoCache(repoFullName, false)
       : await ensureCacheFresh(repoFullName);
 

@@ -15,6 +15,11 @@
  * The frontend sends `repo` and optionally `user` parameters.
  * We only return data relevant to those parameters - no excess data is sent.
  * This optimizes both API response size and frontend processing.
+ * 
+ * REDIS CACHING:
+ * ==============
+ * Uses Upstash Redis with 2-minute TTL for API response caching.
+ * Cache key format: issues:repo:filter:user
  */
 
 const {
@@ -26,31 +31,39 @@ const {
 } = require('../services/issueCacheService');
 
 const { getJobStatus, forceRefreshRepo } = require('../jobs/cacheRefreshJob');
+const cacheService = require('../services/cacheService');
+
+// Redis cache TTL: 5 minutes (optimized from 2 minutes for better hit rates)
+const REDIS_CACHE_TTL = 300;
+
+const crypto = require('crypto');
+
+// ... (other imports)
+
+/**
+ * Generate MD5 ETag from data
+ */
+function generateETag(data) {
+  return crypto.createHash('md5').update(JSON.stringify(data)).digest('hex');
+}
 
 /**
  * GET /api/issues
  * 
  * Fetch issues from cache for a specific repo and filter.
- * Automatically refreshes cache if stale.
- * 
- * Query Parameters:
- * - repo (required): Repository full name (owner/repo)
- * - filter (optional): today|yesterday|this-week|last-week|this-month (default: today)
- * - user (optional): Filter by specific username
- * - forceRefresh (optional): Force cache refresh (default: false)
+ * Uses Redis caching and ETag support for efficient updates.
  */
 async function handleGetIssues(req, res, next) {
   try {
     const { repo, filter = 'today', user, forceRefresh } = req.query;
 
-    // Validate required parameters
+    // Validate params... (keep existing validation)
     if (!repo) {
       const error = new Error('Repository is required. Use ?repo=owner/name');
       error.status = 400;
       throw error;
     }
 
-    // Validate filter value
     const validFilters = ['today', 'yesterday', 'this-week', 'last-week', 'this-month'];
     if (!validFilters.includes(filter)) {
       const error = new Error(`Invalid filter. Must be one of: ${validFilters.join(', ')}`);
@@ -58,24 +71,71 @@ async function handleGetIssues(req, res, next) {
       throw error;
     }
 
-    console.log(`[IssueCache API] GET /api/issues - repo=${repo}, filter=${filter}, user=${user || 'all'}, forceRefresh=${forceRefresh}`);
+    // Build Redis cache key
+    const cacheKey = `issues:${repo}:${filter}:${user || 'all'}`;
+    let responseData = null;
+    let fromRedis = false;
 
-    // Get issues from cache (will refresh if needed)
-    const result = await getIssuesWithCache(
-      repo,
-      filter,
-      user || null,
-      forceRefresh === 'true'
-    );
+    // 1. Try to get from Redis
+    if (forceRefresh !== 'true') {
+      const cached = await cacheService.get(cacheKey);
+      if (cached) {
+        responseData = cached.data;
+        fromRedis = true;
+        console.log(`[Redis] ✅ Cache hit for ${cacheKey}`);
+      }
+    }
 
-    res.json({
+    // 2. If not in Redis, fetch from MySQL (incremental logic)
+    if (!responseData) {
+      // Clear cache if forcing refresh
+      if (forceRefresh === 'true') {
+        await cacheService.delete(cacheKey);
+      }
+
+      const result = await getIssuesWithCache(
+        repo,
+        filter,
+        user || null,
+        forceRefresh === 'true'
+      );
+
+      responseData = result.data;
+
+      // Store in Redis
+      await cacheService.set(cacheKey, {
+        data: responseData,
+        timestamp: Date.now(),
+      }, REDIS_CACHE_TTL);
+    }
+
+    // 3. Prepare final response
+    const finalResponse = {
       success: true,
-      data: result.data,
+      data: responseData,
       repo,
       filter,
       user: user || null,
-      cache: result.cache,
-    });
+      cache: {
+        fromRedis,
+        timestamp: new Date().toISOString(),
+      },
+    };
+
+    // 4. Handle ETag / 304 Not Modified
+    const etag = generateETag(finalResponse);
+    const clientETag = req.headers['if-none-match'];
+
+    if (clientETag === etag) {
+      console.log(`[IssueCache API] 304 Not Modified (ETag match) for ${repo}`);
+      return res.status(304).end();
+    }
+
+    // 5. Send Response
+    res.set('ETag', etag);
+    res.set('Cache-Control', 'public'); // Let client decide TTL based on ETag
+
+    res.json(finalResponse);
 
   } catch (error) {
     console.error('[IssueCache API] Error:', error.message);
@@ -155,6 +215,7 @@ async function handleRefreshCache(req, res, next) {
  * DELETE /api/issues/cache
  * 
  * Clear cache for a repository.
+ * Clears both MySQL cache and Redis cache.
  * Useful when data seems corrupted or for debugging.
  * 
  * Query Parameters:
@@ -170,11 +231,22 @@ async function handleClearCache(req, res, next) {
       throw error;
     }
 
+    // Clear MySQL cache
     await clearRepoCache(repo);
+
+    // Clear Redis cache for all filters and users for this repo
+    const filters = ['today', 'yesterday', 'this-week', 'last-week', 'this-month'];
+    for (const filter of filters) {
+      await cacheService.delete(`issues:${repo}:${filter}:all`);
+      // Also try to delete any user-specific caches (pattern matching)
+      await cacheService.deletePattern(`issues:${repo}:${filter}:*`);
+    }
+
+    console.log(`[Redis] ✅ Cleared Redis cache for ${repo}`);
 
     res.json({
       success: true,
-      message: `Cache cleared for ${repo}`,
+      message: `Cache cleared for ${repo} (MySQL and Redis)`,
     });
 
   } catch (error) {
@@ -230,7 +302,7 @@ async function handleCheckChanges(req, res, next) {
     }
 
     const status = await getCacheStatus(repo);
-    
+
     // If client provided a 'since' timestamp, compare
     let hasChanges = false;
     if (since) {

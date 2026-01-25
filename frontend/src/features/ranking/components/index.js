@@ -4,7 +4,6 @@
  */
 
 export { QuickFilterButton } from './QuickFilterButton';
-export { RefreshButton } from './RefreshButton';
 export { ViewModeSelector } from './ViewModeSelector';
 export { RankingHeader } from './RankingHeader';
 export { RepositorySelect } from './RepositorySelect';
@@ -13,3 +12,4 @@ export { EmptyState } from './EmptyState';
 export { TableSkeleton } from './TableSkeleton';
 export { RankingTable } from './RankingTable';
 export { UserAvatar } from './UserAvatar';
+export { RankingModal } from './RankingModal';

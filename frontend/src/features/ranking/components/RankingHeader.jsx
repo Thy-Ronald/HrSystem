@@ -1,17 +1,14 @@
 /**
  * RankingHeader Component
- * Main header with title, refresh button, and view mode selector
+ * Main header with title and view mode selector
  */
 
-import { RefreshButton } from './RefreshButton';
 import { ViewModeSelector } from './ViewModeSelector';
 
-export function RankingHeader({ 
-  viewMode, 
-  onViewChange, 
-  onRefresh, 
-  isRefreshing, 
-  refreshError,
+export function RankingHeader({
+  viewMode,
+  onViewChange,
+  onOpenModal,
 }) {
   return (
     <header className="flex flex-col gap-4 mb-6">
@@ -20,16 +17,10 @@ export function RankingHeader({
           <h1 className="text-xl font-normal text-[#202124]">Ranking</h1>
         </div>
         <div className="flex items-center gap-2">
-          {onRefresh && (
-            <RefreshButton 
-              onRefresh={onRefresh}
-              isRefreshing={isRefreshing}
-              error={refreshError}
-            />
-          )}
-          <ViewModeSelector 
+          <ViewModeSelector
             viewMode={viewMode}
             onViewChange={onViewChange}
+            onOpenModal={onOpenModal}
           />
         </div>
       </div>

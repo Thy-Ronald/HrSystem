@@ -141,6 +141,7 @@ async function checkRepoChanges(repoFullName) {
 
 /**
  * Fetch all repositories accessible via the GitHub token
+ * Optimized to only fetch the two specific repositories to reduce API calls
  * @returns {Promise<Array>} Array of { owner, name, fullName }
  */
 async function getAccessibleRepositories() {
@@ -151,45 +152,44 @@ async function getAccessibleRepositories() {
     throw error;
   }
 
+  // Only fetch these two specific repositories to reduce API calls
+  const allowedRepos = [
+    { owner: 'timeriver', name: 'cnd_chat', fullName: 'timeriver/cnd_chat' },
+    { owner: 'timeriver', name: 'sacsys009', fullName: 'timeriver/sacsys009' },
+  ];
+
   // Check cache first (5 min TTL for repos list)
-  const cacheKey = 'accessible_repos';
+  const cacheKey = 'accessible_repos_filtered';
   const cached = getCached(cacheKey, REPO_CACHE_TTL);
   if (cached) {
     return cached;
   }
 
   try {
+    // Fetch only the specific repositories we need
     const repos = [];
-    let page = 1;
-    let hasMore = true;
+    
+    for (const repoInfo of allowedRepos) {
+      try {
+        const response = await githubClient.get(`/repos/${repoInfo.fullName}`, {
+          headers: withAuth(),
+        });
 
-    while (hasMore) {
-      const response = await githubClient.get('/user/repos', {
-        headers: withAuth(),
-        params: {
-          per_page: 100,
-          page,
-          sort: 'updated',
-          affiliation: 'owner,collaborator,organization_member',
-        },
-      });
-
-      const data = response.data;
-      repos.push(...data.map((repo) => ({
-        owner: repo.owner.login,
-        name: repo.name,
-        fullName: repo.full_name,
-      })));
-
-      hasMore = data.length === 100;
-      page++;
-
-      // Limit to 500 repos max
-      if (repos.length >= 500) break;
+        const repo = response.data;
+        repos.push({
+          owner: repo.owner.login,
+          name: repo.name,
+          fullName: repo.full_name,
+        });
+      } catch (error) {
+        // If repo doesn't exist or access denied, skip it
+        if (error.response && error.response.status === 404) {
+          console.warn(`Repository ${repoInfo.fullName} not found or not accessible`);
+        } else {
+          console.error(`Error fetching ${repoInfo.fullName}:`, error.message);
+        }
+      }
     }
-
-    // Sort by full name
-    repos.sort((a, b) => a.fullName.localeCompare(b.fullName));
 
     // Cache for 5 minutes
     setCache(cacheKey, repos, REPO_CACHE_TTL);

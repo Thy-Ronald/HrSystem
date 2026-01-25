@@ -2,38 +2,30 @@
  * Staff Ranking Page (Refactored with Clean Architecture)
  * 
  * Displays GitHub repository staff ranking based on issue assignments
- * Features: Manual refresh, localStorage persistence
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { 
-  RankingHeader, 
-  RankingFilters, 
-  RankingTable 
+import {
+  RankingHeader,
+  RankingFilters,
+  RankingTable,
+  RankingModal
 } from '../features/ranking/components';
 import {
   useRankingData,
-  useRankingPersistence,
   useRepositories,
 } from '../features/ranking/hooks';
 import {
   TABLE_COLUMNS,
   QUICK_FILTERS,
   VIEW_MODES,
-  loadFromStorage,
-  STORAGE_KEYS,
 } from '../features/ranking';
 
 export default function StaffRanking() {
   // UI State
-  const [activeQuickFilter, setActiveQuickFilter] = useState(() => 
-    loadFromStorage(STORAGE_KEYS.ACTIVE_FILTER, QUICK_FILTERS.TODAY)
-  );
-  const [viewMode, setViewMode] = useState(() => 
-    loadFromStorage(STORAGE_KEYS.VIEW_MODE, VIEW_MODES.RANK)
-  );
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [refreshError, setRefreshError] = useState('');
+  const [activeQuickFilter, setActiveQuickFilter] = useState(QUICK_FILTERS.TODAY);
+  const [viewMode, setViewMode] = useState(VIEW_MODES.RANK);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Data Management (Custom Hook)
   const {
@@ -43,10 +35,6 @@ export default function StaffRanking() {
     error,
     setError,
     loadData,
-    clearCache,
-    getCacheSnapshot,
-    restoreCache,
-    isManualRefreshRef,
   } = useRankingData();
 
   // Repository Management (Custom Hook)
@@ -57,24 +45,13 @@ export default function StaffRanking() {
     reposLoading,
   } = useRepositories();
 
-  // Persistence (Custom Hook)
-  useRankingPersistence({
-    activeFilter: activeQuickFilter,
-    viewMode,
-    rankingData,
-    selectedRepo,
-    getCacheSnapshot,
-    restoreCache,
-    setRankingData: () => {}, // Data is managed by useRankingData
-  });
-
   // Event Handlers
   const handleQuickFilterChange = useCallback((filter) => {
     // If clicking the same filter that's already active, do nothing
     if (filter === activeQuickFilter) {
       return;
     }
-    
+
     // Clear data immediately to prevent showing stale data from previous filter
     setRankingData([]);
     setActiveQuickFilter(filter);
@@ -91,34 +68,6 @@ export default function StaffRanking() {
     // loadData will be called by useEffect when selectedRepo/activeQuickFilter changes
   }, [setRankingData, setSelectedRepo, setError]);
 
-  const handleManualRefresh = useCallback(async () => {
-    if (!selectedRepo || isRefreshing) return;
-    
-    // Clear errors and set refreshing state
-    setRefreshError('');
-    setError('');
-    isManualRefreshRef.current = true;
-    setIsRefreshing(true);
-    
-    try {
-      // Clear cache for all filters
-      const filters = Object.values(QUICK_FILTERS);
-      clearCache(selectedRepo, filters);
-      
-      // Fetch latest data
-      await loadData(selectedRepo, activeQuickFilter, true);
-      setRefreshError('');
-    } catch (err) {
-      console.error('[Refresh] Error:', err);
-      const errorMessage = err.message || 'Failed to refresh. Please try again.';
-      setRefreshError(errorMessage);
-      setError(errorMessage);
-    } finally {
-      setIsRefreshing(false);
-      isManualRefreshRef.current = false;
-    }
-  }, [selectedRepo, activeQuickFilter, isRefreshing, clearCache, loadData, setError, isManualRefreshRef]);
-
   // Initial data load when repo/filter changes
   useEffect(() => {
     if (selectedRepo) {
@@ -132,9 +81,7 @@ export default function StaffRanking() {
         <RankingHeader
           viewMode={viewMode}
           onViewChange={setViewMode}
-          onRefresh={handleManualRefresh}
-          isRefreshing={isRefreshing}
-          refreshError={refreshError}
+          onOpenModal={() => setIsModalOpen(true)}
         />
 
         <RankingFilters
@@ -158,6 +105,13 @@ export default function StaffRanking() {
             <p>Graph view coming soon...</p>
           </div>
         )}
+
+        <RankingModal
+          open={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          repositories={repositories}
+          sharedCacheData={null}
+        />
       </main>
     </div>
   );

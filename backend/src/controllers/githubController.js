@@ -12,10 +12,17 @@ async function handleGithubLookup(req, res, next) {
 
 async function handleGetRepositories(req, res, next) {
   try {
-    const data = await getAccessibleRepositories();
+    const allRepos = await getAccessibleRepositories();
+    
+    // Filter to only return the two specific repositories to reduce API calls
+    const allowedRepos = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
+    const filteredRepos = allRepos.filter(repo => 
+      allowedRepos.includes(repo.fullName)
+    );
+    
     res.json({
       success: true,
-      data,
+      data: filteredRepos,
     });
   } catch (error) {
     next(error);

@@ -7,7 +7,7 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
  */
 async function handleResponse(res) {
   const data = await res.json();
-  
+
   if (!res.ok) {
     // Handle API error format
     const error = new Error(data.error || data.message || 'Request failed');
@@ -15,7 +15,7 @@ async function handleResponse(res) {
     error.errors = data.errors || [];
     throw error;
   }
-  
+
   // Return data from success response
   return data.success ? data.data : data;
 }
@@ -142,10 +142,33 @@ export async function fetchRepositories() {
  * @param {string} filter - Filter: today, yesterday, this-week, last-week, this-month
  * @returns {Promise<Array>} Array of objects with username and issueCount
  */
-export async function fetchIssuesByPeriod(repo, filter = 'today') {
+export async function fetchIssuesByPeriod(repo, filter = 'today', options = {}) {
   const params = new URLSearchParams({ repo, filter });
-  const res = await fetch(`${API_BASE}/api/github/issues?${params}`);
-  return handleResponse(res);
+  const headers = {};
+
+  if (options.etag) {
+    headers['If-None-Match'] = options.etag;
+  }
+
+  const res = await fetch(`${API_BASE}/api/github/issues?${params}`, {
+    headers,
+    signal: options.signal
+  });
+
+  if (res.status === 304) {
+    return null;
+  }
+
+  const data = await handleResponse(res);
+
+  if (options.includeEtag) {
+    return {
+      data,
+      etag: res.headers.get('ETag')
+    };
+  }
+
+  return data;
 }
 
 /**
@@ -194,7 +217,7 @@ export async function checkRepoChanges(repo) {
  */
 export async function fetchCachedIssues(repo, filter = 'today', options = {}) {
   const params = new URLSearchParams({ repo, filter });
-  
+
   if (options.user) {
     params.set('user', options.user);
   }
@@ -202,8 +225,29 @@ export async function fetchCachedIssues(repo, filter = 'today', options = {}) {
     params.set('forceRefresh', 'true');
   }
 
-  const res = await fetch(`${API_BASE}/api/issues?${params}`);
-  return handleResponse(res);
+  const headers = {};
+  if (options.etag) {
+    headers['If-None-Match'] = options.etag;
+  }
+
+  const res = await fetch(`${API_BASE}/api/issues?${params}`, {
+    headers
+  });
+
+  if (res.status === 304) {
+    return null;
+  }
+
+  const data = await handleResponse(res);
+
+  if (options.includeEtag) {
+    return {
+      data,
+      etag: res.headers.get('ETag')
+    };
+  }
+
+  return data;
 }
 
 /**
