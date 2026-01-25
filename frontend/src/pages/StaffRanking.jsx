@@ -38,6 +38,7 @@ export default function StaffRanking() {
   // Data Management (Custom Hook)
   const {
     rankingData,
+    setRankingData,
     loading,
     error,
     setError,
@@ -69,17 +70,26 @@ export default function StaffRanking() {
 
   // Event Handlers
   const handleQuickFilterChange = useCallback((filter) => {
+    // If clicking the same filter that's already active, do nothing
+    if (filter === activeQuickFilter) {
+      return;
+    }
+    
+    // Clear data immediately to prevent showing stale data from previous filter
+    setRankingData([]);
     setActiveQuickFilter(filter);
     setError('');
-    loadData(selectedRepo, filter);
-  }, [selectedRepo, loadData, setError]);
+    // loadData will be called by useEffect when activeQuickFilter changes
+  }, [activeQuickFilter, setRankingData, setError]);
 
   const handleRepoChange = useCallback((repo) => {
+    // Clear data immediately to prevent showing stale data from previous repo
+    setRankingData([]);
     setSelectedRepo(repo);
     setError('');
     setActiveQuickFilter(QUICK_FILTERS.TODAY);
-    loadData(repo, QUICK_FILTERS.TODAY);
-  }, [setSelectedRepo, setError, loadData]);
+    // loadData will be called by useEffect when selectedRepo/activeQuickFilter changes
+  }, [setRankingData, setSelectedRepo, setError]);
 
   const handleManualRefresh = useCallback(async () => {
     if (!selectedRepo || isRefreshing) return;

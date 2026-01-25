@@ -14,6 +14,9 @@ export function useRankingData() {
   const cacheRef = useRef(new Map());
   const abortControllerRef = useRef(null);
   const isManualRefreshRef = useRef(false);
+  const refreshTimerRef = useRef(null);
+  const currentRepoRef = useRef(null);
+  const currentFilterRef = useRef(null);
 
   /**
    * Load ranking data for a specific repo and filter
@@ -27,35 +30,58 @@ export function useRankingData() {
 
     const cacheKey = getCacheKey(repo, filter);
     
-    // Check cache first (unless forcing refresh)
-    if (!forceRefresh) {
-      const cached = cacheRef.current.get(cacheKey);
-      if (cached) {
-        setRankingData(cached);
-        setError('');
-        return;
-      }
-    }
-
-    // Cancel any pending request
+    // Cancel any pending request first to prevent race conditions
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
     abortControllerRef.current = new AbortController();
+    
+    // Store current repo and filter immediately to track the active request
+    currentRepoRef.current = repo;
+    currentFilterRef.current = filter;
+    
+    // Check cache first (unless forcing refresh)
+    if (!forceRefresh) {
+      const cached = cacheRef.current.get(cacheKey);
+      if (cached) {
+        // Verify this is still the current request (not aborted by a newer filter change)
+        if (currentRepoRef.current === repo && currentFilterRef.current === filter) {
+          setRankingData(cached);
+          setError('');
+          setLoading(false);
+          return;
+        }
+      }
+    }
 
     setLoading(true);
     setError('');
 
     try {
-      const data = await fetchIssuesByPeriod(repo, filter);
+      
+      // Clear existing refresh timer
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+      
+      const data = await fetchIssuesByPeriod(repo, filter, abortControllerRef.current?.signal, true);
+      
+      // Verify this is still the current request (not aborted by a newer filter change)
+      if (currentRepoRef.current !== repo || currentFilterRef.current !== filter) {
+        console.log('[loadData] Request completed but filter/repo changed, ignoring result');
+        return;
+      }
       
       // Transform data to match table structure
       const transformedData = transformRankingData(data);
 
-      // Update cache and state
-      cacheRef.current.set(cacheKey, transformedData);
-      setRankingData(transformedData);
-      setError('');
+      // Update cache and state only if this is still the active request
+      if (currentRepoRef.current === repo && currentFilterRef.current === filter) {
+        cacheRef.current.set(cacheKey, transformedData);
+        setRankingData(transformedData);
+        setError('');
+      }
       
     } catch (err) {
       if (err.name === 'AbortError') return;
