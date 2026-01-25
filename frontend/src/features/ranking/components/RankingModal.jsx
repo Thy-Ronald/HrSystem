@@ -4,7 +4,6 @@ import { RankingTable } from './RankingTable';
 import { FilterDropdown } from './FilterDropdown';
 import { RepositoryMultiSelect } from './RepositoryMultiSelect';
 import { TABLE_COLUMNS, QUICK_FILTERS, FILTER_LABELS, STORAGE_KEYS } from '../constants';
-import { loadFromStorage, saveToStorage } from '../utils/storage';
 import { useAllReposRanking } from '../hooks/useAllReposRanking';
 
 const RANKING_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
@@ -12,8 +11,13 @@ const RANKING_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
 export function RankingModal({ open, onClose, repositories, sharedCacheData }) {
   const [activeFilter, setActiveFilter] = useState(QUICK_FILTERS.THIS_MONTH);
   const [selectedRepos, setSelectedRepos] = useState(() => {
-    const saved = loadFromStorage(STORAGE_KEYS.SELECTED_REPOS, []);
-    return saved.filter(repo => RANKING_REPOS.includes(repo));
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.SELECTED_REPOS);
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed.filter(repo => RANKING_REPOS.includes(repo)) : [];
+    } catch (e) {
+      return [];
+    }
   });
 
   const {
@@ -34,7 +38,7 @@ export function RankingModal({ open, onClose, repositories, sharedCacheData }) {
   // Persist selected repos to localStorage
   useEffect(() => {
     if (selectedRepos.length > 0) {
-      saveToStorage(STORAGE_KEYS.SELECTED_REPOS, selectedRepos);
+      localStorage.setItem(STORAGE_KEYS.SELECTED_REPOS, JSON.stringify(selectedRepos));
     }
   }, [selectedRepos]);
 
