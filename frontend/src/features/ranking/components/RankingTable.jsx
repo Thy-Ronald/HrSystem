@@ -6,6 +6,7 @@
 import { TableSkeleton } from './TableSkeleton';
 import { EmptyState } from './EmptyState';
 import { UserAvatar } from './UserAvatar';
+import { memo } from 'react';
 
 function SortIcon() {
   return (
@@ -23,7 +24,7 @@ function SortIcon() {
   );
 }
 
-export function RankingTable({ columns, data, loading, error }) {
+export const RankingTable = memo(function RankingTable({ columns, data, loading, error }) {
   const isEmpty = !data || data.length === 0;
 
   if (loading) {
@@ -46,49 +47,54 @@ export function RankingTable({ columns, data, loading, error }) {
   }
 
   return (
-    <div className="overflow-x-auto -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8">
-      <table className="w-full min-w-[800px] border-collapse">
-        <thead>
-          <tr className="border-b border-[#e8eaed]">
-            {columns.map((column) => (
-              <th
-                key={column.key}
-                className="px-4 py-3 text-[11px] font-medium text-[#5f6368] uppercase tracking-wider text-center"
-              >
-                {column.label}
-                <SortIcon />
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {isEmpty ? (
-            <EmptyState />
-          ) : (
-            data.map((row, rowIndex) => (
-              <tr
-                key={row.id || rowIndex}
-                className="border-b border-[#e8eaed] hover:bg-[#f8f9fa] transition-colors"
-              >
-                {columns.map((column) => (
-                  <td
-                    key={column.key}
-                    className={`px-4 py-4 text-sm text-[#202124] ${
-                      column.key === 'id' ? 'text-left font-medium min-w-[150px] max-w-[250px]' : 'text-center'
-                    }`}
-                  >
-                    {column.key === 'id' && row[column.key] ? (
-                      <UserAvatar username={row[column.key]} size={32} />
-                    ) : (
-                      row[column.key] ?? '-'
-                    )}
-                  </td>
-                ))}
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+    <div className="w-full">
+      <div className="overflow-visible">
+        <table className="w-full border-collapse table-auto">
+          <thead>
+            <tr className="border-b border-[#e8eaed] bg-gray-50/50">
+              {columns.map((column) => (
+                <th
+                  key={column.key}
+                  className="px-2 py-3 text-[10px] sm:text-[11px] font-medium text-[#5f6368] uppercase tracking-wider text-center first:pl-4 last:pr-4"
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    {column.label}
+                    <SortIcon />
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="bg-white">
+            {isEmpty ? (
+              <EmptyState />
+            ) : (
+              data.map((row, rowIndex) => (
+                <tr
+                  key={row.id || rowIndex}
+                  className="border-b border-[#e8eaed] hover:bg-[#f8f9fa] transition-colors last:border-0"
+                >
+                  {columns.map((column) => (
+                    <td
+                      key={column.key}
+                      className={`px-2 py-3 text-sm text-[#202124] first:pl-4 last:pr-4 ${column.key === 'id'
+                          ? 'text-left font-medium w-3/12 break-all sm:break-normal'
+                          : 'text-center tabular-nums w-[10%]'
+                        }`}
+                    >
+                      {column.key === 'id' && row[column.key] ? (
+                        <UserAvatar username={row[column.key]} size={28} />
+                      ) : (
+                        row[column.key] ?? '-'
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
-}
+});
