@@ -1,32 +1,8 @@
-/**
- * useRankingData Hook
- * Manages data fetching, caching, and state for ranking data
- * 
- * INCREMENTAL CACHING STRATEGY:
- * =============================
- * This hook now supports two fetching modes:
- * 
- * 1. LEGACY MODE (default): Uses fetchIssuesByPeriod which hits the old in-memory cache
- * 2. INCREMENTAL MODE: Uses fetchCachedIssues which:
- *    - Stores data in MySQL for persistence
- *    - Uses `updated_since` parameter for incremental GitHub API calls
- *    - Only fetches issues that changed since last refresh
- *    - Background job refreshes every 30 minutes
- * 
- * SWITCHING MODES:
- * Set useIncrementalCache=true in loadData options to use incremental mode.
- * 
- * SELECTIVE REFRESH:
- * The incremental API only fetches data for the requested repo/user,
- * reducing data transfer and API calls for users viewing specific data.
- */
-
 import { useState, useRef, useCallback } from 'react';
 import { fetchIssuesByPeriod, fetchCachedIssues } from '../../../services/api';
 import { transformRankingData, getCacheKey } from '../utils/dataTransform';
 import { fetchWithCache, generateCacheKey } from '../utils/cacheUtils';
 
-// Configuration: Set to true to use new incremental cache API
 const USE_INCREMENTAL_CACHE = true;
 
 /**
@@ -58,6 +34,10 @@ function mergeWithExisting(existing, incoming) {
   });
 }
 
+/**
+ * useRankingData Hook
+ * Manages data fetching, smart caching (ETags), and state for staff ranking
+ */
 export function useRankingData() {
   const [rankingData, setRankingData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -65,6 +45,7 @@ export function useRankingData() {
   const [cacheInfo, setCacheInfo] = useState(null);
   const cacheRef = useRef(new Map());
   const abortControllerRef = useRef(null);
+  const isManualRefreshRef = useRef(false);
   const lastFetchTimestampRef = useRef(new Map());
 
   /**
@@ -73,16 +54,13 @@ export function useRankingData() {
   const loadData = useCallback(async (repo, filter, forceRefresh = false, retryCount = 0, options = {}) => {
     if (!repo) return;
 
-<<<<<<< HEAD
     const { user = null } = options;
 
-    // Prefix 'main' to separate from modal cache
+    // Unique key for main dashboard cache
     const localStorageKey = generateCacheKey('main', repo, filter, user || 'all');
-    // 2 minutes TTL for main screen too
+    // 2 minutes TTL
     const CACHE_TTL_MS = 2 * 60 * 1000;
 
-=======
->>>>>>> da0f46c (feat: Implement ETag-based smart caching and UI decoupling for Ranking modal and Staff Ranking form to optimize performance and reduce API load)
     // Cancel any pending request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -92,86 +70,52 @@ export function useRankingData() {
     setLoading(true);
     setError('');
 
-<<<<<<< HEAD
     try {
       // Define the fetch function that uses ETags
       const fetchFn = (etag) => fetchCachedIssues(repo, filter, {
         user,
-        forceRefresh, // api supports forceRefresh
+        forceRefresh,
         etag,
         includeEtag: true
       });
 
-=======
-    const { user = null } = options;
-
-    // Prefix 'main' to separate from modal cache
-    const localStorageKey = generateCacheKey('main', repo, filter, user || 'all');
-    // 2 minutes TTL for main screen too
-    const CACHE_TTL_MS = 2 * 60 * 1000;
-
-    try {
-      if (forceRefresh) {
-        // If forcing refresh, we bypass cache check logic in fetchWithCache 
-        // effectively by just calling api directly or we can delete cache first
-        // But fetchWithCache doesn't support "force force".
-        // Simplest: just fetch directly if forceRefresh
-        // Or implement clearCachePattern calls.
-      }
-
-      // Define the fetch function that uses ETags
-      const fetchFn = (etag) => fetchCachedIssues(repo, filter, {
-        user,
-        forceRefresh, // api supports forceRefresh
-        etag,
-        includeEtag: true
-      });
-
->>>>>>> da0f46c (feat: Implement ETag-based smart caching and UI decoupling for Ranking modal and Staff Ranking form to optimize performance and reduce API load)
-      // Use the smart caching util
+      // Use the smart caching utility
       const data = await fetchWithCache(
         localStorageKey,
         fetchFn,
         CACHE_TTL_MS
       );
 
-      // Transform
+      // Transform data for display
       const transformedData = transformRankingData(data);
 
-<<<<<<< HEAD
-      // Update state using functional update to access current state without dependency
+      // Update state using functional update to remove dependency on rankingData
       setRankingData(current => mergeWithExisting(current, transformedData));
 
-=======
-      // Preserve references
-      setRankingData(current => mergeWithExisting(current, transformedData));
->>>>>>> da0f46c (feat: Implement ETag-based smart caching and UI decoupling for Ranking modal and Staff Ranking form to optimize performance and reduce API load)
       setLoading(false);
+      isManualRefreshRef.current = false;
 
     } catch (err) {
       if (err.name === 'AbortError') return;
 
       console.error('[useRankingData] Error:', err);
-      // Fallback to cache if available? fetchWithCache already tries.
-      if (retryCount < 2) {
-        // Retry logic...
+
+      // Retry logic for network errors (max 2 retries)
+      if (retryCount < 2 && (err.message.includes('fetch') || err.status >= 500)) {
+        console.warn(`Retrying... (${retryCount + 1}/2)`);
         setTimeout(() => loadData(repo, filter, forceRefresh, retryCount + 1, options), 1000 * (retryCount + 1));
         return;
       }
 
       setError(err.message || 'Failed to load data');
-<<<<<<< HEAD
       setRankingData([]);
-=======
->>>>>>> da0f46c (feat: Implement ETag-based smart caching and UI decoupling for Ranking modal and Staff Ranking form to optimize performance and reduce API load)
       setLoading(false);
+      isManualRefreshRef.current = false;
     }
   }, []);
 
   /**
-   * Clear cache for specific filters
-   * @param {string} repo - Repository name
-   * @param {string[]} filters - Array of filter names to clear
+   * Clear in-memory cache
    */
   const clearCache = useCallback((repo, filters) => {
     filters.forEach(filter => {
@@ -181,8 +125,23 @@ export function useRankingData() {
   }, []);
 
   /**
-   * Get the last fetch timestamp for a specific cache key
-   * Used for smart polling - only fetch if backend has newer data
+   * Get cache snapshot for persistence
+   */
+  const getCacheSnapshot = useCallback(() => {
+    return Object.fromEntries(cacheRef.current);
+  }, []);
+
+  /**
+   * Restore cache from snapshot
+   */
+  const restoreCache = useCallback((cacheObj) => {
+    if (cacheObj && Object.keys(cacheObj).length > 0) {
+      cacheRef.current = new Map(Object.entries(cacheObj));
+    }
+  }, []);
+
+  /**
+   * Get the last fetch timestamp
    */
   const getLastFetchTimestamp = useCallback((repo, filter) => {
     const key = getCacheKey(repo, filter);
@@ -197,8 +156,10 @@ export function useRankingData() {
     setError,
     loadData,
     clearCache,
+    getCacheSnapshot,
+    restoreCache,
     cacheRef,
-    // New incremental cache features
+    isManualRefreshRef,
     cacheInfo,
     getLastFetchTimestamp,
   };
