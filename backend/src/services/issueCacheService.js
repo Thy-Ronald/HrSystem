@@ -521,9 +521,10 @@ async function getCachedIssues(repoFullName, filter = 'today', username = null) 
   const { startDate, endDate } = getDateRange(filter);
 
   // Build the query based on whether we're filtering by user
+  // Normalize username using LOWER and TRIM directly in SQL
   let sql = `
     SELECT 
-      username,
+      LOWER(TRIM(username)) as normalized_username,
       status,
       COUNT(*) as count
     FROM (
@@ -552,8 +553,8 @@ async function getCachedIssues(repoFullName, filter = 'today', username = null) 
   sql += `
     ) as expanded
     WHERE username IS NOT NULL
-    GROUP BY username, status
-    ORDER BY username, status
+    GROUP BY normalized_username, status
+    ORDER BY normalized_username, status
   `;
 
   try {
@@ -563,9 +564,12 @@ async function getCachedIssues(repoFullName, filter = 'today', username = null) 
     const userStats = new Map();
 
     for (const row of results) {
-      if (!userStats.has(row.username)) {
-        userStats.set(row.username, {
-          username: row.username,
+      // Final safety normalization in JS Map
+      const usernameKey = row.normalized_username.toLowerCase().trim();
+
+      if (!userStats.has(usernameKey)) {
+        userStats.set(usernameKey, {
+          username: usernameKey,
           assigned: 0,
           inProgress: 0,
           done: 0,
@@ -575,7 +579,7 @@ async function getCachedIssues(repoFullName, filter = 'today', username = null) 
         });
       }
 
-      const stats = userStats.get(row.username);
+      const stats = userStats.get(usernameKey);
       stats[row.status] = row.count;
     }
 

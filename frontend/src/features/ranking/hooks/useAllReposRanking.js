@@ -29,7 +29,11 @@ function isPastResetTime(timestamp) {
 }
 
 function mergeUserData(targetMap, user) {
-  const existing = targetMap.get(user.username);
+  if (!user.username) return;
+  // Normalize key to lowercase to prevent duplicates
+  const username = user.username.toLowerCase().trim();
+
+  const existing = targetMap.get(username);
   if (existing) {
     existing.assigned += user.assigned || 0;
     existing.inProgress += user.inProgress || 0;
@@ -39,7 +43,10 @@ function mergeUserData(targetMap, user) {
     existing.devChecked += user.devChecked || 0;
   } else {
     // Clone to avoid reference issues
-    targetMap.set(user.username, { ...user });
+    targetMap.set(username, {
+      ...user,
+      username // Ensure the object also has the normalized username
+    });
   }
 }
 
@@ -79,7 +86,6 @@ export function useAllReposRanking() {
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
 
-    setLoading(true);
     setError(null);
 
     try {
@@ -125,6 +131,11 @@ export function useAllReposRanking() {
       if (reposNeedingCheck.length === 0) {
         setLoading(false);
         return;
+      }
+
+      // Show loading if we actually have to fetch and have no data yet
+      if (rankingData.length === 0 || forceRefresh) {
+        setLoading(true);
       }
 
       // 2. Fetch missing/expired data in batches

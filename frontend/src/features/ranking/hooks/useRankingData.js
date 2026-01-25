@@ -11,27 +11,47 @@ const USE_INCREMENTAL_CACHE = true;
  * optimizing re-renders.
  */
 function mergeWithExisting(existing, incoming) {
-  if (!existing || existing.length === 0) return incoming;
+  if (!existing || existing.length === 0) {
+    // Even if no existing, filter incoming for internal duplicates just in case
+    const unique = [];
+    const seen = new Set();
+    for (const item of incoming) {
+      if (item.id && !seen.has(item.id)) {
+        seen.add(item.id);
+        unique.push(item);
+      }
+    }
+    return unique;
+  }
+
   if (!incoming || incoming.length === 0) return existing;
 
-  const existingMap = new Map(existing.map(item => [item.username, item]));
+  const existingMap = new Map(existing.map(item => [item.id, item]));
+  const seenInIncoming = new Set();
+  const result = [];
 
-  return incoming.map(newItem => {
-    const existingItem = existingMap.get(newItem.username);
+  for (const newItem of incoming) {
+    // Avoid processing duplicates from the source data itself
+    if (seenInIncoming.has(newItem.id)) continue;
+    seenInIncoming.add(newItem.id);
+
+    const existingItem = existingMap.get(newItem.id);
 
     // If item exists and data is identical, keep the old reference
     if (existingItem &&
-      existingItem.assigned === newItem.assigned &&
-      existingItem.inProgress === newItem.inProgress &&
-      existingItem.done === newItem.done &&
+      existingItem.assignedCards === newItem.assignedCards &&
+      existingItem.inProgressCards === newItem.inProgressCards &&
+      existingItem.doneCards === newItem.doneCards &&
       existingItem.reviewed === newItem.reviewed &&
       existingItem.devDeployed === newItem.devDeployed &&
       existingItem.devChecked === newItem.devChecked) {
-      return existingItem;
+      result.push(existingItem);
+    } else {
+      result.push(newItem);
     }
+  }
 
-    return newItem;
-  });
+  return result;
 }
 
 /**
@@ -61,13 +81,25 @@ export function useRankingData() {
     // 2 minutes TTL
     const CACHE_TTL_MS = 2 * 60 * 1000;
 
+    // Synchronously check if we have ANY data (even stale) to avoid flicker
+    const existingRaw = getRawCache(localStorageKey)?.data;
+
+    if (existingRaw && rankingData.length === 0) {
+      const transformed = transformRankingData(existingRaw);
+      // Filter duplicates even in local cache just in case
+      setRankingData(mergeWithExisting([], transformed));
+    }
+
     // Cancel any pending request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
     abortControllerRef.current = new AbortController();
 
-    setLoading(true);
+    // Only show loading spinner if we have NO data at all
+    if (!existingRaw || forceRefresh) {
+      setLoading(true);
+    }
     setError('');
 
     try {
