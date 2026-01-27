@@ -3,13 +3,14 @@ import Modal from '../../../components/Modal';
 import { RankingTable } from './RankingTable';
 import { FilterDropdown } from './FilterDropdown';
 import { RepositoryMultiSelect } from './RepositoryMultiSelect';
-import { TABLE_COLUMNS, QUICK_FILTERS, FILTER_LABELS, STORAGE_KEYS } from '../constants';
+import { TABLE_COLUMNS, COMMITS_TABLE_COLUMNS, QUICK_FILTERS, FILTER_LABELS, STORAGE_KEYS, RANKING_TYPES, RANKING_TYPE_LABELS } from '../constants';
 import { useAllReposRanking } from '../hooks/useAllReposRanking';
 
 const RANKING_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
 
 export function RankingModal({ open, onClose, repositories, sharedCacheData }) {
   const [activeFilter, setActiveFilter] = useState(QUICK_FILTERS.THIS_MONTH);
+  const [rankingType, setRankingType] = useState(RANKING_TYPES.ISSUES);
   const [selectedRepos, setSelectedRepos] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.SELECTED_REPOS);
@@ -63,14 +64,14 @@ export function RankingModal({ open, onClose, repositories, sharedCacheData }) {
     return availableRepositories.filter(repo => selectedRepos.includes(repo.fullName));
   }, [availableRepositories, selectedRepos]);
 
-  // Load data when modal opens or filter/repos change
+  // Load data when modal opens or filter/repos/type change
   useEffect(() => {
     if (!open || !availableRepositories || availableRepositories.length === 0) return;
     if (selectedRepos.length === 0) {
       return;
     }
-    loadAllReposData(selectedRepositories, activeFilter, false);
-  }, [open, activeFilter, selectedRepos, loadAllReposData, availableRepositories, selectedRepositories]);
+    loadAllReposData(selectedRepositories, activeFilter, false, rankingType);
+  }, [open, activeFilter, selectedRepos, rankingType, loadAllReposData, availableRepositories, selectedRepositories]);
 
   const quickFilters = [
     { value: QUICK_FILTERS.TODAY, label: FILTER_LABELS[QUICK_FILTERS.TODAY] },
@@ -98,6 +99,22 @@ export function RankingModal({ open, onClose, repositories, sharedCacheData }) {
               onFilterChange={setActiveFilter}
             />
           </div>
+          <div className="flex-1">
+            <div className="flex flex-col gap-1 relative w-full">
+              <label htmlFor="type-select" className="text-sm font-medium text-[#5f6368]">
+                Type
+              </label>
+              <select
+                id="type-select"
+                value={rankingType}
+                onChange={(e) => setRankingType(e.target.value)}
+                className="w-full px-3 py-1.5 text-sm border border-[#dadce0] rounded-lg bg-white text-[#202124] focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:border-[#1a73e8]"
+              >
+                <option value={RANKING_TYPES.ISSUES}>{RANKING_TYPE_LABELS[RANKING_TYPES.ISSUES]}</option>
+                <option value={RANKING_TYPES.COMMITS}>{RANKING_TYPE_LABELS[RANKING_TYPES.COMMITS]}</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         {selectedRepos.length === 0 ? (
@@ -107,7 +124,7 @@ export function RankingModal({ open, onClose, repositories, sharedCacheData }) {
         ) : (
           <div className="border border-gray-200 rounded-lg overflow-hidden">
             <RankingTable
-              columns={TABLE_COLUMNS}
+              columns={rankingType === RANKING_TYPES.COMMITS ? COMMITS_TABLE_COLUMNS : TABLE_COLUMNS}
               data={rankingData}
               loading={loading}
               error={error}

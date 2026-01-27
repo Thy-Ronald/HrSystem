@@ -34,7 +34,18 @@ export const VIEW_MODES = {
   GRAPH: 'graph',
 };
 
-// Table columns configuration
+// Ranking types
+export const RANKING_TYPES = {
+  ISSUES: 'issues',
+  COMMITS: 'commits',
+};
+
+export const RANKING_TYPE_LABELS = {
+  [RANKING_TYPES.ISSUES]: 'Issues',
+  [RANKING_TYPES.COMMITS]: 'Top Commits',
+};
+
+// Table columns configuration for issues
 export const TABLE_COLUMNS = [
   { key: 'id', label: 'ID' },
   { key: 'assignedCards', label: 'Assigned Cards' },
@@ -44,4 +55,10 @@ export const TABLE_COLUMNS = [
   { key: 'reviewed', label: 'Reviewed' },
   { key: 'devDeployed', label: 'Dev Deployed' },
   { key: 'devChecked', label: 'Dev Checked' },
+];
+
+// Table columns configuration for commits
+export const COMMITS_TABLE_COLUMNS = [
+  { key: 'id', label: 'ID' },
+  { key: 'commits', label: 'Commits' },
 ];

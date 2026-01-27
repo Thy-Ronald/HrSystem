@@ -4,12 +4,15 @@
  * 
  * Features:
  * - localStorage-based caching with TTL
+ * - TTL: 2 minutes OR until 6 PM (whichever comes first)
  * - Automatic cache invalidation
  * - Cache key generation
  * - Cache statistics
  */
 
-const DEFAULT_TTL_MS = 2 * 60 * 1000; // 2 minutes
+import { getTTL2MinOr6PM, getExpiresAt2MinOr6PM } from '../../../utils/ttlHelpers';
+
+const DEFAULT_TTL_MS = 2 * 60 * 1000; // 2 minutes (fallback for legacy code)
 
 /**
  * Generate a cache key from parameters
@@ -23,28 +26,59 @@ export function generateCacheKey(prefix, ...parts) {
 
 /**
  * Get data from localStorage cache
+ * 
+ * Checks expiresAt field first (for 6 PM TTL), then falls back to timestamp-based TTL
+ * 
  * @param {string} key - Cache key
- * @param {number} ttlMs - Time to live in milliseconds
+ * @param {number} ttlMs - Time to live in milliseconds (fallback, defaults to 2min or 6PM)
  * @returns {any|null} Cached data or null if expired/missing
  */
-export function getCached(key, ttlMs = DEFAULT_TTL_MS) {
+export function getCached(key, ttlMs = null) {
   try {
     const cached = localStorage.getItem(key);
     if (!cached) {
       return null;
     }
 
-    const { data, timestamp } = JSON.parse(cached);
-    const age = Date.now() - timestamp;
-
-    if (age > ttlMs) {
-      // Cache expired, remove it
-      localStorage.removeItem(key);
-      return null;
+    const cacheEntry = JSON.parse(cached);
+    const { data, timestamp, expiresAt } = cacheEntry;
+    
+    // Step 1: Check expiresAt field (for 6 PM TTL logic)
+    if (expiresAt) {
+      const expiresAtDate = new Date(expiresAt);
+      const now = new Date();
+      
+      if (now >= expiresAtDate) {
+        // Cache expired (past 6 PM or past 2 minutes)
+        console.log(`[Cache] ❌ Expired: ${key} (expired at ${expiresAtDate.toISOString()})`);
+        localStorage.removeItem(key);
+        return null;
+      }
+      
+      const age = now.getTime() - (timestamp || expiresAtDate.getTime());
+      console.log(`[Cache HIT] ${key} (age: ${Math.round(age / 1000)}s, expires at ${expiresAtDate.toISOString()})`);
+      return data;
     }
-
-    console.log(`[Cache HIT] ${key} (age: ${Math.round(age / 1000)}s)`);
-    return data;
+    
+    // Step 2: Fallback to timestamp-based TTL (legacy format)
+    if (timestamp) {
+      const age = Date.now() - timestamp;
+      const effectiveTTL = ttlMs || getTTL2MinOr6PM();
+      
+      if (age > effectiveTTL) {
+        // Cache expired
+        localStorage.removeItem(key);
+        return null;
+      }
+      
+      console.log(`[Cache HIT] ${key} (age: ${Math.round(age / 1000)}s)`);
+      return data;
+    }
+    
+    // Step 3: No expiration info, assume expired
+    console.log(`[Cache] ❌ Invalid cache entry (no expiration): ${key}`);
+    localStorage.removeItem(key);
+    return null;
   } catch (error) {
     console.error('[Cache] Error reading cache:', error);
     return null;
@@ -54,7 +88,7 @@ export function getCached(key, ttlMs = DEFAULT_TTL_MS) {
 /**
  * Get raw cache entry regardless of expiration
  * @param {string} key 
- * @returns {Object|null} { data, timestamp, etag }
+ * @returns {Object|null} { data, timestamp, expiresAt, etag }
  */
 export function getRawCache(key) {
   try {
@@ -67,7 +101,14 @@ export function getRawCache(key) {
 }
 
 /**
- * Set data in localStorage cache
+ * Set data in localStorage cache with 2min OR 6PM TTL
+ * 
+ * Stores:
+ * - data: The cached data
+ * - timestamp: Current timestamp
+ * - expiresAt: Expiration time (2min from now OR 6PM, whichever comes first)
+ * - etag: Optional ETag for conditional requests
+ * 
  * @param {string} key - Cache key
  * @param {any} data - Data to cache
  * @param {number} timestamp - Optional timestamp (defaults to now)
@@ -75,12 +116,18 @@ export function getRawCache(key) {
  */
 export function setCached(key, data, timestamp = Date.now(), etag = null) {
   try {
-    localStorage.setItem(key, JSON.stringify({
+    // Calculate expiration time: 2 minutes OR 6 PM (whichever comes first)
+    const expiresAt = getExpiresAt2MinOr6PM();
+    
+    const cacheEntry = {
       data,
       timestamp,
-      etag,
-    }));
-    console.log(`[Cache SET] ${key} ${etag ? '(with ETag)' : ''}`);
+      expiresAt: expiresAt.toISOString(),
+      etag: etag || null,
+    };
+    
+    localStorage.setItem(key, JSON.stringify(cacheEntry));
+    console.log(`[Cache SET] ${key} (expires at ${expiresAt.toISOString()}) ${etag ? '(with ETag)' : ''}`);
   } catch (error) {
     console.error('[Cache] Error writing cache:', error);
     // If localStorage is full, clear old entries
@@ -88,7 +135,13 @@ export function setCached(key, data, timestamp = Date.now(), etag = null) {
       clearOldCache();
       // Try again
       try {
-        localStorage.setItem(key, JSON.stringify({ data, timestamp, etag }));
+        const expiresAt = getExpiresAt2MinOr6PM();
+        localStorage.setItem(key, JSON.stringify({ 
+          data, 
+          timestamp, 
+          expiresAt: expiresAt.toISOString(),
+          etag 
+        }));
       } catch (retryError) {
         console.error('[Cache] Failed to write cache after cleanup:', retryError);
       }
@@ -232,38 +285,38 @@ export function isCacheValid(key, ttlMs = DEFAULT_TTL_MS) {
 
 /**
  * Wrapper for async data fetching with caching and ETag support
+ * 
+ * Uses 2min OR 6PM TTL logic automatically
+ * 
  * @param {string} cacheKey - Cache key
  * @param {Function} fetchFn - Async function (etag) => Promise<data | {data, etag} | null>
- * @param {number} ttlMs - Cache TTL in milliseconds
+ * @param {number} ttlMs - Cache TTL in milliseconds (optional, defaults to 2min or 6PM)
  * @returns {Promise<any>} Cached or fresh data
  */
-export async function fetchWithCache(cacheKey, fetchFn, ttlMs = DEFAULT_TTL_MS) {
-  // Check raw cache first
-  const raw = getRawCache(cacheKey);
-
-  // 1. Valid Cache?
-  if (raw) {
-    const age = Date.now() - raw.timestamp;
-    if (age <= ttlMs) {
-      console.log(`[Cache HIT] ${cacheKey} (age: ${Math.round(age / 1000)}s)`);
-      return raw.data;
-    }
-    // Expired - continue to revalidation
+export async function fetchWithCache(cacheKey, fetchFn, ttlMs = null) {
+  // Step 1: Check cache first (uses expiresAt field)
+  const cached = getCached(cacheKey, ttlMs);
+  
+  if (cached !== null) {
+    // Cache hit - return immediately
+    return cached;
   }
-
-  // 2. Conditional Fetch
+  
+  // Step 2: Get raw cache for ETag (even if expired)
+  const raw = getRawCache(cacheKey);
   const previousEtag = raw?.etag;
   let result;
 
   try {
+    // Step 3: Conditional Fetch with ETag if available
     if (previousEtag) {
-      console.log(`[Cache REVALIDATE] ${cacheKey} (ETag: ${previousEtag})`);
+      console.log(`[Cache REVALIDATE] ${cacheKey} (ETag: ${previousEtag.substring(0, 20)}...)`);
       // Pass etag to fetchFn
       result = await fetchFn(previousEtag);
 
       if (result === null) { // 304 Not Modified
         console.log(`[Cache 304] Not Modified - Reviving cache for ${cacheKey}`);
-        // Revive stale data with new timestamp
+        // Revive stale data with new expiration (2min or 6PM)
         setCached(cacheKey, raw.data, Date.now(), previousEtag);
         return raw.data;
       }
@@ -272,7 +325,7 @@ export async function fetchWithCache(cacheKey, fetchFn, ttlMs = DEFAULT_TTL_MS) 
       result = await fetchFn();
     }
 
-    // 3. Store New Data
+    // Step 4: Store New Data with 2min OR 6PM TTL
     // Check if result has etag structure or is just data
     const data = result?.data !== undefined ? result.data : result;
     const newEtag = result?.etag || null;

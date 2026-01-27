@@ -172,6 +172,41 @@ export async function fetchIssuesByPeriod(repo, filter = 'today', options = {}) 
 }
 
 /**
+ * Fetch commits from a repository grouped by user for a given period
+ * @param {string} repo - Repository full name (owner/repo)
+ * @param {string} filter - Filter: today, yesterday, this-week, last-week, this-month
+ * @returns {Promise<Array>} Array of objects with username and commitCount
+ */
+export async function fetchCommitsByPeriod(repo, filter = 'today', options = {}) {
+  const params = new URLSearchParams({ repo, filter });
+  const headers = {};
+
+  if (options.etag) {
+    headers['If-None-Match'] = options.etag;
+  }
+
+  const res = await fetch(`${API_BASE}/api/github/commits?${params}`, {
+    headers,
+    signal: options.signal
+  });
+
+  if (res.status === 304) {
+    return null;
+  }
+
+  const data = await handleResponse(res);
+
+  if (options.includeEtag) {
+    return {
+      data,
+      etag: res.headers.get('ETag')
+    };
+  }
+
+  return data;
+}
+
+/**
  * Lightweight cache status check - does NOT call GitHub API
  * @param {string} repo - Repository full name (owner/repo)
  * @param {string} filter - Filter type

@@ -1,4 +1,11 @@
 const axios = require('axios');
+const {
+  generateCacheKey,
+  getCachedGitHubResponse,
+  setCachedGitHubResponse,
+  refreshCacheTTL,
+  getCachedETag,
+} = require('../utils/githubCache');
 
 const githubClient = axios.create({
   baseURL: 'https://api.github.com',
@@ -610,5 +617,158 @@ function checkCacheStatus(repoFullName, filter) {
   return getCacheInfo(cacheKey) || { valid: false, timestamp: null, hash: null };
 }
 
-module.exports = { getGithubProfileWithRepos, getIssuesByUserForPeriod, getAccessibleRepositories, clearCacheForRepo, checkCacheStatus, checkRepoChanges };
+/**
+ * Fetch commits from a repository grouped by user for a given period
+ * @param {string} repoFullName - Repository full name (owner/repo)
+ * @param {string} filter - Filter type: today, yesterday, this-week, last-week, this-month
+ * @returns {Promise<Array>} Array of objects with username and commitCount
+ */
+async function getCommitsByUserForPeriod(repoFullName, filter = 'today') {
+  if (!repoFullName || !repoFullName.includes('/')) {
+    const error = new Error('Repository must be in format owner/repo');
+    error.status = 400;
+    throw error;
+  }
+
+  // Only allow commits from specific repositories
+  const ALLOWED_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
+  if (!ALLOWED_REPOS.includes(repoFullName)) {
+    const error = new Error(`Commits can only be fetched for: ${ALLOWED_REPOS.join(', ')}`);
+    error.status = 403;
+    throw error;
+  }
+
+  const [owner, repo] = repoFullName.split('/');
+
+  // Step 1: Check Redis cache first
+  const cacheKey = generateCacheKey('commits', repoFullName, filter);
+  const cached = await getCachedGitHubResponse(cacheKey);
+  
+  if (cached && cached.data) {
+    console.log(`[Commits Cache] ✅ Cache HIT for ${repoFullName} (${filter})`);
+    return cached.data;
+  }
+
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) {
+    const error = new Error('GITHUB_TOKEN is required');
+    error.status = 500;
+    throw error;
+  }
+
+  const { startDate, endDate } = getDateRange(filter);
+  
+  // Step 2: Get cached ETag for conditional request
+  const cachedETag = await getCachedETag(cacheKey);
+  const headers = withAuth();
+  
+  // Step 3: Add If-None-Match header if we have cached ETag
+  if (cachedETag) {
+    headers['If-None-Match'] = cachedETag;
+    console.log(`[Commits Cache] 🔄 Conditional request with ETag: ${cachedETag.substring(0, 20)}...`);
+  }
+  
+  // Track commits per user
+  const userCommits = new Map();
+  
+  try {
+    let hasNextPage = true;
+    let page = 1;
+    const maxPages = 10; // Limit to prevent excessive API calls
+    let responseETag = null;
+    
+    while (hasNextPage && page <= maxPages) {
+      const response = await githubClient.get(`/repos/${owner}/${repo}/commits`, {
+        headers,
+        params: {
+          since: startDate.toISOString(),
+          until: endDate.toISOString(),
+          per_page: 100,
+          page: page,
+        },
+      });
+
+      // Step 4: Handle 304 Not Modified response
+      if (response.status === 304 && cached) {
+        console.log(`[Commits Cache] ✅ 304 Not Modified - reusing cached data for ${repoFullName}`);
+        // Refresh cache TTL to 6 PM
+        await refreshCacheTTL(cacheKey, cached.data, cachedETag);
+        return cached.data;
+      }
+
+      // Step 5: Extract ETag from response headers
+      responseETag = response.headers.etag || response.headers['etag'] || null;
+
+      const commits = response.data;
+      
+      if (commits.length === 0) {
+        hasNextPage = false;
+        break;
+      }
+
+      // Process each commit
+      for (const commit of commits) {
+        // Try author first, then committer if author is not a GitHub user
+        const author = commit.author || commit.committer;
+        if (author && author.login) {
+          const username = author.login.toLowerCase().trim();
+          const currentCount = userCommits.get(username) || 0;
+          userCommits.set(username, currentCount + 1);
+        }
+      }
+
+      // Check if there are more pages
+      const linkHeader = response.headers.link;
+      hasNextPage = linkHeader && linkHeader.includes('rel="next"');
+      page++;
+    }
+
+    // Convert map to array format matching issues structure
+    const result = Array.from(userCommits.entries()).map(([username, commitCount]) => ({
+      username,
+      commits: commitCount,
+      total: commitCount, // For consistency with issues structure
+    }));
+
+    // Sort by commit count descending
+    result.sort((a, b) => b.commits - a.commits || a.username.localeCompare(b.username));
+
+    // Step 6: Store new data + ETag in Redis with 6 PM TTL
+    await setCachedGitHubResponse(cacheKey, result, responseETag);
+    console.log(`[Commits Cache] ✅ Stored new data for ${repoFullName} (${filter})`);
+
+    return result;
+  } catch (error) {
+    // Step 7: Handle errors, including 304 Not Modified
+    if (error.response) {
+      if (error.response.status === 304 && cached) {
+        console.log(`[Commits Cache] ✅ 304 Not Modified (from error handler) - reusing cached data`);
+        await refreshCacheTTL(cacheKey, cached.data, cachedETag);
+        return cached.data;
+      }
+      
+      if (error.response.status === 404) {
+        const err = new Error(`Repository ${repoFullName} not found`);
+        err.status = 404;
+        throw err;
+      }
+      if (error.response.status === 403) {
+        const err = new Error('GitHub API rate limit exceeded');
+        err.status = 429;
+        throw err;
+      }
+    }
+    throw error;
+  }
+}
+
+module.exports = { 
+  getGithubProfileWithRepos, 
+  getIssuesByUserForPeriod, 
+  getAccessibleRepositories, 
+  clearCacheForRepo, 
+  checkCacheStatus, 
+  checkRepoChanges,
+  getCommitsByUserForPeriod
+};
 
