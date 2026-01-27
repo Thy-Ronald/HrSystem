@@ -334,6 +334,11 @@ export async function fetchWithCache(cacheKey, fetchFn, ttlMs = null) {
     return data;
 
   } catch (err) {
+    // Don't log abort errors as they're expected when component unmounts or dependencies change
+    if (err.name === 'AbortError') {
+      console.log(`[Cache] Request aborted for ${cacheKey}`);
+      throw err;
+    }
     console.error(`[Cache] Fetch failed for ${cacheKey}`, err);
     throw err;
   }

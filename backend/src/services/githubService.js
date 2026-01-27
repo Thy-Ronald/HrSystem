@@ -775,6 +775,261 @@ async function getCommitsByUserForPeriod(repoFullName, filter = 'today') {
   }
 }
 
+/**
+ * Map file extensions to programming languages
+ */
+const LANGUAGE_MAP = {
+  'js': 'JavaScript',
+  'jsx': 'JavaScript',
+  'ts': 'TypeScript',
+  'tsx': 'TypeScript',
+  'py': 'Python',
+  'java': 'Java',
+  'cpp': 'C++',
+  'c': 'C',
+  'cs': 'C#',
+  'php': 'PHP',
+  'rb': 'Ruby',
+  'go': 'Go',
+  'rs': 'Rust',
+  'swift': 'Swift',
+  'kt': 'Kotlin',
+  'scala': 'Scala',
+  'sh': 'Shell',
+  'bash': 'Shell',
+  'sql': 'SQL',
+  'html': 'HTML',
+  'css': 'CSS',
+  'scss': 'SCSS',
+  'sass': 'SASS',
+  'vue': 'Vue',
+  'json': 'JSON',
+  'xml': 'XML',
+  'yaml': 'YAML',
+  'yml': 'YAML',
+  'md': 'Markdown',
+  'dockerfile': 'Dockerfile',
+  'tf': 'Terraform',
+  'hcl': 'Terraform',
+};
+
+/**
+ * Get language from file path
+ */
+function getLanguageFromFile(filename) {
+  if (!filename) return null;
+  
+  // Handle special cases
+  if (filename.toLowerCase() === 'dockerfile' || filename.toLowerCase().startsWith('dockerfile.')) {
+    return 'Dockerfile';
+  }
+  
+  const parts = filename.split('.');
+  if (parts.length < 2) return null;
+  
+  const extension = parts[parts.length - 1].toLowerCase();
+  return LANGUAGE_MAP[extension] || null;
+}
+
+/**
+ * Fetch languages used by each user from commits in a repository
+ * Analyzes file changes in commits to determine languages
+ * When filter is 'all', fetches all commits (no date filtering) to show overall percentages
+ * @param {string} repoFullName - Repository full name (owner/repo)
+ * @param {string} filter - Filter type: today, yesterday, this-week, last-week, this-month, or 'all' for overall
+ * @returns {Promise<Array>} Array of objects with username and topLanguages
+ */
+async function getLanguagesByUserForPeriod(repoFullName, filter = 'all') {
+  if (!repoFullName || !repoFullName.includes('/')) {
+    const error = new Error('Repository must be in format owner/repo');
+    error.status = 400;
+    throw error;
+  }
+
+  // Only allow languages from specific repositories
+  const ALLOWED_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
+  if (!ALLOWED_REPOS.includes(repoFullName)) {
+    const error = new Error(`Languages can only be fetched for: ${ALLOWED_REPOS.join(', ')}`);
+    error.status = 403;
+    throw error;
+  }
+
+  const [owner, repo] = repoFullName.split('/');
+
+  // Step 1: Check Redis cache first
+  const cacheKey = generateCacheKey('languages', repoFullName, filter);
+  const cached = await getCachedGitHubResponse(cacheKey);
+  
+  if (cached && cached.data) {
+    console.log(`[Languages Cache] ✅ Cache HIT for ${repoFullName} (${filter})`);
+    return cached.data;
+  }
+
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) {
+    const error = new Error('GITHUB_TOKEN is required');
+    error.status = 500;
+    throw error;
+  }
+
+  // Step 2: Get cached ETag for conditional request
+  const cachedETag = await getCachedETag(cacheKey);
+  const headers = withAuth();
+  
+  if (cachedETag) {
+    headers['If-None-Match'] = cachedETag;
+  }
+  
+  // Track languages per user: { username: { language: count } }
+  const userLanguages = new Map();
+  
+  try {
+    let hasNextPage = true;
+    let page = 1;
+    const maxPages = filter === 'all' ? 20 : 10; // More pages for overall data
+    let responseETag = null;
+    
+    while (hasNextPage && page <= maxPages) {
+      // Build params - if filter is 'all', don't use date filtering
+      const commitParams = {
+        per_page: 100,
+        page: page,
+      };
+      
+      // Only add date filters if not 'all'
+      if (filter !== 'all') {
+        const { startDate, endDate } = getDateRange(filter);
+        commitParams.since = startDate.toISOString();
+        commitParams.until = endDate.toISOString();
+      }
+      
+      // Fetch commits with file stats
+      const response = await githubClient.get(`/repos/${owner}/${repo}/commits`, {
+        headers,
+        params: commitParams,
+      });
+
+      // Handle 304 Not Modified
+      if (response.status === 304 && cached) {
+        console.log(`[Languages Cache] ✅ 304 Not Modified - reusing cached data`);
+        await refreshCacheTTL(cacheKey, cached.data, cachedETag);
+        return cached.data;
+      }
+
+      responseETag = response.headers.etag || response.headers['etag'] || null;
+      const commits = response.data;
+      
+      if (commits.length === 0) {
+        hasNextPage = false;
+        break;
+      }
+
+      // Process each commit to get file changes
+      // Limit to first 50 commits per page to avoid excessive API calls
+      const commitsToProcess = commits.slice(0, 50);
+      
+      for (const commit of commitsToProcess) {
+        const author = commit.author || commit.committer;
+        if (!author || !author.login) continue;
+        
+        const username = author.login.toLowerCase().trim();
+        const commitSha = commit.sha;
+        
+        try {
+          // Fetch commit details with file stats
+          const commitResponse = await githubClient.get(`/repos/${owner}/${repo}/commits/${commitSha}`, {
+            headers: withAuth(),
+          });
+          
+          const files = commitResponse.data.files || [];
+          
+          // Initialize user language map if not exists
+          if (!userLanguages.has(username)) {
+            userLanguages.set(username, new Map());
+          }
+          const userLangMap = userLanguages.get(username);
+          
+          // Count languages from changed files
+          for (const file of files) {
+            const language = getLanguageFromFile(file.filename);
+            if (language) {
+              const currentCount = userLangMap.get(language) || 0;
+              userLangMap.set(language, currentCount + 1);
+            }
+          }
+          
+          // Small delay to avoid hitting rate limits
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (fileError) {
+          // Skip if we can't fetch commit details (rate limit or other error)
+          console.warn(`[Languages] Could not fetch commit ${commitSha}:`, fileError.message);
+          // Continue with next commit
+        }
+      }
+      
+      // If we processed fewer commits than available, don't fetch more pages
+      if (commitsToProcess.length < commits.length) {
+        hasNextPage = false;
+      }
+
+      // Check if there are more pages
+      const linkHeader = response.headers.link;
+      hasNextPage = linkHeader && linkHeader.includes('rel="next"');
+      page++;
+    }
+
+    // Convert to array format with top languages (as percentages)
+    const result = Array.from(userLanguages.entries()).map(([username, langMap]) => {
+      // Calculate total files for this user
+      const totalFiles = Array.from(langMap.values()).reduce((sum, count) => sum + count, 0);
+      
+      // Sort languages by count and get top 5, calculate percentages
+      const sortedLangs = Array.from(langMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([lang, count]) => {
+          const percentage = totalFiles > 0 ? Math.round((count / totalFiles) * 100) : 0;
+          return { language: lang, count, percentage };
+        });
+      
+      return {
+        username,
+        topLanguages: sortedLangs,
+        totalFiles,
+      };
+    });
+
+    // Sort by total files descending
+    result.sort((a, b) => b.totalFiles - a.totalFiles || a.username.localeCompare(b.username));
+
+    // Step 3: Store new data in Redis with 6 PM TTL
+    await setCachedGitHubResponse(cacheKey, result, responseETag);
+    console.log(`[Languages Cache] ✅ Stored new data for ${repoFullName} (${filter})`);
+
+    return result;
+  } catch (error) {
+    if (error.response) {
+      if (error.response.status === 304 && cached) {
+        console.log(`[Languages Cache] ✅ 304 Not Modified (from error handler)`);
+        await refreshCacheTTL(cacheKey, cached.data, cachedETag);
+        return cached.data;
+      }
+      
+      if (error.response.status === 404) {
+        const err = new Error(`Repository ${repoFullName} not found`);
+        err.status = 404;
+        throw err;
+      }
+      if (error.response.status === 403) {
+        const err = new Error('GitHub API rate limit exceeded');
+        err.status = 429;
+        throw err;
+      }
+    }
+    throw error;
+  }
+}
+
 module.exports = { 
   getGithubProfileWithRepos, 
   getIssuesByUserForPeriod, 
@@ -782,6 +1037,7 @@ module.exports = {
   clearCacheForRepo, 
   checkCacheStatus, 
   checkRepoChanges,
-  getCommitsByUserForPeriod
+  getCommitsByUserForPeriod,
+  getLanguagesByUserForPeriod
 };
 

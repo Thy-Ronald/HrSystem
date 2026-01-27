@@ -1,4 +1,4 @@
-const { getGithubProfileWithRepos, getIssuesByUserForPeriod, getAccessibleRepositories, checkCacheStatus, checkRepoChanges, getCommitsByUserForPeriod } = require('../services/githubService');
+const { getGithubProfileWithRepos, getIssuesByUserForPeriod, getAccessibleRepositories, checkCacheStatus, checkRepoChanges, getCommitsByUserForPeriod, getLanguagesByUserForPeriod } = require('../services/githubService');
 
 async function handleGithubLookup(req, res, next) {
   try {
@@ -139,4 +139,34 @@ async function handleCommitsByPeriod(req, res, next) {
   }
 }
 
-module.exports = { handleGithubLookup, handleIssuesByPeriod, handleGetRepositories, handleCacheCheck, handleRepoChanges, handleCommitsByPeriod };
+async function handleLanguagesByPeriod(req, res, next) {
+  try {
+    const { repo, filter = 'all' } = req.query;
+    
+    if (!repo) {
+      const error = new Error('Repository is required. Use ?repo=owner/name');
+      error.status = 400;
+      throw error;
+    }
+    
+    // Allow 'all' for overall percentages, or standard period filters
+    const validFilters = ['all', 'today', 'yesterday', 'this-week', 'last-week', 'this-month'];
+    if (!validFilters.includes(filter)) {
+      const error = new Error(`Invalid filter. Must be one of: ${validFilters.join(', ')}`);
+      error.status = 400;
+      throw error;
+    }
+    
+    const data = await getLanguagesByUserForPeriod(repo, filter);
+    res.json({
+      success: true,
+      data,
+      repo,
+      filter,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = { handleGithubLookup, handleIssuesByPeriod, handleGetRepositories, handleCacheCheck, handleRepoChanges, handleCommitsByPeriod, handleLanguagesByPeriod };

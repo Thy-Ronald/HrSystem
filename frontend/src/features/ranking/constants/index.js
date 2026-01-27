@@ -38,11 +38,13 @@ export const VIEW_MODES = {
 export const RANKING_TYPES = {
   ISSUES: 'issues',
   COMMITS: 'commits',
+  LANGUAGES: 'languages',
 };
 
 export const RANKING_TYPE_LABELS = {
   [RANKING_TYPES.ISSUES]: 'Issues',
   [RANKING_TYPES.COMMITS]: 'Top Commits',
+  [RANKING_TYPES.LANGUAGES]: 'Top Languages',
 };
 
 // Table columns configuration for issues
@@ -61,4 +63,10 @@ export const TABLE_COLUMNS = [
 export const COMMITS_TABLE_COLUMNS = [
   { key: 'id', label: 'ID' },
   { key: 'commits', label: 'Commits' },
+];
+
+// Table columns configuration for languages
+export const LANGUAGES_TABLE_COLUMNS = [
+  { key: 'id', label: 'ID' },
+  { key: 'topLanguages', label: 'Top Languages' },
 ];

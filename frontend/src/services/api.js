@@ -207,6 +207,41 @@ export async function fetchCommitsByPeriod(repo, filter = 'today', options = {})
 }
 
 /**
+ * Fetch languages used by each user from commits in a repository
+ * @param {string} repo - Repository full name (owner/repo)
+ * @param {string} filter - Filter: 'all' for overall percentages, or today, yesterday, this-week, last-week, this-month
+ * @returns {Promise<Array>} Array of objects with username and topLanguages
+ */
+export async function fetchLanguagesByPeriod(repo, filter = 'all', options = {}) {
+  const params = new URLSearchParams({ repo, filter: filter || 'all' });
+  const headers = {};
+
+  if (options.etag) {
+    headers['If-None-Match'] = options.etag;
+  }
+
+  const res = await fetch(`${API_BASE}/api/github/languages?${params}`, {
+    headers,
+    signal: options.signal
+  });
+
+  if (res.status === 304) {
+    return null;
+  }
+
+  const data = await handleResponse(res);
+
+  if (options.includeEtag) {
+    return {
+      data,
+      etag: res.headers.get('ETag')
+    };
+  }
+
+  return data;
+}
+
+/**
  * Lightweight cache status check - does NOT call GitHub API
  * @param {string} repo - Repository full name (owner/repo)
  * @param {string} filter - Filter type

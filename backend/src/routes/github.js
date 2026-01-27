@@ -1,5 +1,5 @@
 const express = require('express');
-const { handleGithubLookup, handleIssuesByPeriod, handleGetRepositories, handleCacheCheck, handleRepoChanges, handleCommitsByPeriod } = require('../controllers/githubController');
+const { handleGithubLookup, handleIssuesByPeriod, handleGetRepositories, handleCacheCheck, handleRepoChanges, handleCommitsByPeriod, handleLanguagesByPeriod } = require('../controllers/githubController');
 
 const router = express.Router();
 
@@ -11,6 +11,9 @@ router.get('/issues', handleIssuesByPeriod);
 
 // GET /api/github/commits?repo=owner/name&filter=today|yesterday|this-week|last-week|this-month
 router.get('/commits', handleCommitsByPeriod);
+
+// GET /api/github/languages?repo=owner/name&filter=today|yesterday|this-week|last-week|this-month
+router.get('/languages', handleLanguagesByPeriod);
 
 // GET /api/github/cache-check?repo=owner/name&filter=today - Lightweight cache status check
 router.get('/cache-check', handleCacheCheck);

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { fetchCachedIssues, fetchCommitsByPeriod } from '../../../services/api';
+import { fetchCachedIssues, fetchCommitsByPeriod, fetchLanguagesByPeriod } from '../../../services/api';
 import { transformRankingData, getCacheKey } from '../utils/dataTransform';
 import { fetchWithCache, generateCacheKey, setCached, getCached, clearCachePattern } from '../utils/cacheUtils';
 import { RANKING_TYPES } from '../constants';
@@ -13,6 +13,8 @@ const BATCH_SIZE = 10;
 // Note: TTL is now handled by cacheUtils.js (2min OR 6PM, whichever comes first)
 const RESET_HOUR = 18; // 6 PM
 const RESET_AT_6PM_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
+// Only these repos are allowed for languages and commits ranking
+const ALLOWED_RANKING_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
 
 /**
  * Check if cache timestamp is past the 6 PM reset time
@@ -40,6 +42,29 @@ function mergeUserData(targetMap, user, rankingType = RANKING_TYPES.ISSUES) {
       // For commits, just sum up the commit counts
       existing.commits = (existing.commits || 0) + (user.commits || 0);
       existing.total = existing.commits;
+    } else if (rankingType === RANKING_TYPES.LANGUAGES) {
+      // For languages, merge language arrays and recalculate top languages with percentages
+      const existingLangs = new Map();
+      (existing.topLanguages || []).forEach(lang => {
+        existingLangs.set(lang.language, lang.count || 0);
+      });
+      (user.topLanguages || []).forEach(lang => {
+        const currentCount = existingLangs.get(lang.language) || 0;
+        existingLangs.set(lang.language, currentCount + (lang.count || 0));
+      });
+      
+      // Update total files
+      existing.totalFiles = (existing.totalFiles || 0) + (user.totalFiles || 0);
+      const totalFiles = existing.totalFiles;
+      
+      // Convert back to sorted array (top 5) with percentages
+      existing.topLanguages = Array.from(existingLangs.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([lang, count]) => {
+          const percentage = totalFiles > 0 ? Math.round((count / totalFiles) * 100) : 0;
+          return { language: lang, count, percentage };
+        });
     } else {
       // For issues, merge all issue-related fields
       existing.assigned += user.assigned || 0;
@@ -87,6 +112,22 @@ export function useAllReposRanking() {
       return;
     }
 
+    // Filter repositories to only allowed ones for commits and languages
+    const allowedRepos = repositories.filter(repo => {
+      if (rankingType === RANKING_TYPES.COMMITS || rankingType === RANKING_TYPES.LANGUAGES) {
+        return ALLOWED_RANKING_REPOS.includes(repo.fullName);
+      }
+      return true; // For issues, allow all repos
+    });
+
+    if (allowedRepos.length === 0) {
+      setRankingData([]);
+      setError(rankingType === RANKING_TYPES.LANGUAGES || rankingType === RANKING_TYPES.COMMITS
+        ? `Only ${ALLOWED_RANKING_REPOS.join(' and ')} repositories are supported for ${rankingType === RANKING_TYPES.LANGUAGES ? 'languages' : 'commits'} ranking`
+        : 'No repositories available');
+      return;
+    }
+
     // Cancel pending request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -102,9 +143,17 @@ export function useAllReposRanking() {
 
       // 1. Check Cache for all repos (include rankingType in cache key)
       // Uses new TTL logic: 2 minutes OR until 6 PM (whichever comes first)
-      repositories.forEach(repo => {
-        const cachePrefix = rankingType === RANKING_TYPES.COMMITS ? 'commits' : 'allrepos';
-        const localStorageKey = generateCacheKey(cachePrefix, repo.fullName, filter);
+      // For languages, use 'all' instead of filter to show overall percentages
+      allowedRepos.forEach(repo => {
+        let cachePrefix = 'allrepos';
+        if (rankingType === RANKING_TYPES.COMMITS) {
+          cachePrefix = 'commits';
+        } else if (rankingType === RANKING_TYPES.LANGUAGES) {
+          cachePrefix = 'languages';
+        }
+        // For languages, use 'all' filter to show overall data
+        const filterForCache = rankingType === RANKING_TYPES.LANGUAGES ? 'all' : filter;
+        const localStorageKey = generateCacheKey(cachePrefix, repo.fullName, filterForCache);
         const cached = getCached(localStorageKey); // Uses 2min OR 6PM TTL automatically
 
         // Manual check for 6PM reset repositories (only for issues)
@@ -134,6 +183,8 @@ export function useAllReposRanking() {
           .map(user => {
             if (rankingType === RANKING_TYPES.COMMITS) {
               return { ...user, total: user.commits || 0 };
+            } else if (rankingType === RANKING_TYPES.LANGUAGES) {
+              return { ...user, total: user.totalFiles || 0 };
             }
             return { ...user, total: calculateUserTotal(user) };
           })
@@ -160,21 +211,38 @@ export function useAllReposRanking() {
         const batch = reposNeedingCheck.slice(i, i + BATCH_SIZE);
         const fetchPromises = batch.map(async (repo) => {
           try {
-            const cachePrefix = rankingType === RANKING_TYPES.COMMITS ? 'commits' : 'allrepos';
-            const localStorageKey = generateCacheKey(cachePrefix, repo.fullName, filter);
+            let cachePrefix = 'allrepos';
+            if (rankingType === RANKING_TYPES.COMMITS) {
+              cachePrefix = 'commits';
+            } else if (rankingType === RANKING_TYPES.LANGUAGES) {
+              cachePrefix = 'languages';
+            }
+            // For languages, use 'all' filter to show overall percentages
+            const filterForCache = rankingType === RANKING_TYPES.LANGUAGES ? 'all' : filter;
+            const localStorageKey = generateCacheKey(cachePrefix, repo.fullName, filterForCache);
 
             // Choose fetch function based on ranking type
-            const fetchFn = rankingType === RANKING_TYPES.COMMITS
-              ? (etag) => fetchCommitsByPeriod(repo.fullName, filter, {
-                  etag,
-                  includeEtag: true,
-                  signal
-                })
-              : (etag) => fetchCachedIssues(repo.fullName, filter, {
-                  etag,
-                  includeEtag: true,
-                  forceRefresh
-                });
+            let fetchFn;
+            if (rankingType === RANKING_TYPES.COMMITS) {
+              fetchFn = (etag) => fetchCommitsByPeriod(repo.fullName, filter, {
+                etag,
+                includeEtag: true,
+                signal
+              });
+            } else if (rankingType === RANKING_TYPES.LANGUAGES) {
+              // For languages, fetch with 'all' filter to get overall percentages
+              fetchFn = (etag) => fetchLanguagesByPeriod(repo.fullName, 'all', {
+                etag,
+                includeEtag: true,
+                signal
+              });
+            } else {
+              fetchFn = (etag) => fetchCachedIssues(repo.fullName, filter, {
+                etag,
+                includeEtag: true,
+                forceRefresh
+              });
+            }
 
             // fetchWithCache uses 2min OR 6PM TTL automatically
             const data = await fetchWithCache(
@@ -184,17 +252,33 @@ export function useAllReposRanking() {
 
             return { repo: repo.fullName, data };
           } catch (err) {
-            if (err.name === 'AbortError') throw err;
+            // Re-throw abort errors to stop processing
+            if (err.name === 'AbortError') {
+              throw err;
+            }
             console.error(`[useAllReposRanking] Error fetching ${repo.fullName}:`, err);
             return { repo: repo.fullName, data: null };
           }
         });
 
-        const results = await Promise.all(fetchPromises);
+        // Use Promise.allSettled to handle abort errors gracefully
+        // Use Promise.allSettled to handle abort errors gracefully
+        const results = await Promise.allSettled(fetchPromises);
+
+        // Check if any request was aborted
+        const abortError = results.find(r => r.status === 'rejected' && r.reason?.name === 'AbortError');
+        if (abortError) {
+          // If aborted, stop processing this batch
+          throw abortError.reason;
+        }
 
         // Update results map with new data
-        results.forEach(({ repo, data }) => {
-          if (data) cacheResults.set(repo, data);
+        results.forEach((result, index) => {
+          if (result.status === 'fulfilled' && result.value?.data) {
+            cacheResults.set(result.value.repo, result.value.data);
+          } else if (result.status === 'rejected') {
+            console.error(`[useAllReposRanking] Failed to fetch ${batch[index]?.fullName}:`, result.reason);
+          }
         });
 
         // Re-merge EVERYTHING (cached + new batch) for consistent ranking
@@ -209,6 +293,8 @@ export function useAllReposRanking() {
           .map(user => {
             if (rankingType === RANKING_TYPES.COMMITS) {
               return { ...user, total: user.commits || 0 };
+            } else if (rankingType === RANKING_TYPES.LANGUAGES) {
+              return { ...user, total: user.totalFiles || 0 };
             }
             return { ...user, total: calculateUserTotal(user) };
           })

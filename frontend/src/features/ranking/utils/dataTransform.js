@@ -21,6 +21,14 @@ export function transformRankingData(data, rankingType = 'issues') {
     }));
   }
   
+  if (rankingType === RANKING_TYPES.LANGUAGES) {
+    return data.map((item) => ({
+      id: item.username || 'Unknown',
+      topLanguages: item.topLanguages || [],
+      totalFiles: item.totalFiles || 0,
+    }));
+  }
+  
   // Default: issues format
   return data.map((item) => ({
     id: item.username || 'Unknown',

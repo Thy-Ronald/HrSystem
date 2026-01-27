@@ -3,7 +3,7 @@ import Modal from '../../../components/Modal';
 import { RankingTable } from './RankingTable';
 import { FilterDropdown } from './FilterDropdown';
 import { RepositoryMultiSelect } from './RepositoryMultiSelect';
-import { TABLE_COLUMNS, COMMITS_TABLE_COLUMNS, QUICK_FILTERS, FILTER_LABELS, STORAGE_KEYS, RANKING_TYPES, RANKING_TYPE_LABELS } from '../constants';
+import { TABLE_COLUMNS, COMMITS_TABLE_COLUMNS, LANGUAGES_TABLE_COLUMNS, QUICK_FILTERS, FILTER_LABELS, STORAGE_KEYS, RANKING_TYPES, RANKING_TYPE_LABELS } from '../constants';
 import { useAllReposRanking } from '../hooks/useAllReposRanking';
 
 const RANKING_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
@@ -65,13 +65,17 @@ export function RankingModal({ open, onClose, repositories, sharedCacheData }) {
   }, [availableRepositories, selectedRepos]);
 
   // Load data when modal opens or filter/repos/type change
+  // For languages, don't use filter (show overall percentages)
   useEffect(() => {
     if (!open || !availableRepositories || availableRepositories.length === 0) return;
     if (selectedRepos.length === 0) {
       return;
     }
-    loadAllReposData(selectedRepositories, activeFilter, false, rankingType);
-  }, [open, activeFilter, selectedRepos, rankingType, loadAllReposData, availableRepositories, selectedRepositories]);
+    // For languages, pass null filter to show overall data
+    const filterToUse = rankingType === RANKING_TYPES.LANGUAGES ? null : activeFilter;
+    loadAllReposData(selectedRepositories, filterToUse, false, rankingType);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, activeFilter, selectedRepos.join(','), rankingType]);
 
   const quickFilters = [
     { value: QUICK_FILTERS.TODAY, label: FILTER_LABELS[QUICK_FILTERS.TODAY] },
@@ -82,7 +86,13 @@ export function RankingModal({ open, onClose, repositories, sharedCacheData }) {
   ];
 
   return (
-    <Modal open={open} onClose={onClose} title="All Repositories Ranking" size="xl">
+    <Modal 
+      open={open} 
+      onClose={onClose} 
+      title="All Repositories Ranking" 
+      subtitle="Ranking data refreshes every 6 PM"
+      size="xl"
+    >
       <div className="p-6">
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="flex-1">
@@ -93,12 +103,15 @@ export function RankingModal({ open, onClose, repositories, sharedCacheData }) {
               loading={!repositories}
             />
           </div>
-          <div className="flex-1">
-            <FilterDropdown
-              activeFilter={activeFilter}
-              onFilterChange={setActiveFilter}
-            />
-          </div>
+          {/* Hide period dropdown for languages - show overall percentages */}
+          {rankingType !== RANKING_TYPES.LANGUAGES && (
+            <div className="flex-1">
+              <FilterDropdown
+                activeFilter={activeFilter}
+                onFilterChange={setActiveFilter}
+              />
+            </div>
+          )}
           <div className="flex-1">
             <div className="flex flex-col gap-1 relative w-full">
               <label htmlFor="type-select" className="text-sm font-medium text-[#5f6368]">
@@ -112,6 +125,7 @@ export function RankingModal({ open, onClose, repositories, sharedCacheData }) {
               >
                 <option value={RANKING_TYPES.ISSUES}>{RANKING_TYPE_LABELS[RANKING_TYPES.ISSUES]}</option>
                 <option value={RANKING_TYPES.COMMITS}>{RANKING_TYPE_LABELS[RANKING_TYPES.COMMITS]}</option>
+                <option value={RANKING_TYPES.LANGUAGES}>{RANKING_TYPE_LABELS[RANKING_TYPES.LANGUAGES]}</option>
               </select>
             </div>
           </div>
@@ -125,7 +139,13 @@ export function RankingModal({ open, onClose, repositories, sharedCacheData }) {
           ) : (
             <div className="overflow-y-auto h-full">
               <RankingTable
-                columns={rankingType === RANKING_TYPES.COMMITS ? COMMITS_TABLE_COLUMNS : TABLE_COLUMNS}
+                columns={
+                  rankingType === RANKING_TYPES.COMMITS 
+                    ? COMMITS_TABLE_COLUMNS 
+                    : rankingType === RANKING_TYPES.LANGUAGES
+                    ? LANGUAGES_TABLE_COLUMNS
+                    : TABLE_COLUMNS
+                }
                 data={rankingData}
                 loading={loading}
                 error={error}

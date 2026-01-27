@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom';
 
-const Modal = ({ open, onClose, title, children, size = 'medium' }) => {
+const Modal = ({ open, onClose, title, subtitle, children, size = 'medium' }) => {
   if (!open) return null;
 
   const sizeClasses = {
@@ -23,7 +23,12 @@ const Modal = ({ open, onClose, title, children, size = 'medium' }) => {
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between bg-[#f2f6fc] px-4 py-3">
-          <h2 className="text-sm font-medium text-[#202124]">{title}</h2>
+          <div className="flex flex-col">
+            <h2 className="text-sm font-medium text-[#202124]">{title}</h2>
+            {subtitle && (
+              <p className="text-xs text-[#70757a] mt-0.5">{subtitle}</p>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
