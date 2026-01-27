@@ -242,6 +242,51 @@ export async function fetchLanguagesByPeriod(repo, filter = 'all', options = {})
 }
 
 /**
+ * Get analytics overview
+ * @param {string} filter - Filter: today, yesterday, this-week, last-week, this-month
+ * @returns {Promise<Object>} Overview statistics
+ */
+export async function getAnalyticsOverview(filter = 'this-month') {
+  const res = await fetch(`${API_BASE}/api/analytics/overview?filter=${filter}`);
+  const data = await handleResponse(res);
+  return data.success ? data : { success: true, data };
+}
+
+/**
+ * Get daily activity trends
+ * @param {string} filter - Filter: today, yesterday, this-week, last-week, this-month
+ * @returns {Promise<Array>} Daily activity data
+ */
+export async function getDailyActivityTrends(filter = 'this-month') {
+  const res = await fetch(`${API_BASE}/api/analytics/trends?filter=${filter}`);
+  const data = await handleResponse(res);
+  return data.success ? data : { success: true, data: data.data || data };
+}
+
+/**
+ * Get top contributors
+ * @param {number} limit - Number of contributors to return
+ * @param {string} filter - Filter: today, yesterday, this-week, last-week, this-month
+ * @returns {Promise<Array>} Top contributors
+ */
+export async function getTopContributors(limit = 10, filter = 'this-month') {
+  const res = await fetch(`${API_BASE}/api/analytics/top-contributors?limit=${limit}&filter=${filter}`);
+  const data = await handleResponse(res);
+  return data.success ? data : { success: true, data: data.data || data };
+}
+
+/**
+ * Get language distribution
+ * @param {string} filter - Filter: all, today, yesterday, this-week, last-week, this-month
+ * @returns {Promise<Array>} Language distribution
+ */
+export async function getLanguageDistribution(filter = 'all') {
+  const res = await fetch(`${API_BASE}/api/analytics/languages?filter=${filter}`);
+  const data = await handleResponse(res);
+  return data.success ? data : { success: true, data: data.data || data };
+}
+
+/**
  * Lightweight cache status check - does NOT call GitHub API
  * @param {string} repo - Repository full name (owner/repo)
  * @param {string} filter - Filter type
