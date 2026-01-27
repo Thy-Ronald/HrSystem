@@ -357,11 +357,13 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
 
   const [owner, repo] = repoFullName.split('/');
 
-  // Check cache first
-  const cacheKey = `issues_${repoFullName}_${filter}`;
-  const cached = getCached(cacheKey);
-  if (cached) {
-    return cached;
+  // Step 1: Check Redis cache first (same as commits)
+  const cacheKey = generateCacheKey('issues', repoFullName, filter);
+  const cached = await getCachedGitHubResponse(cacheKey);
+  
+  if (cached && cached.data) {
+    console.log(`[Issues Cache] ✅ Cache HIT for ${repoFullName} (${filter})`);
+    return cached.data;
   }
 
   const token = process.env.GITHUB_TOKEN;
@@ -372,6 +374,15 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
   }
 
   const { startDate, endDate } = getDateRange(filter);
+  
+  // Step 2: Get cached ETag for conditional request
+  const cachedETag = await getCachedETag(cacheKey);
+  const headers = withAuth();
+  
+  // Step 3: Add If-None-Match header if we have cached ETag
+  // Note: GitHub GraphQL API doesn't support ETags, so we skip this for issues
+  // But we still use Redis caching for the response data
+  
   let hasNextPage = true;
   let cursor = null;
   let pageCount = 0;
@@ -579,8 +590,10 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
       }))
       .sort((a, b) => b.total - a.total || a.username.localeCompare(b.username));
 
-    // Cache the result
-    setCache(cacheKey, result);
+    // Step 4: Store new data in Redis with 6 PM TTL (same as commits)
+    // Note: GitHub GraphQL API doesn't return ETags, so we pass null
+    await setCachedGitHubResponse(cacheKey, result, null);
+    console.log(`[Issues Cache] ✅ Stored new data for ${repoFullName} (${filter})`);
 
     return result;
   } catch (error) {

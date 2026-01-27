@@ -50,7 +50,7 @@ export const RankingTable = memo(function RankingTable({ columns, data, loading,
     <div className="w-full">
       <div className="overflow-visible">
         <table className="w-full border-collapse table-auto">
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr className="border-b border-[#e8eaed] bg-gray-50/50">
               {columns.map((column) => (
                 <th

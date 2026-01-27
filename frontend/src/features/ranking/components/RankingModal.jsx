@@ -117,20 +117,22 @@ export function RankingModal({ open, onClose, repositories, sharedCacheData }) {
           </div>
         </div>
 
-        {selectedRepos.length === 0 ? (
-          <div className="flex items-center justify-center min-h-[400px] text-[#70757a]">
-            <p>Please select at least one repository to view rankings</p>
-          </div>
-        ) : (
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <RankingTable
-              columns={rankingType === RANKING_TYPES.COMMITS ? COMMITS_TABLE_COLUMNS : TABLE_COLUMNS}
-              data={rankingData}
-              loading={loading}
-              error={error}
-            />
-          </div>
-        )}
+        <div className="border border-gray-200 rounded-lg overflow-hidden h-[500px] flex flex-col">
+          {selectedRepos.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-[#70757a]">
+              <p>Please select at least one repository to view rankings</p>
+            </div>
+          ) : (
+            <div className="overflow-y-auto h-full">
+              <RankingTable
+                columns={rankingType === RANKING_TYPES.COMMITS ? COMMITS_TABLE_COLUMNS : TABLE_COLUMNS}
+                data={rankingData}
+                loading={loading}
+                error={error}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </Modal>
   );
