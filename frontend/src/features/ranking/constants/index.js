@@ -18,6 +18,7 @@ export const QUICK_FILTERS = {
   THIS_WEEK: 'this-week',
   LAST_WEEK: 'last-week',
   THIS_MONTH: 'this-month',
+  CUSTOM_MONTH: 'custom-month',
 };
 
 export const FILTER_LABELS = {
@@ -26,6 +27,7 @@ export const FILTER_LABELS = {
   [QUICK_FILTERS.THIS_WEEK]: 'This Week',
   [QUICK_FILTERS.LAST_WEEK]: 'Last Week',
   [QUICK_FILTERS.THIS_MONTH]: 'This Month',
+  [QUICK_FILTERS.CUSTOM_MONTH]: 'Select Month',
 };
 
 // View modes

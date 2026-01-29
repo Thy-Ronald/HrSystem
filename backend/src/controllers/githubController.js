@@ -40,8 +40,10 @@ async function handleIssuesByPeriod(req, res, next) {
     }
     
     const validFilters = ['today', 'yesterday', 'this-week', 'last-week', 'this-month'];
-    if (!validFilters.includes(filter)) {
-      const error = new Error(`Invalid filter. Must be one of: ${validFilters.join(', ')}`);
+    // Allow standard filters or custom month format (month-MM-YYYY)
+    const isValidFilter = validFilters.includes(filter) || (filter && filter.startsWith('month-') && filter.match(/^month-\d{2}-\d{4}$/));
+    if (!isValidFilter) {
+      const error = new Error(`Invalid filter. Must be one of: ${validFilters.join(', ')}, or a custom month format (month-MM-YYYY)`);
       error.status = 400;
       throw error;
     }
@@ -121,8 +123,10 @@ async function handleCommitsByPeriod(req, res, next) {
     }
     
     const validFilters = ['today', 'yesterday', 'this-week', 'last-week', 'this-month'];
-    if (!validFilters.includes(filter)) {
-      const error = new Error(`Invalid filter. Must be one of: ${validFilters.join(', ')}`);
+    // Allow standard filters or custom month format (month-MM-YYYY)
+    const isValidFilter = validFilters.includes(filter) || (filter && filter.startsWith('month-') && filter.match(/^month-\d{2}-\d{4}$/));
+    if (!isValidFilter) {
+      const error = new Error(`Invalid filter. Must be one of: ${validFilters.join(', ')}, or a custom month format (month-MM-YYYY)`);
       error.status = 400;
       throw error;
     }
@@ -149,10 +153,11 @@ async function handleLanguagesByPeriod(req, res, next) {
       throw error;
     }
     
-    // Allow 'all' for overall percentages, or standard period filters
+    // Allow 'all' for overall percentages, or standard period filters, or custom month format
     const validFilters = ['all', 'today', 'yesterday', 'this-week', 'last-week', 'this-month'];
-    if (!validFilters.includes(filter)) {
-      const error = new Error(`Invalid filter. Must be one of: ${validFilters.join(', ')}`);
+    const isValidFilter = validFilters.includes(filter) || (filter && filter.startsWith('month-') && filter.match(/^month-\d{2}-\d{4}$/));
+    if (!isValidFilter) {
+      const error = new Error(`Invalid filter. Must be one of: ${validFilters.join(', ')}, or a custom month format (month-MM-YYYY)`);
       error.status = 400;
       throw error;
     }

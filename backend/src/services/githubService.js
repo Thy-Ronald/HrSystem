@@ -289,6 +289,21 @@ function getDateRange(filter) {
   const now = new Date();
   let startDate, endDate;
 
+  // Handle custom month format: month-MM-YYYY (e.g., month-01-2024)
+  if (filter && filter.startsWith('month-')) {
+    const parts = filter.split('-');
+    if (parts.length === 3) {
+      const month = parseInt(parts[1]) - 1; // JavaScript months are 0-indexed
+      const year = parseInt(parts[2]);
+      startDate = new Date(year, month, 1);
+      startDate.setHours(0, 0, 0, 0);
+      // Get last day of the month
+      endDate = new Date(year, month + 1, 0);
+      endDate.setHours(23, 59, 59, 999);
+      return { startDate, endDate };
+    }
+  }
+
   switch (filter) {
     case 'yesterday': {
       startDate = new Date(now);
