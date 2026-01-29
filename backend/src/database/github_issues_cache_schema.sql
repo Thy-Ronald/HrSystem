@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS github_issues_cache (
   
   -- Issue metadata
   title VARCHAR(500) NOT NULL COMMENT 'Issue title',
+  body TEXT COMMENT 'Issue body/description text',
   state ENUM('open', 'closed') NOT NULL DEFAULT 'open' COMMENT 'Issue state',
   
   -- Assignees stored as JSON array of usernames

@@ -93,6 +93,36 @@ function deriveStatusFromLabels(labels) {
 }
 
 /**
+ * Extract P value from issue title or body/description
+ * Looks for patterns like "P:120" or "P: 120" (case-insensitive)
+ * Extracts and sums all numbers that follow "P:" pattern
+ * @param {string} text - Issue title or body/description text
+ * @returns {number} Sum of all P values found, or 0 if none found
+ */
+function extractPValue(text) {
+  if (!text || typeof text !== 'string') return 0;
+  
+  // Match patterns like "P:120", "P: 120", "P:120.5", etc.
+  // Case-insensitive, allows optional whitespace after colon
+  // Global flag to find all occurrences, capture group for the number
+  const regex = /P\s*:\s*(\d+(?:\.\d+)?)/gi;
+  let sum = 0;
+  let match;
+  
+  // Use exec in a loop to get all matches with capture groups
+  while ((match = regex.exec(text)) !== null) {
+    if (match[1]) {
+      const value = parseFloat(match[1]);
+      if (!isNaN(value)) {
+        sum += value;
+      }
+    }
+  }
+  
+  return sum;
+}
+
+/**
  * Calculate date range for a filter type
  * @param {string} filter - Filter type: today, yesterday, this-week, last-week, this-month, or month-MM-YYYY
  * @returns {Object} { startDate, endDate }
@@ -251,6 +281,7 @@ async function fetchIssuesFromGitHub(repoFullName, since = null) {
               databaseId
               number
               title
+              body
               state
               createdAt
               updatedAt
@@ -330,6 +361,7 @@ async function fetchIssuesFromGitHub(repoFullName, since = null) {
           repoFullName,
           repoOwner: owner,
           title: issue.title,
+          body: issue.body || '',
           state: issue.state.toLowerCase(),
           assignees,
           labels,
@@ -381,12 +413,13 @@ async function saveIssuesToCache(issues) {
   await transaction(async (conn) => {
     const sql = `
       INSERT INTO github_issues_cache 
-        (github_issue_id, issue_number, repo_full_name, repo_owner, title, state,
+        (github_issue_id, issue_number, repo_full_name, repo_owner, title, body, state,
          assignees, labels, status, github_created_at, github_updated_at,
          last_assigned_at, last_assigned_user)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         title = VALUES(title),
+        body = VALUES(body),
         state = VALUES(state),
         assignees = VALUES(assignees),
         labels = VALUES(labels),
@@ -405,6 +438,7 @@ async function saveIssuesToCache(issues) {
           issue.repoFullName,
           issue.repoOwner,
           issue.title,
+          issue.body || '',
           issue.state,
           JSON.stringify(issue.assignees),
           JSON.stringify(issue.labels),
@@ -535,9 +569,8 @@ async function refreshRepoCache(repoFullName, forceFullRefresh = false) {
 async function getCachedIssues(repoFullName, filter = 'today', username = null) {
   const { startDate, endDate } = getDateRange(filter);
 
-  // Build the query based on whether we're filtering by user
-  // Normalize username using LOWER and TRIM directly in SQL
-  let sql = `
+  // First query: Get status counts per user
+  let statusSql = `
     SELECT 
       LOWER(TRIM(username)) as normalized_username,
       status,
@@ -558,28 +591,82 @@ async function getCachedIssues(repoFullName, filter = 'today', username = null) 
         AND last_assigned_at <= ?
   `;
 
-  const params = [repoFullName, startDate, endDate];
+  const statusParams = [repoFullName, startDate, endDate];
 
   if (username) {
-    sql += ` AND JSON_CONTAINS(assignees, ?)`;
-    params.push(JSON.stringify(username));
+    statusSql += ` AND JSON_CONTAINS(assignees, ?)`;
+    statusParams.push(JSON.stringify(username));
   }
 
-  sql += `
+  statusSql += `
     ) as expanded
     WHERE username IS NOT NULL
     GROUP BY normalized_username, status
     ORDER BY normalized_username, status
   `;
 
+  // Second query: Get unique issues per user with title and body for P value extraction
+  // Use GROUP BY instead of DISTINCT for better MySQL compatibility
+  // Handle case where body column might not exist yet
+  let pValueSql = `
+    SELECT 
+      LOWER(TRIM(JSON_UNQUOTE(JSON_EXTRACT(assignees, CONCAT('$[', idx.i, ']'))))) as normalized_username,
+      issue_number,
+      title,
+      COALESCE(body, '') as body
+    FROM github_issues_cache
+    CROSS JOIN (
+      SELECT 0 as i UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4
+      UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9
+    ) as idx
+    WHERE repo_full_name = ?
+      AND JSON_UNQUOTE(JSON_EXTRACT(assignees, CONCAT('$[', idx.i, ']'))) IS NOT NULL
+      AND LOWER(TRIM(JSON_UNQUOTE(JSON_EXTRACT(assignees, CONCAT('$[', idx.i, ']'))))) IS NOT NULL
+      AND last_assigned_at >= ?
+      AND last_assigned_at <= ?
+  `;
+
+  const pValueParams = [repoFullName, startDate, endDate];
+
+  if (username) {
+    pValueSql += ` AND JSON_CONTAINS(assignees, ?)`;
+    pValueParams.push(JSON.stringify(username));
+  }
+
+  pValueSql += `
+    GROUP BY normalized_username, issue_number, title, body
+  `;
+
   try {
-    const results = await query(sql, params);
+    // Execute status query first
+    const statusResults = await query(statusSql, statusParams);
+    
+    // Try to execute P value query, but handle case where body column doesn't exist
+    let pValueResults = [];
+    try {
+      pValueResults = await query(pValueSql, pValueParams);
+    } catch (pValueError) {
+      // If body column doesn't exist yet, skip P value extraction
+      // This can happen if migration hasn't been run
+      const errorMessage = pValueError.message || String(pValueError);
+      if (errorMessage.includes('Unknown column') || 
+          errorMessage.includes('Invalid field') ||
+          errorMessage.includes('body') && errorMessage.includes('doesn\'t exist')) {
+        console.log(`[IssueCache] Body column not found, skipping P value extraction. Run migration: node backend/src/database/add_body_column_migration.js`);
+        pValueResults = []; // Set to empty array so code continues normally
+      } else {
+        // Log the error but don't fail the entire request
+        console.error(`[IssueCache] Error fetching P values:`, errorMessage);
+        pValueResults = []; // Set to empty array so code continues normally
+      }
+    }
 
-    // Aggregate results by user
+    // Aggregate status results by user
     const userStats = new Map();
+    const userPValues = new Map(); // Track P values per user (using issue_number to avoid duplicates)
 
-    for (const row of results) {
-      // Final safety normalization in JS Map
+    // Process status counts
+    for (const row of statusResults) {
       const usernameKey = row.normalized_username.toLowerCase().trim();
 
       if (!userStats.has(usernameKey)) {
@@ -591,17 +678,68 @@ async function getCachedIssues(repoFullName, filter = 'today', username = null) 
           reviewed: 0,
           devDeployed: 0,
           devChecked: 0,
+          assignedP: 0,
         });
+        userPValues.set(usernameKey, new Set()); // Use Set to track unique issue numbers
       }
 
       const stats = userStats.get(usernameKey);
       stats[row.status] = row.count;
     }
 
-    // Convert to array with totals
+    // Process P values from unique issues
+    for (const row of pValueResults) {
+      const usernameKey = row.normalized_username.toLowerCase().trim();
+      const issueKey = `${usernameKey}_${row.issue_number}`;
+
+      // Initialize userPValues Set if not exists
+      if (!userPValues.has(usernameKey)) {
+        userPValues.set(usernameKey, new Set());
+      }
+
+      const processedIssues = userPValues.get(usernameKey);
+      
+      // Only process each issue once per user
+      if (!processedIssues.has(issueKey)) {
+        processedIssues.add(issueKey);
+        
+        // Extract P value from both title and body
+        const titlePValue = extractPValue(row.title || '');
+        const bodyPValue = extractPValue(row.body || '');
+        const pValue = titlePValue + bodyPValue;
+        
+        // Debug logging (can be removed later)
+        if (pValue > 0) {
+          console.log(`[IssueCache] Found P value for issue #${row.issue_number}: title=${titlePValue}, body=${bodyPValue}, total=${pValue}`);
+        }
+        
+        if (pValue > 0) {
+          // Initialize stats if not exists
+          if (!userStats.has(usernameKey)) {
+            userStats.set(usernameKey, {
+              username: usernameKey,
+              assigned: 0,
+              inProgress: 0,
+              done: 0,
+              reviewed: 0,
+              devDeployed: 0,
+              devChecked: 0,
+              assignedP: 0,
+            });
+          }
+          
+          // Add P value to sum
+          const stats = userStats.get(usernameKey);
+          stats.assignedP = (stats.assignedP || 0) + pValue;
+        }
+      }
+    }
+
+    // Convert to array with totals and assignedP
     const result = Array.from(userStats.values())
       .map(stats => ({
         ...stats,
+        assignedP: stats.assignedP || 0,
         total: stats.assigned + stats.inProgress + stats.done +
           stats.reviewed + stats.devDeployed + stats.devChecked,
       }))

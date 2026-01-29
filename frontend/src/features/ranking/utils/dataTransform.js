@@ -33,7 +33,7 @@ export function transformRankingData(data, rankingType = 'issues') {
   return data.map((item) => ({
     id: item.username || 'Unknown',
     assignedCards: item.total || 0, // Total of all card types
-    assignedP: 0, // Reserved for future use
+    assignedP: item.assignedP || 0, // Sum of P values from card descriptions
     inProgressCards: item.inProgress || 0,
     doneCards: item.done || 0,
     reviewed: item.reviewed || 0,

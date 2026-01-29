@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS github_issues_cache (
   repo_full_name VARCHAR(255) NOT NULL COMMENT 'Full repository name (owner/repo)',
   repo_owner VARCHAR(100) NOT NULL COMMENT 'Repository owner (extracted for indexing)',
   title VARCHAR(500) NOT NULL COMMENT 'Issue title',
+  body TEXT COMMENT 'Issue body/description text',
   state ENUM('open', 'closed') NOT NULL DEFAULT 'open' COMMENT 'Issue state',
   assignees JSON COMMENT 'Array of assignee usernames',
   labels JSON COMMENT 'Array of label objects',
