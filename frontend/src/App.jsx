@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import ContractForm from './pages/ContractForm';
 import Dashboard from './pages/Dashboard';
 import RankingPage from './pages/StaffRanking';
+import Monitoring from './pages/Monitoring';
 import Layout from './components/Layout';
 
 // Map URL paths to page keys
@@ -11,6 +12,7 @@ const routeMap = {
   '/dashboard': 'dashboard',
   '/staff-ranking': 'staff-ranking',
   '/ranking': 'staff-ranking', // Alias
+  '/monitoring': 'monitoring',
 };
 
 // Get page from URL
@@ -25,6 +27,7 @@ function setPathFromPage(page) {
     'contract-form': '/contract-form',
     'dashboard': '/dashboard',
     'staff-ranking': '/staff-ranking',
+    'monitoring': '/monitoring',
   };
   const path = pathMap[page] || '/';
   if (window.location.pathname !== path) {
@@ -61,6 +64,7 @@ function App() {
       {currentPage === 'contract-form' && <ContractForm />}
       {currentPage === 'dashboard' && <Dashboard />}
       {currentPage === 'staff-ranking' && <RankingPage />}
+      {currentPage === 'monitoring' && <Monitoring />}
     </Layout>
   );
 }
