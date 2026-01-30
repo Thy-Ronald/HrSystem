@@ -15,15 +15,32 @@ class MonitoringService {
    * @param {string} employeeName - Name of the employee
    * @returns {string} Session ID
    */
-  createSession(employeeSocketId, employeeName) {
+  createSession(employeeSocketId, employeeName, expirationMinutes = 30) {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const expiresAt = new Date(Date.now() + expirationMinutes * 60 * 1000);
+    
     this.sessions.set(sessionId, {
       employeeSocketId,
       employeeName,
       adminSocketIds: new Set(),
       streamActive: false,
       createdAt: new Date(),
+      expiresAt,
     });
+
+    // Auto-cleanup after expiration
+    const timeoutId = setTimeout(() => {
+      if (this.sessions.has(sessionId)) {
+        this.deleteSession(sessionId);
+      }
+    }, expirationMinutes * 60 * 1000);
+
+    // Store timeout ID for potential cancellation
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      session.timeoutId = timeoutId;
+    }
+
     return sessionId;
   }
 
@@ -87,7 +104,16 @@ class MonitoringService {
    * @returns {Object|null} Session info
    */
   getSession(sessionId) {
-    return this.sessions.get(sessionId) || null;
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return null;
+    }
+    // Check if expired
+    if (this.isSessionExpired(sessionId)) {
+      this.deleteSession(sessionId);
+      return null;
+    }
+    return session;
   }
 
   /**
@@ -95,7 +121,38 @@ class MonitoringService {
    * @param {string} sessionId - Session ID
    */
   deleteSession(sessionId) {
+    const session = this.sessions.get(sessionId);
+    if (session && session.timeoutId) {
+      clearTimeout(session.timeoutId);
+    }
     this.sessions.delete(sessionId);
+  }
+
+  /**
+   * Check if session is expired
+   * @param {string} sessionId - Session ID
+   * @returns {boolean} True if expired
+   */
+  isSessionExpired(sessionId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return true;
+    }
+    return new Date() > session.expiresAt;
+  }
+
+  /**
+   * Get time remaining until expiration (in minutes)
+   * @param {string} sessionId - Session ID
+   * @returns {number} Minutes remaining, or 0 if expired
+   */
+  getTimeRemaining(sessionId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return 0;
+    }
+    const remaining = session.expiresAt - new Date();
+    return Math.max(0, Math.floor(remaining / 60000));
   }
 
   /**
@@ -103,13 +160,17 @@ class MonitoringService {
    * @returns {Array} Array of session info
    */
   getAllSessions() {
-    return Array.from(this.sessions.entries()).map(([sessionId, session]) => ({
-      sessionId,
-      employeeName: session.employeeName,
-      streamActive: session.streamActive,
-      adminCount: session.adminSocketIds.size,
-      createdAt: session.createdAt,
-    }));
+    return Array.from(this.sessions.entries())
+      .filter(([sessionId]) => !this.isSessionExpired(sessionId))
+      .map(([sessionId, session]) => ({
+        sessionId,
+        employeeName: session.employeeName,
+        streamActive: session.streamActive,
+        adminCount: session.adminSocketIds.size,
+        createdAt: session.createdAt,
+        expiresAt: session.expiresAt,
+        timeRemaining: this.getTimeRemaining(sessionId),
+      }));
   }
 
   /**

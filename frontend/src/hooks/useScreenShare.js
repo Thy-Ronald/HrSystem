@@ -290,5 +290,6 @@ export function useScreenShare(role, sessionId) {
     startViewing,
     stopViewing,
     isConnected,
+    peerConnection: peerConnectionRef.current,
   };
 }

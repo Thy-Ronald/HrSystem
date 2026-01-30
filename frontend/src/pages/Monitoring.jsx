@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSocket } from '../hooks/useSocket';
 import { useScreenShare } from '../hooks/useScreenShare';
+import { useToast, ToastContainer } from '../components/Toast';
+import { useConnectionQuality } from '../hooks/useConnectionQuality';
 
 const Monitoring = () => {
   const { socket, isConnected, emit, subscribe, unsubscribe } = useSocket();
@@ -11,6 +13,11 @@ const Monitoring = () => {
   const [selectedSession, setSelectedSession] = useState(null);
   const [streamActive, setStreamActive] = useState(false);
   const [adminCount, setAdminCount] = useState(0);
+  const [sessionTimeRemaining, setSessionTimeRemaining] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+
+  const toast = useToast();
 
   const {
     isSharing,
@@ -22,39 +29,64 @@ const Monitoring = () => {
     startViewing,
     stopViewing,
     isConnected: shareConnected,
+    peerConnection,
   } = useScreenShare(role, sessionId);
+
+  // Connection quality monitoring
+  const connectionQuality = useConnectionQuality(peerConnection, shareConnected);
 
   // Handle authentication
   const handleAuth = useCallback(() => {
     if (!name.trim() || !role) {
-      alert('Please enter your name and select a role');
+      toast.error('Please enter your name and select a role');
       return;
     }
 
-    emit('monitoring:auth', { role, name });
-  }, [role, name, emit]);
+    if (name.trim().length < 2) {
+      toast.error('Name must be at least 2 characters long');
+      return;
+    }
+
+    setLoading(true);
+    emit('monitoring:auth', { role, name: name.trim() });
+  }, [role, name, emit, toast]);
 
   // Handle session creation (employee)
   useEffect(() => {
-    const handleSessionCreated = ({ sessionId: newSessionId }) => {
+    const handleSessionCreated = ({ sessionId: newSessionId, timeRemaining }) => {
       setSessionId(newSessionId);
-      console.log('Session created:', newSessionId);
+      setSessionTimeRemaining(timeRemaining || 30);
+      setLoading(false);
+      toast.success('Session created successfully');
+    };
+
+    const handleAuthError = ({ message }) => {
+      setLoading(false);
+      toast.error(message || 'Authentication failed');
     };
 
     subscribe('monitoring:session-created', handleSessionCreated);
-    return () => unsubscribe('monitoring:session-created', handleSessionCreated);
-  }, [subscribe, unsubscribe]);
+    subscribe('monitoring:error', handleAuthError);
+
+    return () => {
+      unsubscribe('monitoring:session-created', handleSessionCreated);
+      unsubscribe('monitoring:error', handleAuthError);
+    };
+  }, [subscribe, unsubscribe, toast]);
 
   // Handle sessions list (admin)
   useEffect(() => {
     const handleSessionsList = ({ sessions: sessionsList }) => {
       setSessions(sessionsList);
+      setSessionsLoading(false);
+      setLoading(false);
     };
 
     const handleSessionAvailable = ({ sessionId: newSessionId, employeeName }) => {
       setSessions((prev) => {
         const exists = prev.find((s) => s.sessionId === newSessionId);
         if (!exists) {
+          toast.info(`${employeeName} started a new session`);
           return [...prev, { sessionId: newSessionId, employeeName, streamActive: false }];
         }
         return prev;
@@ -62,6 +94,10 @@ const Monitoring = () => {
     };
 
     const handleSessionEnded = ({ sessionId: endedSessionId }) => {
+      const endedSession = sessions.find((s) => s.sessionId === endedSessionId);
+      if (endedSession) {
+        toast.warning(`Session with ${endedSession.employeeName} has ended`);
+      }
       setSessions((prev) => prev.filter((s) => s.sessionId !== endedSessionId));
       if (selectedSession?.sessionId === endedSessionId) {
         setSelectedSession(null);
@@ -85,6 +121,7 @@ const Monitoring = () => {
     const handleStreamStarted = ({ sessionId: targetSessionId }) => {
       if (targetSessionId === sessionId) {
         setStreamActive(true);
+        toast.success('Screen sharing started');
       }
       setSessions((prev) =>
         prev.map((s) =>
@@ -96,6 +133,7 @@ const Monitoring = () => {
     const handleStreamStopped = ({ sessionId: targetSessionId }) => {
       if (targetSessionId === sessionId) {
         setStreamActive(false);
+        toast.info('Screen sharing stopped');
       }
       setSessions((prev) =>
         prev.map((s) =>
@@ -115,16 +153,20 @@ const Monitoring = () => {
 
   // Handle session joined (admin)
   useEffect(() => {
-    const handleSessionJoined = ({ streamActive: active }) => {
+    const handleSessionJoined = ({ streamActive: active, employeeName }) => {
       setStreamActive(active);
+      setLoading(false);
       if (active && selectedSession) {
         startViewing(selectedSession.sessionId);
+        toast.success(`Connected to ${employeeName}'s stream`);
+      } else {
+        toast.info(`Joined ${employeeName}'s session. Waiting for stream...`);
       }
     };
 
     subscribe('monitoring:session-joined', handleSessionJoined);
     return () => unsubscribe('monitoring:session-joined', handleSessionJoined);
-  }, [selectedSession, startViewing, subscribe, unsubscribe]);
+  }, [selectedSession, startViewing, subscribe, unsubscribe, toast]);
 
   // Handle admin join/leave notifications (employee)
   useEffect(() => {
@@ -132,12 +174,12 @@ const Monitoring = () => {
 
     const handleAdminJoined = ({ adminName }) => {
       setAdminCount((prev) => prev + 1);
-      console.log(`Admin ${adminName} joined`);
+      toast.info(`${adminName} joined your session`);
     };
 
     const handleAdminLeft = ({ adminName }) => {
       setAdminCount((prev) => Math.max(0, prev - 1));
-      console.log(`Admin ${adminName} left`);
+      toast.info(`${adminName} left your session`);
     };
 
     subscribe('monitoring:admin-joined', handleAdminJoined);
@@ -147,7 +189,7 @@ const Monitoring = () => {
       unsubscribe('monitoring:admin-joined', handleAdminJoined);
       unsubscribe('monitoring:admin-left', handleAdminLeft);
     };
-  }, [role, subscribe, unsubscribe]);
+  }, [role, subscribe, unsubscribe, toast]);
 
   // Join session (admin)
   const handleJoinSession = (session) => {
@@ -156,6 +198,7 @@ const Monitoring = () => {
       stopViewing();
       setSelectedSession(null);
       emit('monitoring:leave-session');
+      toast.info('Left session');
     } else {
       // Join new session
       if (selectedSession) {
@@ -163,19 +206,40 @@ const Monitoring = () => {
         emit('monitoring:leave-session');
       }
       setSelectedSession(session);
+      setLoading(true);
       emit('monitoring:join-session', { sessionId: session.sessionId });
+      toast.info(`Joining ${session.employeeName}'s session...`);
     }
   };
 
   // Reset on disconnect
   useEffect(() => {
     if (!isConnected && role) {
+      toast.error('Connection lost. Please refresh the page.');
       setRole(null);
       setSessionId(null);
       setSelectedSession(null);
       setSessions([]);
     }
-  }, [isConnected, role]);
+  }, [isConnected, role, toast]);
+
+  // Update session time remaining (employee)
+  useEffect(() => {
+    if (role === 'employee' && sessionId && sessionTimeRemaining !== null) {
+      const interval = setInterval(() => {
+        setSessionTimeRemaining((prev) => {
+          if (prev === null) return null;
+          if (prev <= 1) {
+            toast.warning('Session will expire in 1 minute');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 60000); // Update every minute
+
+      return () => clearInterval(interval);
+    }
+  }, [role, sessionId, sessionTimeRemaining, toast]);
 
   // Not authenticated - show login form
   if (!role) {
@@ -254,37 +318,58 @@ const Monitoring = () => {
   // Employee view
   if (role === 'employee') {
     return (
-      <div className="p-8">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl font-bold mb-6 text-gray-800">
-            Screen Sharing - Employee View
-          </h2>
-
-          {/* Sharing banner */}
-          {isSharing && (
-            <div className="bg-red-600 text-white px-4 py-3 rounded-md mb-4 flex items-center justify-between">
+      <>
+        <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
+        <div className="p-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">
+                Screen Sharing - Employee View
+              </h2>
+              {/* Connection Status */}
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 bg-white rounded-full animate-pulse"></span>
-                <span className="font-semibold">Sharing ON</span>
-                {adminCount > 0 && (
-                  <span className="text-sm ml-2">
-                    ({adminCount} admin{adminCount !== 1 ? 's' : ''} viewing)
-                  </span>
-                )}
+                <div className={`w-2 h-2 rounded-full ${
+                  isConnected ? 'bg-green-500' : 'bg-red-500'
+                }`}></div>
+                <span className="text-sm text-gray-600">
+                  {isConnected ? 'Connected' : 'Disconnected'}
+                </span>
               </div>
-              <button
-                onClick={stopSharing}
-                className="bg-white text-red-600 px-4 py-1 rounded-md hover:bg-red-50 font-medium"
-              >
-                Stop Sharing
-              </button>
             </div>
-          )}
+
+            {/* Sharing banner */}
+            {isSharing && (
+              <div className="bg-red-600 text-white px-4 py-3 rounded-md mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 bg-white rounded-full animate-pulse"></span>
+                  <span className="font-semibold">Sharing ON</span>
+                  {adminCount > 0 && (
+                    <span className="text-sm ml-2">
+                      ({adminCount} admin{adminCount !== 1 ? 's' : ''} viewing)
+                    </span>
+                  )}
+                  {sessionTimeRemaining !== null && (
+                    <span className="text-sm ml-2 opacity-90">
+                      • {sessionTimeRemaining} min remaining
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={stopSharing}
+                  className="bg-white text-red-600 px-4 py-1 rounded-md hover:bg-red-50 font-medium"
+                >
+                  Stop Sharing
+                </button>
+              </div>
+            )}
 
           {/* Error message */}
           {shareError && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-              {shareError}
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex items-center gap-2">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              <span>{shareError}</span>
             </div>
           )}
 
@@ -316,10 +401,20 @@ const Monitoring = () => {
                 </p>
                 <button
                   onClick={startSharing}
-                  disabled={!shareConnected}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
+                  disabled={!shareConnected || loading}
+                  className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium flex items-center gap-2 mx-auto"
                 >
-                  Start Sharing
+                  {loading ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Starting...
+                    </>
+                  ) : (
+                    'Start Sharing'
+                  )}
                 </button>
               </div>
             ) : (
@@ -341,16 +436,55 @@ const Monitoring = () => {
           </div>
         </div>
       </div>
+      </>
     );
   }
 
   // Admin view
   return (
-    <div className="p-8">
-      <div className="max-w-6xl mx-auto">
-        <h2 className="text-2xl font-bold mb-6 text-gray-800">
-          Screen Sharing - Admin View
-        </h2>
+    <>
+      <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
+      <div className="p-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-800">
+              Screen Sharing - Admin View
+            </h2>
+            {/* Connection Status */}
+            <div className="flex items-center gap-4">
+              {connectionQuality.isConnecting && (
+                <div className="flex items-center gap-2 text-sm text-blue-600">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Connecting...
+                </div>
+              )}
+              {connectionQuality.isConnected && (
+                <div className="flex items-center gap-2 text-sm">
+                  <div className={`w-2 h-2 rounded-full ${
+                    connectionQuality.quality === 'excellent' ? 'bg-green-500' :
+                    connectionQuality.quality === 'good' ? 'bg-green-400' :
+                    connectionQuality.quality === 'fair' ? 'bg-yellow-500' :
+                    'bg-red-500'
+                  }`}></div>
+                  <span className="text-gray-600">
+                    {connectionQuality.quality.charAt(0).toUpperCase() + connectionQuality.quality.slice(1)}
+                    {connectionQuality.latency && ` • ${connectionQuality.latency}ms`}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  isConnected ? 'bg-green-500' : 'bg-red-500'
+                }`}></div>
+                <span className="text-sm text-gray-600">
+                  {isConnected ? 'Connected' : 'Disconnected'}
+                </span>
+              </div>
+            </div>
+          </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Sessions list */}
@@ -360,7 +494,13 @@ const Monitoring = () => {
                 Active Sessions
               </h3>
 
-              {sessions.length === 0 ? (
+              {sessionsLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="animate-pulse bg-gray-200 h-16 rounded-md"></div>
+                  ))}
+                </div>
+              ) : sessions.length === 0 ? (
                 <p className="text-gray-500 text-sm">
                   No active sessions. Employees can start sharing to appear here.
                 </p>
@@ -381,13 +521,20 @@ const Monitoring = () => {
                           <p className="font-medium text-gray-800">
                             {session.employeeName}
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {session.streamActive ? (
-                              <span className="text-green-600">● Sharing</span>
-                            ) : (
-                              <span className="text-gray-400">○ Waiting</span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-xs text-gray-500">
+                              {session.streamActive ? (
+                                <span className="text-green-600">● Sharing</span>
+                              ) : (
+                                <span className="text-gray-400">○ Waiting</span>
+                              )}
+                            </p>
+                            {session.timeRemaining !== undefined && (
+                              <span className="text-xs text-gray-400">
+                                • {session.timeRemaining}m left
+                              </span>
                             )}
-                          </p>
+                          </div>
                         </div>
                         {selectedSession?.sessionId === session.sessionId && (
                           <span className="text-blue-600 text-sm">Viewing</span>
@@ -420,8 +567,16 @@ const Monitoring = () => {
                     </button>
                   </div>
 
-                  {streamActive ? (
-                    <div className="bg-black rounded-lg overflow-hidden">
+                  {loading && !streamActive ? (
+                    <div className="bg-gray-100 rounded-lg p-12 text-center">
+                      <svg className="animate-spin h-12 w-12 mx-auto text-gray-400 mb-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      <p className="text-gray-600">Connecting to stream...</p>
+                    </div>
+                  ) : streamActive ? (
+                    <div className="bg-black rounded-lg overflow-hidden relative">
                       <video
                         ref={remoteVideoRef}
                         autoPlay
@@ -429,9 +584,17 @@ const Monitoring = () => {
                         className="w-full h-auto"
                         style={{ maxHeight: '70vh' }}
                       />
+                      {connectionQuality.isConnecting && (
+                        <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded text-sm">
+                          Connecting...
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="bg-gray-100 rounded-lg p-12 text-center">
+                      <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
                       <p className="text-gray-600">
                         Waiting for {selectedSession.employeeName} to start sharing...
                       </p>
@@ -439,8 +602,11 @@ const Monitoring = () => {
                   )}
 
                   {shareError && (
-                    <div className="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                      {shareError}
+                    <div className="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded flex items-center gap-2">
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                      <span>{shareError}</span>
                     </div>
                   )}
                 </div>
@@ -469,6 +635,7 @@ const Monitoring = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

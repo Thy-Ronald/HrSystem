@@ -88,7 +88,8 @@ async function startServer() {
         // Create session for employee
         const sessionId = monitoringService.createSession(socket.id, name);
         socket.data.sessionId = sessionId;
-        socket.emit('monitoring:session-created', { sessionId });
+        const timeRemaining = monitoringService.getTimeRemaining(sessionId);
+        socket.emit('monitoring:session-created', { sessionId, timeRemaining });
         socket.broadcast.emit('monitoring:session-available', {
           sessionId,
           employeeName: name,
