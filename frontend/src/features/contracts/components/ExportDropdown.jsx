@@ -43,7 +43,7 @@ export function ExportDropdown({ contracts, currentTime, disabled }) {
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={disabled}
-        className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#f8f9fa] text-[#5f6368] border border-[#dadce0] rounded-full font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#f8f9fa] text-[#5f6368] border border-[#dadce0] rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         title="Export contracts"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -52,12 +52,12 @@ export function ExportDropdown({ contracts, currentTime, disabled }) {
           <line x1="12" y1="15" x2="12" y2="3" />
         </svg>
         <span>Export</span>
-        <svg 
-          width="16" 
-          height="16" 
-          viewBox="0 0 24 24" 
-          fill="none" 
-          stroke="currentColor" 
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
           strokeWidth="2"
           className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
         >
@@ -66,7 +66,7 @@ export function ExportDropdown({ contracts, currentTime, disabled }) {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white border border-[#dadce0] rounded-lg shadow-lg z-50">
+        <div className="absolute right-0 mt-2 w-48 bg-white border border-[#dadce0] rounded shadow-lg z-50">
           <div className="py-1">
             <button
               onClick={handleExportPDF}

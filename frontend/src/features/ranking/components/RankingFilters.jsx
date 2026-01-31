@@ -7,8 +7,8 @@ import { QuickFilterButton } from './QuickFilterButton';
 import { RepositorySelect } from './RepositorySelect';
 import { QUICK_FILTERS, FILTER_LABELS } from '../constants';
 
-export function RankingFilters({ 
-  activeQuickFilter, 
+export function RankingFilters({
+  activeQuickFilter,
   onQuickFilterChange,
   repositories,
   selectedRepo,
@@ -24,7 +24,7 @@ export function RankingFilters({
   ];
 
   return (
-    <section className="mb-8 pb-8 border-b border-[#e8eaed]">
+    <section className="mb-0 pb-4 border-b border-[#e8eaed]">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <nav className="flex flex-nowrap items-center gap-2 overflow-x-auto" aria-label="Quick date filters">
           {quickFilters.map((filter) => (

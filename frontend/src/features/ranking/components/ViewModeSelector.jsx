@@ -11,14 +11,13 @@ export function ViewModeSelector({ viewMode, onViewChange, onOpenModal }) {
       <button
         onClick={onOpenModal}
         type="button"
-        className="px-4 py-2 text-sm font-medium rounded-full bg-white border border-[#dadce0] text-[#5f6368] hover:bg-[#f8f9fa] transition-colors"
+        className="px-4 py-2 text-sm font-medium rounded bg-white border border-[#dadce0] text-[#5f6368] hover:bg-[#f8f9fa] transition-colors"
       >
         Rank
       </button>
       <button
         type="button"
-        className="px-4 py-2 text-sm font-medium rounded-full bg-white border border-[#dadce0] text-[#9aa0a6] cursor-not-allowed"
-        title="Coming soon"
+        className="px-4 py-2 text-sm font-medium rounded bg-white border border-[#dadce0] text-[#5f6368] hover:bg-[#f8f9fa] transition-colors"
       >
         Graph Ranking
       </button>

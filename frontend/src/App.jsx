@@ -105,7 +105,7 @@ function AppContent() {
             <Button
               variant="contained"
               onClick={() => handleNavigate('dashboard')}
-              sx={{ borderRadius: 1.5, textTransform: 'none', px: 4 }}
+              sx={{ borderRadius: 1, textTransform: 'none', px: 4 }}
             >
               Go to Dashboard
             </Button>

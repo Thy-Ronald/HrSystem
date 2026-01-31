@@ -11,7 +11,7 @@ export function RepositorySelect({ repositories, selectedRepo, onRepoChange, loa
   const [search, setSearch] = useState('');
   const dropdownRef = useRef(null);
   const inputRef = useRef(null);
-  
+
   // Debounce search input (300ms delay)
   const debouncedSearch = useDebounce(search, 300);
 
@@ -68,7 +68,7 @@ export function RepositorySelect({ repositories, selectedRepo, onRepoChange, loa
           onFocus={handleInputFocus}
           placeholder={loading ? 'Loading...' : 'Search repositories...'}
           disabled={loading}
-          className="px-3 py-1.5 pr-8 text-sm border border-[#dadce0] rounded-lg bg-white text-[#202124] focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:border-[#1a73e8] min-w-[280px] disabled:opacity-50"
+          className="px-3 py-1.5 pr-8 text-sm border border-[#dadce0] rounded bg-white text-[#202124] focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:border-[#1a73e8] min-w-[280px] disabled:opacity-50"
         />
         <button
           type="button"
@@ -81,9 +81,9 @@ export function RepositorySelect({ repositories, selectedRepo, onRepoChange, loa
           </svg>
         </button>
       </div>
-      
+
       {isOpen && !loading && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#dadce0] rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#dadce0] rounded shadow-lg z-50 max-h-64 overflow-y-auto">
           {filteredRepos.length === 0 ? (
             <div className="px-3 py-2 text-sm text-[#70757a]">
               {repositories.length === 0 ? 'No repositories found' : 'No matching repositories'}
@@ -94,9 +94,8 @@ export function RepositorySelect({ repositories, selectedRepo, onRepoChange, loa
                 key={repo.fullName}
                 type="button"
                 onClick={() => handleSelect(repo.fullName)}
-                className={`w-full px-3 py-2 text-left text-sm hover:bg-[#f1f3f4] ${
-                  selectedRepo === repo.fullName ? 'bg-[#e8f0fe] text-[#1967d2]' : 'text-[#202124]'
-                }`}
+                className={`w-full px-3 py-2 text-left text-sm hover:bg-[#f1f3f4] ${selectedRepo === repo.fullName ? 'bg-[#e8f0fe] text-[#1967d2]' : 'text-[#202124]'
+                  }`}
               >
                 {repo.fullName}
               </button>

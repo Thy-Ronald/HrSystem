@@ -9,10 +9,10 @@ export function QuickFilterButton({ label, active, onClick }) {
       onClick={onClick}
       type="button"
       className={`
-        px-4 py-1.5 text-sm font-medium rounded-full border transition-colors
+        px-4 py-1.5 text-sm font-medium rounded border transition-colors
         ${active
-          ? 'bg-[#1a73e8] border-transparent text-white shadow-sm'
-          : 'bg-white border-[#dadce0] text-[#3c4043] hover:bg-[#f8f9fa]'
+          ? 'bg-[#007bff] border-transparent text-white shadow-sm'
+          : 'bg-white border-[#dadce0] text-[#5f6368] hover:bg-[#f8f9fa]'
         }
       `}
     >

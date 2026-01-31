@@ -1,14 +1,14 @@
 /**
  * Pagination component for contract list
  */
-export function ContractPagination({ 
-  currentPage, 
-  totalPages, 
-  startIndex, 
-  endIndex, 
-  totalItems, 
+export function ContractPagination({
+  currentPage,
+  totalPages,
+  startIndex,
+  endIndex,
+  totalItems,
   searchQuery,
-  onPageChange 
+  onPageChange
 }) {
   const hasPrevious = currentPage > 1;
   const hasNext = currentPage < totalPages;
@@ -22,14 +22,13 @@ export function ContractPagination({
         <button
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
           disabled={!hasPrevious}
-          className="p-2 rounded-full text-[#5f6368] transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#eaebef] disabled:hover:bg-transparent"
+          className="p-2 rounded text-[#5f6368] transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#eaebef] disabled:hover:bg-transparent"
           title={!hasPrevious ? "No previous page" : "Previous page"}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="m15 18-6-6 6-6" />
           </svg>
         </button>
-        
         {totalPages > 0 && (
           <div className="flex items-center gap-1">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
@@ -43,11 +42,10 @@ export function ContractPagination({
                   <button
                     key={page}
                     onClick={() => onPageChange(page)}
-                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                      currentPage === page
-                        ? 'bg-[#1a73e8] text-white'
-                        : 'text-[#5f6368] hover:bg-[#eaebef]'
-                    }`}
+                    className={`px-3 py-1 rounded text-sm font-medium transition-colors ${currentPage === page
+                      ? 'bg-[#007bff] text-white'
+                      : 'text-[#5f6368] hover:bg-[#eaebef]'
+                      }`}
                   >
                     {page}
                   </button>
@@ -66,11 +64,11 @@ export function ContractPagination({
             })}
           </div>
         )}
-        
+
         <button
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
           disabled={!hasNext}
-          className="p-2 rounded-full text-[#5f6368] transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#eaebef] disabled:hover:bg-transparent"
+          className="p-2 rounded text-[#5f6368] transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#eaebef] disabled:hover:bg-transparent"
           title={!hasNext ? "No next page" : "Next page"}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -359,7 +359,7 @@ const Monitoring = () => {
         <Box>
           <Typography variant="h6" sx={{ color: '#333', fontWeight: 500 }}>Monitoring</Typography>
         </Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowAddModal(true)} sx={{ borderRadius: 2 }}>Add New</Button>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowAddModal(true)} sx={{ borderRadius: 1 }}>Add New</Button>
       </Box>
       <Box sx={{ p: 5 }}>
         {sessions.length === 0 ? (
