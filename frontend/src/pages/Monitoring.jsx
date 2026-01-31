@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../hooks/useSocket';
 import { useScreenShare } from '../hooks/useScreenShare';
 import { useToast, ToastContainer } from '../components/Toast';
-import { useConnectionQuality } from '../hooks/useConnectionQuality';
+import { useMonitoring } from '../contexts/MonitoringContext';
 import {
   Box,
   Typography,
@@ -181,13 +181,25 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
 
 const Monitoring = () => {
   const { user } = useAuth();
-  const { isConnected, emit, subscribe, unsubscribe } = useSocket();
-  const [sessionId, setSessionId] = useState(null);
-  const [sessions, setSessions] = useState([]);
-  const [adminCount, setAdminCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [connectionCode, setConnectionCode] = useState('');
-  const [showConnectionCodeSetup, setShowConnectionCodeSetup] = useState(true);
+  const { isConnected: socketConnected } = useSocket();
+  const {
+    sessionId,
+    connectionCode,
+    setConnectionCode,
+    loading,
+    setLoading,
+    sessions,
+    setSessions,
+    adminCount,
+    justReconnected,
+    setJustReconnected,
+    isSharing,
+    shareError,
+    startSharing,
+    stopSharing,
+    emit
+  } = useMonitoring();
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [addFormCode, setAddFormCode] = useState('');
   const [addFormError, setAddFormError] = useState('');
@@ -197,92 +209,28 @@ const Monitoring = () => {
   const role = user?.role || null;
   const name = user?.name || '';
 
-  const { isSharing, error: shareError, startSharing, stopSharing } = useScreenShare(role === 'employee' ? 'employee' : null, sessionId);
-
   const handleSubmitConnectionCode = useCallback(() => {
-    if (!isConnected) return toast.error('Check your connection');
+    if (!socketConnected) return toast.error('Check your connection');
     if (connectionCode.trim().length < 4) return toast.error('Min 4 characters required');
     setLoading(true);
     emit('monitoring:auth', { role: user.role, name: user.name, connectionCode: connectionCode.trim() });
-  }, [user, isConnected, connectionCode, emit, toast]);
-
-  useEffect(() => {
-    if (user && isConnected && role === 'admin') {
-      emit('monitoring:auth', { role: user.role, name: user.name });
-    }
-  }, [user, isConnected, emit, role]);
-
-  useEffect(() => {
-    const handleCreated = ({ sessionId: sid, connectionCode: code }) => {
-      setSessionId(sid);
-      setLoading(false);
-      setShowConnectionCodeSetup(false);
-      if (code) setConnectionCode(code);
-      toast.success('System ready');
-    };
-    const handleError = ({ message }) => { setLoading(false); toast.error(message); };
-
-    subscribe('monitoring:session-created', handleCreated);
-    subscribe('monitoring:error', handleError);
-    return () => {
-      unsubscribe('monitoring:session-created', handleCreated);
-      unsubscribe('monitoring:error', handleError);
-    };
-  }, [subscribe, unsubscribe, toast]);
-
-  useEffect(() => {
-    if (role !== 'admin') return;
-    const handleSuccess = ({ sessionId: sid, employeeName, streamActive: active }) => {
-      setAddFormLoading(false);
-      setShowAddModal(false);
-      setAddFormCode('');
-      setSessions(prev => prev.find(s => s.sessionId === sid) ? prev : [...prev, { sessionId: sid, employeeName, streamActive: active }]);
-      toast.success(`Connected to ${employeeName}`);
-    };
-    const handleErr = ({ message }) => { setAddFormLoading(false); setAddFormError(message); };
-
-    subscribe('monitoring:connect-success', handleSuccess);
-    subscribe('monitoring:connect-error', handleErr);
-    return () => {
-      unsubscribe('monitoring:connect-success', handleSuccess);
-      unsubscribe('monitoring:connect-error', handleErr);
-    };
-  }, [role, subscribe, unsubscribe, toast]);
-
-  useEffect(() => {
-    if (role !== 'admin') return;
-    const onStart = ({ sessionId: id }) => setSessions(prev => prev.map(s => s.sessionId === id ? { ...s, streamActive: true } : s));
-    const onStop = ({ sessionId: id }) => setSessions(prev => prev.map(s => s.sessionId === id ? { ...s, streamActive: false } : s));
-    const onEnd = ({ sessionId: id }) => setSessions(prev => prev.filter(s => s.sessionId !== id));
-
-    subscribe('monitoring:stream-started', onStart);
-    subscribe('monitoring:stream-stopped', onStop);
-    subscribe('monitoring:session-ended', onEnd);
-    return () => {
-      unsubscribe('monitoring:stream-started', onStart);
-      unsubscribe('monitoring:stream-stopped', onStop);
-      unsubscribe('monitoring:session-ended', onEnd);
-    };
-  }, [role, subscribe, unsubscribe]);
-
-  useEffect(() => {
-    if (role !== 'employee') return;
-    const onJoin = ({ adminName }) => { setAdminCount(prev => prev + 1); toast.info(`${adminName} joined`); };
-    const onLeave = () => setAdminCount(prev => Math.max(0, prev - 1));
-
-    subscribe('monitoring:admin-joined', onJoin);
-    subscribe('monitoring:admin-left', onLeave);
-    return () => {
-      unsubscribe('monitoring:admin-joined', onJoin);
-      unsubscribe('monitoring:admin-left', onLeave);
-    };
-  }, [role, subscribe, unsubscribe, toast]);
+  }, [user, socketConnected, connectionCode, emit, toast, setLoading]);
 
   const handleAddConnection = () => {
     if (!addFormCode.trim()) return setAddFormError('Code required');
     setAddFormLoading(true);
     emit('monitoring:connect-by-code', { connectionCode: addFormCode.trim() });
   };
+
+  // Close modal when sessions update (if we just added one)
+  useEffect(() => {
+    if (showAddModal) {
+      setShowAddModal(false);
+      setAddFormLoading(false);
+      setAddFormCode('');
+      setAddFormError('');
+    }
+  }, [sessions.length]);
 
   const handleRemoveSession = (id) => {
     setSessions(prev => prev.filter(s => s.sessionId !== id));
@@ -296,7 +244,7 @@ const Monitoring = () => {
       <Box sx={{ minHeight: 'calc(100vh - 64px)', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f5f7f9', p: 3 }}>
         <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
         <Box sx={{ maxWidth: 500, width: '100%' }}>
-          {showConnectionCodeSetup && !sessionId ? (
+          {!sessionId ? (
             <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid #e0e6ed', p: 4, textAlign: 'center' }}>
               <Box sx={{ width: 64, height: 64, borderRadius: '50%', bgcolor: 'rgba(25, 118, 210, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 3 }}>
                 <VpnKeyIcon sx={{ fontSize: 32, color: '#1976d2' }} />
@@ -316,13 +264,30 @@ const Monitoring = () => {
                     <Box sx={{ width: 64, height: 64, borderRadius: '50%', bgcolor: 'rgba(25, 118, 210, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
                       <MonitorIcon sx={{ fontSize: 32, color: '#1976d2' }} />
                     </Box>
-                    <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Ready to Share</Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>Admins can view your screen once you start sharing.</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>
+                      {justReconnected ? 'Session Restored' : 'Ready to Share'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+                      {justReconnected
+                        ? 'Your connection was restored. Please resume sharing to allow admins to view your screen.'
+                        : 'Admins can view your screen once you start sharing.'}
+                    </Typography>
                     <Box sx={{ mb: 4, p: 3, bgcolor: '#f8fbff', borderRadius: 3, border: '1px dashed #c2d6ff' }}>
                       <Typography variant="caption" sx={{ color: '#1976d2', fontWeight: 700, display: 'block', mb: 1 }}>CONNECTION CODE</Typography>
                       <Typography variant="h3" sx={{ fontWeight: 900, color: '#1976d2', letterSpacing: 4 }}>{connectionCode}</Typography>
                     </Box>
-                    <Button fullWidth variant="contained" size="large" onClick={startSharing} sx={{ py: 2, borderRadius: 2, fontWeight: 700 }}>Start Sharing</Button>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      size="large"
+                      onClick={() => {
+                        startSharing();
+                        setJustReconnected(false);
+                      }}
+                      sx={{ py: 2, borderRadius: 2, fontWeight: 700 }}
+                    >
+                      {justReconnected ? 'Resume Sharing Screen' : 'Start Sharing Screen'}
+                    </Button>
                   </>
                 ) : (
                   <>

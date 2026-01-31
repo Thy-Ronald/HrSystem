@@ -125,10 +125,14 @@ function AppContent() {
   );
 }
 
+import { MonitoringProvider } from './contexts/MonitoringContext';
+
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <MonitoringProvider>
+        <AppContent />
+      </MonitoringProvider>
     </AuthProvider>
   );
 }
