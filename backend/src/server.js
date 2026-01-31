@@ -459,19 +459,24 @@ async function startServer() {
         return;
       }
 
-      // If employee sends ICE candidate, forward to all admins in the session
-      if (socket.data.role === 'employee') {
+      // If specific toSocketId is provided, route directly
+      if (toSocketId) {
+        io.to(toSocketId).emit('monitoring:ice-candidate', { candidate, sessionId, fromSocketId: socket.id });
+      }
+      // Otherwise fallback to role-based routing
+      else if (socket.data.role === 'employee') {
+        // Broadcast from employee to all admins in the session
         session.adminSocketIds.forEach((adminId) => {
-          io.to(adminId).emit('monitoring:ice-candidate', { candidate, sessionId });
+          io.to(adminId).emit('monitoring:ice-candidate', { candidate, sessionId, fromSocketId: socket.id });
         });
       }
-      // If admin sends ICE candidate, forward to employee
       else if (socket.data.role === 'admin') {
-        io.to(session.employeeSocketId).emit('monitoring:ice-candidate', { candidate, sessionId });
-      }
-      // Fallback: if toSocketId is provided, forward to that socket
-      else if (toSocketId) {
-        io.to(toSocketId).emit('monitoring:ice-candidate', { candidate, sessionId });
+        // Direct from admin to employee
+        io.to(session.employeeSocketId).emit('monitoring:ice-candidate', {
+          candidate,
+          sessionId,
+          fromSocketId: socket.id
+        });
       }
     });
 
@@ -480,9 +485,17 @@ async function startServer() {
       console.log(`[Socket.IO] Client disconnected: ${socket.id}`);
 
       if (socket.data.role === 'employee' && socket.data.sessionId) {
-        // Clean up employee session
+        // Clean up employee session (marks as inactive but keeps for reconnection)
+        const sessionId = socket.data.sessionId;
         monitoringService.cleanupEmployeeSession(socket.id);
-        io.emit('monitoring:session-ended', { sessionId: socket.data.sessionId });
+
+        // Notify admins in this session that employee disconnected
+        const session = monitoringService.getSession(sessionId);
+        if (session) {
+          session.adminSocketIds.forEach(adminId => {
+            io.to(adminId).emit('monitoring:stream-stopped', { sessionId });
+          });
+        }
       } else if (socket.data.role === 'admin' && socket.data.sessionId) {
         // Remove admin from session
         const sessionId = socket.data.sessionId;

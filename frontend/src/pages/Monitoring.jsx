@@ -197,10 +197,12 @@ const Monitoring = () => {
     shareError,
     startSharing,
     stopSharing,
+    resetSession,
     emit
   } = useMonitoring();
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [addFormCode, setAddFormCode] = useState('');
   const [addFormError, setAddFormError] = useState('');
   const [addFormLoading, setAddFormLoading] = useState(false);
@@ -272,9 +274,17 @@ const Monitoring = () => {
                         ? 'Your connection was restored. Please resume sharing to allow admins to view your screen.'
                         : 'Admins can view your screen once you start sharing.'}
                     </Typography>
-                    <Box sx={{ mb: 4, p: 3, bgcolor: '#f8fbff', borderRadius: 3, border: '1px dashed #c2d6ff' }}>
+                    <Box sx={{ mb: 4, p: 3, bgcolor: '#f8fbff', borderRadius: 3, border: '1px dashed #c2d6ff', position: 'relative' }}>
                       <Typography variant="caption" sx={{ color: '#1976d2', fontWeight: 700, display: 'block', mb: 1 }}>CONNECTION CODE</Typography>
                       <Typography variant="h3" sx={{ fontWeight: 900, color: '#1976d2', letterSpacing: 4 }}>{connectionCode}</Typography>
+                      <IconButton
+                        size="small"
+                        onClick={() => setShowResetConfirm(true)}
+                        sx={{ position: 'absolute', top: 8, right: 8, color: '#1976d2', opacity: 0.6, '&:hover': { opacity: 1 } }}
+                        title="Change Code"
+                      >
+                        <CloseIcon sx={{ fontSize: 18 }} />
+                      </IconButton>
                     </Box>
                     <Button
                       fullWidth
@@ -298,7 +308,15 @@ const Monitoring = () => {
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>Your screen is live for connected administrators.</Typography>
                     <Box sx={{ mb: 4, display: 'flex', justifyContent: 'center', gap: 3 }}>
                       <Box sx={{ textAlign: 'left' }}><Typography variant="caption" color="text.secondary">Viewers</Typography><Typography variant="body2" sx={{ fontWeight: 700 }}>{adminCount}</Typography></Box>
-                      <Box sx={{ textAlign: 'left' }}><Typography variant="caption" color="text.secondary">Code</Typography><Typography variant="body2" sx={{ fontWeight: 700 }}>{connectionCode}</Typography></Box>
+                      <Box sx={{ textAlign: 'left', position: 'relative' }}>
+                        <Typography variant="caption" color="text.secondary">Code</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          {connectionCode}
+                          <IconButton size="small" onClick={() => setShowResetConfirm(true)} sx={{ p: 0.2 }}>
+                            <AddIcon sx={{ transform: 'rotate(45deg)', fontSize: 14 }} />
+                          </IconButton>
+                        </Typography>
+                      </Box>
                     </Box>
                     <Button fullWidth variant="outlined" color="error" size="large" onClick={stopSharing} sx={{ py: 1.5, borderRadius: 2, fontWeight: 700, borderWidth: 2 }}>Stop Sharing</Button>
                   </>
@@ -308,6 +326,27 @@ const Monitoring = () => {
             </Card>
           )}
         </Box>
+        <Dialog open={showResetConfirm} onClose={() => setShowResetConfirm(false)}>
+          <DialogTitle sx={{ fontWeight: 800 }}>Change Connection Code?</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Changing the code will disconnect any currently viewing administrators and stop your current screen share. You will need to set a new code and share it with admins.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions sx={{ p: 3 }}>
+            <Button onClick={() => setShowResetConfirm(false)}>Cancel</Button>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={() => {
+                resetSession();
+                setShowResetConfirm(false);
+              }}
+            >
+              Change Code
+            </Button>
+          </DialogActions>
+        </Dialog>
         <style>{`@keyframes pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); } }`}</style>
       </Box>
     );

@@ -66,9 +66,18 @@ export const MonitoringProvider = ({ children }) => {
             toast.success('System ready');
         };
 
-        const handleError = ({ message }) => {
+        const handleError = ({ message, sessionId: errSessionId }) => {
             setLoading(false);
-            toast.error(message);
+
+            // If the error is about a missing session, clean it up from our list
+            if (message.includes('Session not found') || message.includes('expired')) {
+                console.warn(`[MonitoringContext] Session dead, cleaning up: ${errSessionId || 'unknown'}`);
+                if (errSessionId) {
+                    setSessions(prev => prev.filter(s => s.sessionId !== errSessionId));
+                }
+            } else {
+                toast.error(message);
+            }
         };
 
         const handleConnectSuccess = ({ sessionId: sid, employeeName, streamActive: active }) => {
@@ -146,7 +155,8 @@ export const MonitoringProvider = ({ children }) => {
                 sessions.forEach(s => {
                     emit('monitoring:join-session', { sessionId: s.sessionId });
                 });
-            } else if (role === 'employee' && connectionCode) {
+            } else if (role === 'employee' && connectionCode && !sessionId) {
+                // If employee re-authenticates after refresh, server should reuse session by name
                 emit('monitoring:auth', {
                     role: user.role,
                     name: user.name,
@@ -155,6 +165,16 @@ export const MonitoringProvider = ({ children }) => {
             }
         }
     }, [user, isConnected, role, emit]); // connectionCode and sessions omitted from deps to avoid loop
+
+    const resetSession = useCallback(() => {
+        stopSharing();
+        setSessionId(null);
+        setConnectionCode('');
+        setJustReconnected(false);
+        localStorage.removeItem('monitoring_sessionId');
+        localStorage.removeItem('monitoring_connectionCode');
+        toast.info('Session reset. You can now set a new code.');
+    }, [stopSharing, toast]);
 
     const value = {
         sessionId,
@@ -166,6 +186,7 @@ export const MonitoringProvider = ({ children }) => {
         setSessions,
         justReconnected,
         setJustReconnected,
+        resetSession,
         isSharing,
         shareError,
         startSharing,

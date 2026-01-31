@@ -17,9 +17,10 @@ export function useScreenShare(role, sessionId) {
   const [remoteStream, setRemoteStream] = useState(null);
 
   const localStreamRef = useRef(null);
-  const peerConnectionRef = useRef(null);
+  const peerConnectionsRef = useRef(new Map()); // Map<adminSocketId, RTCPeerConnection>
   const remoteVideoRef = useRef(null);
   const cleanupHandlersRef = useRef([]);
+  const iceCandidateQueuesRef = useRef(new Map()); // Map<adminSocketId, Array<candidate>>
 
   // Cleanup on unmount
   useEffect(() => {
@@ -34,11 +35,12 @@ export function useScreenShare(role, sessionId) {
       cleanupHandlersRef.current.forEach((cleanup) => cleanup());
       cleanupHandlersRef.current = [];
 
-      // Close peer connection
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-        peerConnectionRef.current = null;
-      }
+      // Close all peer connections
+      peerConnectionsRef.current.forEach((pc) => {
+        pc.close();
+      });
+      peerConnectionsRef.current.clear();
+      iceCandidateQueuesRef.current.clear();
 
       // Clear remote stream
       if (remoteVideoRef.current) {
@@ -107,10 +109,12 @@ export function useScreenShare(role, sessionId) {
       emit('monitoring:stop-sharing');
     }
 
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-    }
+    // Close all peer connections
+    peerConnectionsRef.current.forEach((pc) => {
+      pc.close();
+    });
+    peerConnectionsRef.current.clear();
+    iceCandidateQueuesRef.current.clear();
 
     setRemoteStream(null);
   }, [role, emit]);
@@ -123,28 +127,34 @@ export function useScreenShare(role, sessionId) {
       return;
     }
 
-    const pc = new RTCPeerConnection(STUN_SERVERS);
-    peerConnectionRef.current = pc;
-
-    // Add local stream tracks
-    localStreamRef.current.getTracks().forEach((track) => {
-      pc.addTrack(track, localStreamRef.current);
-    });
-
-    // Handle ICE candidates
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        // Send ICE candidate - server will broadcast to all admins
-        emit('monitoring:ice-candidate', {
-          sessionId,
-          candidate: event.candidate,
-        });
-      }
-    };
-
-    // Handle offer from admin
     const handleOffer = async ({ offer, fromSocketId }) => {
       try {
+        console.log(`[WebRTC] Received offer from admin: ${fromSocketId}`);
+
+        // Clean up existing connection for this admin if it exists
+        if (peerConnectionsRef.current.has(fromSocketId)) {
+          peerConnectionsRef.current.get(fromSocketId).close();
+        }
+
+        const pc = new RTCPeerConnection(STUN_SERVERS);
+        peerConnectionsRef.current.set(fromSocketId, pc);
+
+        // Add local stream tracks
+        localStreamRef.current.getTracks().forEach((track) => {
+          pc.addTrack(track, localStreamRef.current);
+        });
+
+        // Handle ICE candidates from employee to this specific admin
+        pc.onicecandidate = (event) => {
+          if (event.candidate) {
+            emit('monitoring:ice-candidate', {
+              sessionId,
+              candidate: event.candidate,
+              toSocketId: fromSocketId
+            });
+          }
+        };
+
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
@@ -154,33 +164,37 @@ export function useScreenShare(role, sessionId) {
           answer,
           toSocketId: fromSocketId,
         });
+
+        // Process any queued ICE candidates for this admin
+        if (iceCandidateQueuesRef.current.has(fromSocketId)) {
+          console.log(`[WebRTC] Processing ${iceCandidateQueuesRef.current.get(fromSocketId).length} queued candidates for ${fromSocketId}`);
+          iceCandidateQueuesRef.current.get(fromSocketId).forEach(cand => {
+            pc.addIceCandidate(new RTCIceCandidate(cand)).catch(e => console.error('[WebRTC] Queued ICE Error:', e));
+          });
+          iceCandidateQueuesRef.current.delete(fromSocketId);
+        }
       } catch (err) {
         console.error('Error handling offer:', err);
-        setError('Failed to establish connection');
+        setError('Failed to establish connection with viewer');
+      }
+    };
+
+    const handleIceCandidate = ({ candidate, fromSocketId }) => {
+      const pc = peerConnectionsRef.current.get(fromSocketId);
+      if (pc && pc.remoteDescription) {
+        pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error('[WebRTC] ICE Error:', e));
+      } else if (candidate) {
+        // Queue for this admin
+        if (!iceCandidateQueuesRef.current.has(fromSocketId)) {
+          iceCandidateQueuesRef.current.set(fromSocketId, []);
+        }
+        iceCandidateQueuesRef.current.get(fromSocketId).push(candidate);
       }
     };
 
     subscribe('monitoring:offer', handleOffer);
-
-    // Handle ICE candidate from admin
-    const handleIceCandidate = ({ candidate, sessionId: candidateSessionId }) => {
-      // Only process if sessionId matches (or if not provided for backward compatibility)
-      if (candidateSessionId && candidateSessionId !== sessionId) return;
-      if (candidate) {
-        if (pc.remoteDescription) {
-          pc.addIceCandidate(new RTCIceCandidate(candidate)).catch((err) => {
-            console.error('Error adding ICE candidate:', err);
-          });
-        } else {
-          // Queue candidate for when remote description is set
-          console.log('[WebRTC] Queuing ICE candidate (waiting for remote description)');
-        }
-      }
-    };
-
     subscribe('monitoring:ice-candidate', handleIceCandidate);
 
-    // Store cleanup functions
     const cleanup = () => {
       unsubscribe('monitoring:offer', handleOffer);
       unsubscribe('monitoring:ice-candidate', handleIceCandidate);
@@ -203,13 +217,13 @@ export function useScreenShare(role, sessionId) {
       setError(null);
 
       // Clean up any existing connection first
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-        peerConnectionRef.current = null;
+      const existingPc = peerConnectionsRef.current.get('active');
+      if (existingPc) {
+        existingPc.close();
       }
 
       const pc = new RTCPeerConnection(STUN_SERVERS);
-      peerConnectionRef.current = pc;
+      peerConnectionsRef.current.set('active', pc);
 
       // Handle incoming stream
       pc.ontrack = (event) => {
@@ -324,9 +338,10 @@ export function useScreenShare(role, sessionId) {
     cleanupHandlersRef.current.forEach((cleanup) => cleanup());
     cleanupHandlersRef.current = [];
 
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
+    const pc = peerConnectionsRef.current.get('active');
+    if (pc) {
+      pc.close();
+      peerConnectionsRef.current.delete('active');
     }
 
     setRemoteStream(null);
@@ -349,8 +364,11 @@ export function useScreenShare(role, sessionId) {
   const [webrtcConnected, setWebrtcConnected] = useState(false);
 
   useEffect(() => {
-    if (peerConnectionRef.current) {
-      const pc = peerConnectionRef.current;
+    // For admins, we track the 'active' connection
+    // For employees, we don't track a single connection state this way
+    const pc = peerConnectionsRef.current.get('active');
+
+    if (pc) {
       const updateConnectionState = () => {
         const connected = pc.connectionState === 'connected' || pc.connectionState === 'connecting';
         setWebrtcConnected(connected);
@@ -365,7 +383,7 @@ export function useScreenShare(role, sessionId) {
     } else {
       setWebrtcConnected(false);
     }
-  }, [remoteStream]); // Only depend on remoteStream, not the ref
+  }, [remoteStream]); // remoteStream changes when startViewing/stopViewing is called
 
   return {
     isSharing,
@@ -376,7 +394,7 @@ export function useScreenShare(role, sessionId) {
     stopSharing,
     startViewing,
     stopViewing,
-    isConnected: webrtcConnected || !!remoteStream, // Connected if we have a stream or connection is active
-    peerConnection: peerConnectionRef.current,
+    isConnected: role === 'employee' ? isSharing : (webrtcConnected || !!remoteStream),
+    peerConnections: peerConnectionsRef.current,
   };
 }

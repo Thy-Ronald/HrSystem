@@ -18,6 +18,7 @@ class MonitoringService {
    */
   createSession(employeeSocketId, employeeName, connectionCode) {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours default
 
     this.sessions.set(sessionId, {
       employeeSocketId,
@@ -26,6 +27,7 @@ class MonitoringService {
       adminSocketIds: new Set(),
       streamActive: false,
       createdAt: new Date(),
+      expiresAt,
     });
 
     return sessionId;
@@ -70,8 +72,8 @@ class MonitoringService {
   getSessionByEmployeeName(employeeName) {
     for (const [sessionId, session] of this.sessions.entries()) {
       if (session.employeeName === employeeName) {
-        // Check if session is not expired
-        if (session.expiresAt && session.expiresAt > new Date()) {
+        // If session is still valid (not deleted and not expired)
+        if (!session.expiresAt || session.expiresAt > new Date()) {
           return sessionId;
         }
       }
@@ -201,7 +203,14 @@ class MonitoringService {
   cleanupEmployeeSession(employeeSocketId) {
     const sessionId = this.getSessionByEmployee(employeeSocketId);
     if (sessionId) {
-      this.deleteSession(sessionId);
+      const session = this.sessions.get(sessionId);
+      if (session) {
+        session.streamActive = false;
+        session.employeeSocketId = null; // Mark as disconnected but keep session
+
+        // Give some time for reconnection before deleting
+        // We'll let the periodic cleanup handle true deletion
+      }
     }
   }
 
