@@ -8,36 +8,318 @@ import {
   Box,
   Typography,
   Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   IconButton,
   Card,
   CardContent,
   CircularProgress,
-  Chip
+  Chip,
+  Grid,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions
 } from '@mui/material';
 import {
   Add as AddIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
-  SignalCellularAlt as SignalIcon
+  SignalCellularAlt as SignalIcon,
+  People as PeopleIcon,
+  Close as CloseIcon,
+  Fullscreen as FullscreenIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
+
+// ─────────────────────────────────────────────────────────────
+// Sub-components
+// ─────────────────────────────────────────────────────────────
+
+const MonitoringSessionCard = ({ session, adminName, onRemove }) => {
+  const {
+    error: shareError,
+    remoteStream,
+    remoteVideoRef,
+    startViewing,
+    stopViewing,
+    isConnected: shareConnected,
+  } = useScreenShare('admin', session.sessionId);
+
+  const [loading, setLoading] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [showFullView, setShowFullView] = useState(false);
+  const { emit } = useSocket();
+  const fullVideoRef = useRef(null);
+
+  // Attach remote stream to video element
+  useEffect(() => {
+    if (remoteStream && remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream, remoteVideoRef]);
+
+  // Sync stream to full view video element
+  useEffect(() => {
+    let timeoutId;
+    if (showFullView && remoteStream) {
+      // Use a small timeout to ensure the component has mounted and the ref is available
+      timeoutId = setTimeout(() => {
+        if (fullVideoRef.current) {
+          console.log(`[CCTV] Syncing stream to fullscreen view for ${session.employeeName}`);
+          fullVideoRef.current.srcObject = remoteStream;
+          // Explicitly call play to ensure it starts
+          fullVideoRef.current.play().catch(err => console.error('[CCTV] Fullscreen play error:', err));
+        }
+      }, 200);
+    }
+    return () => clearTimeout(timeoutId);
+  }, [showFullView, remoteStream, session.employeeName]);
+
+  // Automatically start viewing if stream becomes active
+  useEffect(() => {
+    if (session.streamActive && !shareConnected) {
+      console.log(`[CCTV] Auto-starting view for ${session.employeeName}`);
+      setLoading(true);
+      emit('monitoring:join-session', { sessionId: session.sessionId });
+      startViewing(session.sessionId);
+    } else if (!session.streamActive && shareConnected) {
+      console.log(`[CCTV] Stream stopped for ${session.employeeName}, cleaning up`);
+      stopViewing();
+      setLoading(false);
+      setShowFullView(false);
+    }
+  }, [session.streamActive, shareConnected, startViewing, stopViewing, session.sessionId, session.employeeName, emit]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      stopViewing();
+    };
+  }, [stopViewing]);
+
+  const handleRemoveClick = () => {
+    setShowConfirm(true);
+  };
+
+  const handleConfirmRemove = () => {
+    onRemove(session.sessionId);
+    setShowConfirm(false);
+  };
+
+  return (
+    <>
+      <Card
+        variant="outlined"
+        sx={{
+          height: '100%',
+          borderRadius: 3,
+          overflow: 'hidden',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          borderColor: session.streamActive ? '#1976d2' : '#e0e0e0',
+          borderWidth: session.streamActive ? 2 : 1,
+          display: 'flex',
+          flexDirection: 'column',
+          bgcolor: 'white',
+          boxShadow: session.streamActive ? '0 12px 32px rgba(25, 118, 210, 0.15)' : 'none',
+          '&:hover': {
+            borderColor: '#1976d2',
+            transform: 'translateY(-4px)',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.12)'
+          }
+        }}
+      >
+        {/* Card Header */}
+        <Box sx={{ p: 2, borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#fcfcfc' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#1a1a1a' }}>
+              {session.employeeName}
+            </Typography>
+            {session.streamActive && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#4caf50', animation: 'pulse 1.5s infinite' }} />
+                <Typography variant="caption" sx={{ color: '#4caf50', fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase' }}>Live Feed</Typography>
+              </Box>
+            )}
+          </Box>
+        </Box>
+
+        {/* Video Body */}
+        <Box sx={{
+          width: '100%',
+          pt: '60%',
+          bgcolor: '#000',
+          position: 'relative',
+          overflow: 'hidden',
+          cursor: session.streamActive ? 'pointer' : 'default'
+        }} onClick={() => session.streamActive && setShowFullView(true)}>
+          <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {session.streamActive ? (
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain'
+                }}
+                onLoadedMetadata={() => setLoading(false)}
+                onPlay={() => setLoading(false)}
+              />
+            ) : (
+              <Box sx={{ textAlign: 'center', opacity: 0.5 }}>
+                <VisibilityOffIcon sx={{ fontSize: 48, color: '#666', mb: 1 }} />
+                <Typography variant="body2" sx={{ color: '#999', fontWeight: 600 }}>
+                  Connection Offline
+                </Typography>
+              </Box>
+            )}
+
+            {loading && session.streamActive && (
+              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.4)' }}>
+                <CircularProgress size={40} thickness={4} sx={{ color: 'white' }} />
+              </Box>
+            )}
+          </Box>
+        </Box>
+
+        {/* Action Footer */}
+        <Box sx={{ p: 1.5, display: 'flex', gap: 1, bgcolor: '#f8f9fa', borderTop: '1px solid #f0f0f0' }}>
+          <Button
+            fullWidth
+            variant="contained"
+            disableElevation
+            startIcon={<VisibilityIcon />}
+            disabled={!session.streamActive}
+            onClick={() => setShowFullView(true)}
+            sx={{
+              textTransform: 'none',
+              borderRadius: 2,
+              fontWeight: 600,
+              bgcolor: '#1976d2',
+              '&:hover': { bgcolor: '#1565c0' }
+            }}
+          >
+            View
+          </Button>
+          <Button
+            fullWidth
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={handleRemoveClick}
+            sx={{
+              textTransform: 'none',
+              borderRadius: 2,
+              fontWeight: 600,
+              borderColor: '#ffcdd2',
+              color: '#d32f2f',
+              '&:hover': { bgcolor: '#ffebee', borderColor: '#d32f2f' }
+            }}
+          >
+            Remove
+          </Button>
+        </Box>
+      </Card>
+
+      {/* Fullscreen Modal View */}
+      <Dialog
+        fullWidth
+        maxWidth="md"
+        open={showFullView}
+        onClose={() => setShowFullView(false)}
+        PaperProps={{
+          sx: { bgcolor: '#000', borderRadius: 2, overflow: 'hidden' }
+        }}
+      >
+        <Box sx={{ position: 'relative', width: '100%', height: '90vh', display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{
+            p: 2,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            bgcolor: 'rgba(0,0,0,0.8)',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1
+          }}>
+            <Typography variant="h6" sx={{ color: 'white', fontWeight: 700 }}>
+              Live Stream: {session.employeeName}
+            </Typography>
+            <IconButton onClick={() => setShowFullView(false)} sx={{ color: 'white' }}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+          <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#000' }}>
+            <video
+              ref={fullVideoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            />
+          </Box>
+        </Box>
+      </Dialog>
+
+      {/* Removal Confirmation Dialog */}
+      <Dialog
+        open={showConfirm}
+        onClose={() => setShowConfirm(false)}
+        PaperProps={{
+          sx: { borderRadius: 3, p: 1, maxWidth: 400 }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, fontSize: '1.25rem' }}>Stop Monitoring?</DialogTitle>
+        <DialogContent sx={{ pb: 1 }}>
+          <DialogContentText sx={{ color: '#444' }}>
+            Are you sure you want to disconnect from <strong>{session.employeeName}</strong>?
+            This will terminate the active session and remove them from your dashboard.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
+          <Button
+            fullWidth
+            onClick={() => setShowConfirm(false)}
+            sx={{ color: '#777', textTransform: 'none', fontWeight: 600, borderRadius: 2 }}
+          >
+            Go Back
+          </Button>
+          <Button
+            fullWidth
+            onClick={handleConfirmRemove}
+            variant="contained"
+            color="error"
+            disableElevation
+            sx={{
+              textTransform: 'none',
+              fontWeight: 700,
+              borderRadius: 2,
+              bgcolor: '#d32f2f'
+            }}
+          >
+            Disconnect
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <style>
+        {`@keyframes pulse { 0% { transform: scale(0.9); opacity: 0.7; } 50% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(0.9); opacity: 0.7; } }`}
+      </style>
+    </>
+  );
+};
 
 const Monitoring = () => {
   const { user, token } = useAuth();
   const { socket, isConnected, emit, subscribe, unsubscribe } = useSocket();
   const [sessionId, setSessionId] = useState(null);
   const [sessions, setSessions] = useState([]);
-  const [selectedSession, setSelectedSession] = useState(null);
-  const [streamActive, setStreamActive] = useState(false);
   const [adminCount, setAdminCount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [sessionsLoading, setSessionsLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Connection code states
@@ -57,28 +339,10 @@ const Monitoring = () => {
   const {
     isSharing,
     error: shareError,
-    remoteStream,
-    remoteVideoRef,
     startSharing,
     stopSharing,
-    startViewing,
-    stopViewing,
-    isConnected: shareConnected,
-    peerConnection,
-  } = useScreenShare(role, sessionId);
+  } = useScreenShare(role === 'employee' ? 'employee' : null, sessionId);
 
-  // Connection quality monitoring
-  const connectionQuality = useConnectionQuality(peerConnection, shareConnected);
-
-  // Attach remoteStream to video element when both are available (admin)
-  useEffect(() => {
-    if (role === 'admin' && remoteStream && remoteVideoRef.current) {
-      console.log('[Monitoring] Attaching remoteStream to video element via useEffect');
-      remoteVideoRef.current.srcObject = remoteStream;
-      // Force loading to false and ensure stream is considered active
-      setLoading(false);
-    }
-  }, [role, remoteStream, remoteVideoRef]);
 
   // Employee: Submit connection code and create session
   const handleSubmitConnectionCode = useCallback(() => {
@@ -207,10 +471,6 @@ const Monitoring = () => {
         toast.warning(`Session with ${endedSession.employeeName} has ended`);
       }
       setSessions((prev) => prev.filter((s) => s.sessionId !== endedSessionId));
-      if (selectedSession?.sessionId === endedSessionId) {
-        setSelectedSession(null);
-        stopViewing();
-      }
     };
 
     subscribe('monitoring:session-ended', handleSessionEnded);
@@ -218,70 +478,28 @@ const Monitoring = () => {
     return () => {
       unsubscribe('monitoring:session-ended', handleSessionEnded);
     };
-  }, [role, sessions, selectedSession, stopViewing, subscribe, unsubscribe, toast]);
+  }, [role, sessions, subscribe, unsubscribe, toast]);
 
   // Handle stream status updates (admin)
   useEffect(() => {
     if (role !== 'admin') return;
 
-    // Debug: Log all Socket.IO events for admin
-    const debugListener = (...args) => {
-      console.log('[Monitoring] Socket.IO event received:', args);
-    };
-    socket?.onAny(debugListener);
-
     const handleStreamStarted = ({ sessionId: targetSessionId, employeeName }) => {
-      console.log('========== STREAM STARTED EVENT RECEIVED ==========');
-      console.log('[Monitoring] Stream started event received:', { targetSessionId, employeeName, currentSelectedSession: selectedSession });
-
-      // Update session list
-      setSessions((prev) => {
-        const updated = prev.map((s) =>
+      setSessions((prev) =>
+        prev.map((s) =>
           s.sessionId === targetSessionId ? { ...s, streamActive: true } : s
-        );
-        console.log('[Monitoring] Updated sessions list:', updated);
-        return updated;
-      });
-
-      // Check if admin is viewing this session and update accordingly
-      setSelectedSession((prev) => {
-        const isViewing = prev?.sessionId === targetSessionId;
-        console.log('[Monitoring] Checking if admin is viewing:', { isViewing, prevSessionId: prev?.sessionId, targetSessionId, prev });
-
-        if (isViewing) {
-          console.log('[Monitoring] Admin is viewing this session, updating streamActive and starting WebRTC connection');
-          // Update streamActive state immediately
-          setStreamActive(true);
-          setLoading(true);
-          // Small delay to ensure employee's peer connection is ready
-          setTimeout(() => {
-            console.log('[Monitoring] Initiating startViewing for session:', targetSessionId);
-            startViewing(targetSessionId);
-          }, 500);
-          toast.success(`${employeeName || 'Employee'} started sharing`);
-          // Return updated session with streamActive: true
-          return { ...prev, streamActive: true };
-        } else {
-          console.log('[Monitoring] Admin is not viewing this session. Current selectedSession:', prev);
-          return prev;
-        }
-      });
+        )
+      );
+      toast.success(`${employeeName || 'Employee'} started sharing`);
     };
 
     const handleStreamStopped = ({ sessionId: targetSessionId }) => {
-      // Update session list
       setSessions((prev) =>
         prev.map((s) =>
           s.sessionId === targetSessionId ? { ...s, streamActive: false } : s
         )
       );
-
-      // If admin is viewing this session, stop viewing
-      if (selectedSession?.sessionId === targetSessionId) {
-        setStreamActive(false);
-        stopViewing();
-        toast.info('Screen sharing stopped');
-      }
+      toast.info('Screen sharing stopped');
     };
 
     subscribe('monitoring:stream-started', handleStreamStarted);
@@ -290,51 +508,24 @@ const Monitoring = () => {
     return () => {
       unsubscribe('monitoring:stream-started', handleStreamStarted);
       unsubscribe('monitoring:stream-stopped', handleStreamStopped);
-      socket?.offAny(debugListener);
     };
-  }, [role, selectedSession, startViewing, stopViewing, subscribe, unsubscribe, toast, socket]);
+  }, [role, subscribe, unsubscribe, toast]);
 
   // Handle session joined (admin)
   useEffect(() => {
     if (role !== 'admin') return;
 
     const handleSessionJoined = ({ streamActive: active, employeeName, sessionId: joinedSessionId }) => {
-      console.log('[Monitoring] Session joined event received:', { active, employeeName, joinedSessionId, selectedSessionId: selectedSession?.sessionId });
-
-      // Update selectedSession with streamActive status
-      setSelectedSession((prev) => {
-        if (prev?.sessionId === joinedSessionId) {
-          console.log('[Monitoring] Updating selectedSession with streamActive:', active);
-          return { ...prev, streamActive: active };
-        }
-        return prev;
-      });
-
-      setStreamActive(active);
-      setLoading(false);
-
-      // If stream is already active when joining, start viewing immediately
-      if (active) {
-        // Use a small delay to ensure selectedSession is updated
-        setTimeout(() => {
-          setSelectedSession((current) => {
-            if (current?.sessionId === joinedSessionId) {
-              console.log('[Monitoring] Stream already active, starting WebRTC connection');
-              startViewing(current.sessionId);
-              toast.success(`Connected to ${employeeName}'s stream`);
-            }
-            return current;
-          });
-        }, 50);
-      } else {
-        console.log('[Monitoring] Stream not active yet, waiting for employee to start sharing');
-        toast.info(`Joined ${employeeName}'s session. Waiting for stream...`);
-      }
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.sessionId === joinedSessionId ? { ...s, streamActive: active } : s
+        )
+      );
     };
 
     subscribe('monitoring:session-joined', handleSessionJoined);
     return () => unsubscribe('monitoring:session-joined', handleSessionJoined);
-  }, [role, selectedSession, startViewing, subscribe, unsubscribe, toast]);
+  }, [role, subscribe, unsubscribe]);
 
   // Handle admin join/leave notifications (employee)
   useEffect(() => {
@@ -359,63 +550,20 @@ const Monitoring = () => {
     };
   }, [role, subscribe, unsubscribe, toast]);
 
-  // Sync selectedSession with sessions list (admin) - ensures streamActive status is always current
+
+  // Reset on disconnect
   useEffect(() => {
-    if (role !== 'admin' || !selectedSession) return;
-
-    const latestSession = sessions.find(s => s.sessionId === selectedSession.sessionId);
-    if (latestSession && latestSession.streamActive !== selectedSession.streamActive) {
-      console.log('[Monitoring] Syncing selectedSession streamActive status:', {
-        old: selectedSession.streamActive,
-        new: latestSession.streamActive
-      });
-      setSelectedSession({ ...selectedSession, streamActive: latestSession.streamActive });
-      if (latestSession.streamActive) {
-        setStreamActive(true);
-      }
-    }
-  }, [role, sessions, selectedSession]);
-
-  // Join session (admin)
-  const handleJoinSession = (session) => {
-    if (selectedSession?.sessionId === session.sessionId) {
-      // Already viewing this session, leave it
-      stopViewing();
-      setSelectedSession(null);
-      setStreamActive(false);
-      emit('monitoring:leave-session');
-      toast.info('Left session');
-    } else {
-      // Join new session
-      if (selectedSession) {
-        stopViewing();
-        emit('monitoring:leave-session');
-      }
-      // Get latest session from sessions list to ensure we have current streamActive status
-      const latestSession = sessions.find(s => s.sessionId === session.sessionId) || session;
-      setSelectedSession(latestSession);
-      setStreamActive(latestSession.streamActive || false); // Use session's streamActive status
-      setLoading(true);
-      console.log('[Monitoring] Joining session:', latestSession.sessionId, 'streamActive:', latestSession.streamActive);
-      emit('monitoring:join-session', { sessionId: latestSession.sessionId });
-      toast.info(`Joining ${latestSession.employeeName}'s session...`);
-    }
-  };
-
-  // Reset on disconnect (only show error if we were previously connected)
-  const wasConnectedRef = useRef(false);
-  useEffect(() => {
-    if (isConnected) {
-      wasConnectedRef.current = true;
-    } else if (!isConnected && wasConnectedRef.current && user) {
-      // Only show error if we were connected before and now disconnected
-      toast.error('Connection lost. Please refresh the page.');
+    if (!isConnected && user) {
       setSessionId(null);
-      setSelectedSession(null);
       setSessions([]);
-      wasConnectedRef.current = false;
     }
-  }, [isConnected, user, toast]);
+  }, [isConnected, user]);
+
+  const handleRemoveSession = (id) => {
+    setSessions(prev => prev.filter(s => s.sessionId !== id));
+    emit('monitoring:leave-session', { sessionId: id });
+    toast.info('Connection removed');
+  };
 
 
 
@@ -704,162 +852,67 @@ const Monitoring = () => {
       {/* Header Section */}
       <Box sx={{
         borderBottom: '1px solid #eee',
-        p: 3,
+        p: 4,
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
+        bgcolor: 'white'
       }}>
-        <Typography variant="h6" sx={{ color: '#333', fontWeight: 500 }}>
-          Monitoring
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 3 }}>
+          <Box>
+            <Typography variant="h5" sx={{ color: '#1a1a1a', fontWeight: 800, mb: 0.5, letterSpacing: '-0.5px' }}>
+              Monitoring
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ opacity: 0.8 }}>
+              View active employee screens and support sessions in real-time
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setShowAddModal(true)}
+            sx={{
+              textTransform: 'none',
+              bgcolor: '#1976d2',
+              '&:hover': { bgcolor: '#1565c0' },
+              borderRadius: 2,
+              px: 3,
+              py: 1,
+              fontWeight: 600,
+              boxShadow: '0 4px 12px rgba(25, 118, 210, 0.2)',
+              mt: 0.5
+            }}
+          >
+            Add New
+          </Button>
+        </Box>
       </Box>
 
-      <Box sx={{ p: 4 }}>
-        <Card variant="outlined" sx={{ borderRadius: 1, border: '1px solid #eee' }}>
-          <CardContent sx={{ p: '0 !important' }}>
-            {/* Action Bar */}
-            <Box sx={{ p: 2, display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid #eee' }}>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => setShowAddModal(true)}
-                sx={{
-                  textTransform: 'none',
-                  bgcolor: '#1976d2',
-                  '&:hover': { bgcolor: '#1565c0' }
-                }}
-              >
-                Add New
-              </Button>
-            </Box>
-
-            {/* Table */}
-            <TableContainer component={Box}>
-              <Table sx={{ minWidth: 650 }} aria-label="monitoring table">
-                <TableHead>
-                  <TableRow sx={{ '& th': { color: '#888', fontWeight: 500, borderBottom: '1px solid #eee' } }}>
-                    <TableCell>Group Name</TableCell>
-                    <TableCell align="center">Connection</TableCell>
-                    <TableCell align="center">Count</TableCell>
-                    <TableCell align="center">View</TableCell>
-                    <TableCell align="center">Action</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {sessions.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ py: 10 }}>
-                        <Typography variant="body2" sx={{ color: '#999' }}>
-                          No Data
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    sessions.map((session) => (
-                      <TableRow key={session.sessionId} hover sx={{ '& td': { borderBottom: '1px solid #f9f9f9' } }}>
-                        <TableCell component="th" scope="row">
-                          {session.employeeName}
-                        </TableCell>
-                        <TableCell align="center">
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                            <SignalIcon sx={{ fontSize: 16, color: session.streamActive ? '#4caf50' : '#bdbdbd' }} />
-                            {session.connectionCode || '-'}
-                          </Box>
-                        </TableCell>
-                        <TableCell align="center">
-                          {session.sessionId === selectedSession?.sessionId ? adminCount : (session.streamActive ? '1' : '0')}
-                        </TableCell>
-                        <TableCell align="center">
-                          {session.streamActive ? (
-                            <Chip
-                              label="Live"
-                              size="small"
-                              sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontWeight: 500, fontSize: '0.7rem' }}
-                            />
-                          ) : (
-                            <Typography variant="caption" sx={{ color: '#999' }}>Offline</Typography>
-                          )}
-                        </TableCell>
-                        <TableCell align="center">
-                          <Button
-                            size="small"
-                            variant={selectedSession?.sessionId === session.sessionId ? "outlined" : "text"}
-                            color={selectedSession?.sessionId === session.sessionId ? "error" : "primary"}
-                            onClick={() => {
-                              if (selectedSession?.sessionId === session.sessionId) {
-                                stopViewing();
-                                setSelectedSession(null);
-                              } else {
-                                handleJoinSession(session);
-                              }
-                            }}
-                            sx={{ textTransform: 'none' }}
-                          >
-                            {selectedSession?.sessionId === session.sessionId ? "Stop" : "View"}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </CardContent>
-        </Card>
-
-        {/* Video Viewer Section */}
-        {selectedSession && (
-          <Box sx={{ mt: 4 }}>
-            <Card variant="outlined" sx={{ borderRadius: 1, border: '1px solid #eee' }}>
-              <Box sx={{
-                p: 2,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                borderBottom: '1px solid #eee'
-              }}>
-                <Typography variant="subtitle1" fontWeight={500}>
-                  Live Stream: {selectedSession.employeeName}
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  {loading && <CircularProgress size={20} />}
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    size="small"
-                    onClick={() => {
-                      stopViewing();
-                      setSelectedSession(null);
-                    }}
-                  >
-                    Close Viewer
-                  </Button>
-                </Box>
-              </Box>
-              <CardContent sx={{ p: 0, bgcolor: 'black', position: 'relative', display: 'flex', justifyContent: 'center' }}>
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  playsInline
-                  style={{
-                    width: '100%',
-                    maxHeight: '70vh',
-                    display: (selectedSession?.streamActive || !!remoteStream) ? 'block' : 'none'
-                  }}
-                  onLoadedMetadata={() => setLoading(false)}
-                  onPlay={() => setLoading(false)}
-                />
-                {!selectedSession?.streamActive && !remoteStream && (
-                  <Box sx={{ py: 10, textAlign: 'center', color: '#666' }}>
-                    <VisibilityOffIcon sx={{ fontSize: 48, mb: 1, opacity: 0.5 }} />
-                    <Typography>Waiting for stream to start...</Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
+      <Box sx={{ p: 5 }}>
+        {sessions.length === 0 ? (
+          <Box sx={{ py: 15, textAlign: 'center', bgcolor: 'white', borderRadius: 4, border: '2px dashed #eceff1' }}>
+            <Typography variant="h6" sx={{ color: '#b0bec5', fontWeight: 600, mb: 1 }}>
+              No active sessions available
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#cfd8dc' }}>
+              Click the "Add New" button above to connect to an employee
+            </Typography>
           </Box>
+        ) : (
+          <Grid container spacing={4}>
+            {sessions.map((session) => (
+              <Grid item xs={12} sm={6} md={4} key={session.sessionId}>
+                <MonitoringSessionCard
+                  session={session}
+                  adminName={name}
+                  onRemove={handleRemoveSession}
+                />
+              </Grid>
+            ))}
+          </Grid>
         )}
       </Box>
+
 
       {/* Connection Code Modal */}
       {showAddModal && (

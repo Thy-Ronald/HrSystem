@@ -43,10 +43,11 @@ const Layout = ({ children, currentPath, onNavigate }) => {
 
   const navItems = [
     { label: 'Dashboard', path: 'dashboard' },
+    { label: 'Employees', path: 'contract-form', adminOnly: true },
     { label: 'Github Analytics', path: 'github-analytics' },
     { label: 'Ranking', path: 'staff-ranking' },
     { label: 'Monitoring', path: 'monitoring' },
-  ];
+  ].filter(item => !item.adminOnly || isAdmin);
 
   // Map our currentPath to the tab index
   const tabValue = navItems.findIndex(item => item.path === currentPath);
@@ -55,7 +56,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
   const handleTabChange = (event, newValue) => {
     const targetPath = navItems[newValue].path;
     // Only navigate to implemented pages
-    if (['dashboard', 'staff-ranking', 'monitoring'].includes(targetPath)) {
+    if (['dashboard', 'contract-form', 'staff-ranking', 'monitoring'].includes(targetPath)) {
       onNavigate(targetPath);
     }
   };
