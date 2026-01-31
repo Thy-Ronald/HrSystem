@@ -15,8 +15,18 @@ const Monitoring = () => {
   const [adminCount, setAdminCount] = useState(0);
   const [sessionTimeRemaining, setSessionTimeRemaining] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Connection code states
+  const [connectionCode, setConnectionCode] = useState('');
+  const [showConnectionCodeSetup, setShowConnectionCodeSetup] = useState(true);
+
+  // Admin "Add New" modal states
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addFormCode, setAddFormCode] = useState('');
+  const [addFormError, setAddFormError] = useState('');
+  const [addFormLoading, setAddFormLoading] = useState(false);
 
   const toast = useToast();
   const role = user?.role || null;
@@ -48,28 +58,45 @@ const Monitoring = () => {
     }
   }, [role, remoteStream, remoteVideoRef]);
 
-  // Handle Socket.IO authentication (after login and on reconnect)
-  useEffect(() => {
-    if (user && token && isConnected) {
-      // Always re-authenticate on connection (handles reconnections)
-      // The backend will reuse existing sessions for employees
-      console.log('[Monitoring] Authenticating with Socket.IO:', { role: user.role, name: user.name, hasSessionId: !!sessionId, socketId: socket?.id });
-      setIsAuthenticated(false); // Reset auth state while authenticating
-      setLoading(true);
-      // Send auth request with existing user info
-      emit('monitoring:auth', { role: user.role, name: user.name });
-    } else {
-      setIsAuthenticated(false);
+  // Employee: Submit connection code and create session
+  const handleSubmitConnectionCode = useCallback(() => {
+    if (!user || !token || !isConnected) {
+      toast.error('Not connected to server');
+      return;
     }
-  }, [user, token, isConnected, emit, role, sessionId, socket]);
+
+    if (connectionCode.trim().length < 4) {
+      toast.error('Connection code must be at least 4 characters');
+      return;
+    }
+
+    console.log('[Monitoring] Submitting connection code for employee:', { name: user.name, code: connectionCode });
+    setLoading(true);
+    emit('monitoring:auth', {
+      role: user.role,
+      name: user.name,
+      connectionCode: connectionCode.trim()
+    });
+  }, [user, token, isConnected, connectionCode, emit, toast]);
+
+  // Admin: Authenticate on connect (no session list, they connect via code)
+  useEffect(() => {
+    if (user && token && isConnected && role === 'admin') {
+      console.log('[Monitoring] Admin authenticating with Socket.IO');
+      setLoading(true);
+      emit('monitoring:auth', { role: user.role, name: user.name });
+    }
+  }, [user, token, isConnected, emit, role]);
 
   // Handle session creation (employee)
   useEffect(() => {
-    const handleSessionCreated = ({ sessionId: newSessionId, timeRemaining }) => {
+    const handleSessionCreated = ({ sessionId: newSessionId, timeRemaining, connectionCode: code }) => {
       setSessionId(newSessionId);
       setSessionTimeRemaining(timeRemaining || 30);
       setLoading(false);
       setIsAuthenticated(true);
+      setShowConnectionCodeSetup(false);
+      if (code) setConnectionCode(code);
       toast.success('Session created successfully');
     };
 
@@ -78,34 +105,80 @@ const Monitoring = () => {
       toast.error(message || 'Authentication failed');
     };
 
+    // Admin auth success
+    const handleAuthSuccess = () => {
+      setLoading(false);
+      setIsAuthenticated(true);
+      console.log('[Monitoring] Admin authenticated successfully');
+    };
+
     subscribe('monitoring:session-created', handleSessionCreated);
+    subscribe('monitoring:auth-success', handleAuthSuccess);
     subscribe('monitoring:error', handleAuthError);
 
     return () => {
       unsubscribe('monitoring:session-created', handleSessionCreated);
+      unsubscribe('monitoring:auth-success', handleAuthSuccess);
       unsubscribe('monitoring:error', handleAuthError);
     };
   }, [subscribe, unsubscribe, toast]);
 
-  // Handle sessions list (admin)
+  // Admin: Handle connect by code events
   useEffect(() => {
-    const handleSessionsList = ({ sessions: sessionsList }) => {
-      setSessions(sessionsList);
-      setSessionsLoading(false);
-      setLoading(false);
-      setIsAuthenticated(true);
-    };
+    if (role !== 'admin') return;
 
-    const handleSessionAvailable = ({ sessionId: newSessionId, employeeName }) => {
+    const handleConnectSuccess = ({ sessionId: newSessionId, employeeName, streamActive: active, timeRemaining }) => {
+      console.log('[Monitoring] Connected to employee session:', { newSessionId, employeeName, active });
+      setAddFormLoading(false);
+      setShowAddModal(false);
+      setAddFormCode('');
+      setAddFormError('');
+
+      // Add to sessions list
       setSessions((prev) => {
         const exists = prev.find((s) => s.sessionId === newSessionId);
         if (!exists) {
-          toast.info(`${employeeName} started a new session`);
-          return [...prev, { sessionId: newSessionId, employeeName, streamActive: false }];
+          return [...prev, { sessionId: newSessionId, employeeName, streamActive: active, timeRemaining }];
         }
         return prev;
       });
+
+      toast.success(`Connected to ${employeeName}'s session`);
     };
+
+    const handleConnectError = ({ message }) => {
+      console.log('[Monitoring] Connection error:', message);
+      setAddFormLoading(false);
+      setAddFormError(message);
+    };
+
+    subscribe('monitoring:connect-success', handleConnectSuccess);
+    subscribe('monitoring:connect-error', handleConnectError);
+
+    return () => {
+      unsubscribe('monitoring:connect-success', handleConnectSuccess);
+      unsubscribe('monitoring:connect-error', handleConnectError);
+    };
+  }, [role, subscribe, unsubscribe, toast]);
+
+  // Admin: Submit connect by code form
+  const handleAddConnection = useCallback(() => {
+    if (!addFormCode.trim()) {
+      setAddFormError('Please enter the connection code');
+      return;
+    }
+
+    console.log('[Monitoring] Admin connecting by code:', { code: addFormCode });
+    setAddFormLoading(true);
+    setAddFormError('');
+    emit('monitoring:connect-by-code', {
+      connectionCode: addFormCode.trim()
+    });
+  }, [addFormCode, emit]);
+
+  // Handle session ended event (admin)
+  useEffect(() => {
+    if (role !== 'admin') return;
 
     const handleSessionEnded = ({ sessionId: endedSessionId }) => {
       const endedSession = sessions.find((s) => s.sessionId === endedSessionId);
@@ -119,16 +192,12 @@ const Monitoring = () => {
       }
     };
 
-    subscribe('monitoring:sessions-list', handleSessionsList);
-    subscribe('monitoring:session-available', handleSessionAvailable);
     subscribe('monitoring:session-ended', handleSessionEnded);
 
     return () => {
-      unsubscribe('monitoring:sessions-list', handleSessionsList);
-      unsubscribe('monitoring:session-available', handleSessionAvailable);
       unsubscribe('monitoring:session-ended', handleSessionEnded);
     };
-  }, [subscribe, unsubscribe, selectedSession, stopViewing]);
+  }, [role, sessions, selectedSession, stopViewing, subscribe, unsubscribe, toast]);
 
   // Handle stream status updates (admin)
   useEffect(() => {
@@ -483,8 +552,71 @@ const Monitoring = () => {
 
             {/* Main content */}
             <div className="bg-white rounded-lg shadow-md p-6">
-              {!isSharing ? (
+              {/* Connection Code Setup */}
+              {showConnectionCodeSetup && !sessionId ? (
                 <div className="text-center py-12">
+                  <div className="mb-6">
+                    <svg
+                      className="w-24 h-24 mx-auto text-blue-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2 text-gray-800">
+                    Set Your Connection Code
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    Enter a code that admins will use to connect to your screen.
+                    Share this code with your admin to allow them to view your screen.
+                  </p>
+                  <div className="max-w-xs mx-auto">
+                    <input
+                      type="text"
+                      value={connectionCode}
+                      onChange={(e) => setConnectionCode(e.target.value)}
+                      placeholder="Enter connection code (min 4 chars)"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center text-lg tracking-wider"
+                      disabled={loading || !isConnected}
+                    />
+                    <button
+                      onClick={handleSubmitConnectionCode}
+                      disabled={!isConnected || loading || connectionCode.trim().length < 4}
+                      className="mt-4 w-full bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
+                    >
+                      {loading ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Creating Session...
+                        </span>
+                      ) : (
+                        'Create Session'
+                      )}
+                    </button>
+                    {!isConnected && (
+                      <p className="text-sm text-red-500 mt-2">Connecting to server...</p>
+                    )}
+                  </div>
+                </div>
+              ) : !isSharing ? (
+                <div className="text-center py-12">
+                  {/* Show connection code prominently */}
+                  <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-600 mb-2">Your Connection Code</p>
+                    <p className="text-3xl font-bold text-blue-700 tracking-widest">{connectionCode}</p>
+                    <p className="text-xs text-blue-500 mt-2">Share this code with your admin</p>
+                  </div>
+
                   <div className="mb-6">
                     <svg
                       className="w-24 h-24 mx-auto text-gray-400"
@@ -534,14 +666,14 @@ const Monitoring = () => {
                       'Start Sharing'
                     )}
                   </button>
-                  {(!isConnected || !sessionId || !isAuthenticated) && (
-                    <p className="text-sm text-gray-500 mt-2 text-center">
-                      {!isConnected ? 'Connecting to server...' : !sessionId ? 'Authenticating...' : !isAuthenticated ? 'Waiting for authentication...' : ''}
-                    </p>
-                  )}
                 </div>
               ) : (
                 <div className="text-center py-8">
+                  {/* Show connection code while sharing */}
+                  <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-600 mb-2">Your Connection Code</p>
+                    <p className="text-3xl font-bold text-green-700 tracking-widest">{connectionCode}</p>
+                  </div>
                   <p className="text-gray-600">
                     Your screen is being shared. Admins can now view your screen.
                   </p>
@@ -614,20 +746,33 @@ const Monitoring = () => {
             {/* Sessions list */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-lg font-semibold mb-4 text-gray-800">
-                  Active Sessions
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Active Sessions
+                  </h3>
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 text-sm font-medium flex items-center gap-1"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add New
+                  </button>
+                </div>
 
-                {sessionsLoading ? (
-                  <div className="space-y-2">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="animate-pulse bg-gray-200 h-16 rounded-md"></div>
-                    ))}
+                {sessions.length === 0 ? (
+                  <div className="text-center py-8">
+                    <svg className="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <p className="text-gray-500 text-sm">
+                      No active connections
+                    </p>
+                    <p className="text-gray-400 text-xs mt-1">
+                      Click "Add New" to connect to an employee
+                    </p>
                   </div>
-                ) : sessions.length === 0 ? (
-                  <p className="text-gray-500 text-sm">
-                    No active sessions. Employees can start sharing to appear here.
-                  </p>
                 ) : (
                   <div className="space-y-2">
                     {sessions.map((session) => (
@@ -785,6 +930,87 @@ const Monitoring = () => {
           </div>
         </div>
       </div>
+
+      {/* Add Connection Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Connect to Employee</h3>
+              <button
+                onClick={() => {
+                  setShowAddModal(false);
+                  setAddFormCode('');
+                  setAddFormError('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              Enter the employee's connection code to view their screen.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Connection Code
+                </label>
+                <input
+                  type="text"
+                  value={addFormCode}
+                  onChange={(e) => setAddFormCode(e.target.value)}
+                  placeholder="Enter employee's connection code"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 tracking-wider text-center text-lg"
+                  disabled={addFormLoading}
+                  autoFocus
+                />
+              </div>
+
+              {addFormError && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-md text-sm">
+                  {addFormError}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setAddFormCode('');
+                    setAddFormError('');
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                  disabled={addFormLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddConnection}
+                  disabled={addFormLoading || !addFormCode.trim()}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
+                >
+                  {addFormLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Connecting...
+                    </span>
+                  ) : (
+                    'Connect'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

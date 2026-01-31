@@ -5,7 +5,7 @@
 
 class MonitoringService {
   constructor() {
-    // Store active sessions: { sessionId: { employeeSocketId, adminSocketIds: Set, streamActive: boolean } }
+    // Store active sessions: { sessionId: { employeeSocketId, adminSocketIds: Set, streamActive: boolean, connectionCode: string } }
     this.sessions = new Map();
   }
 
@@ -13,15 +13,18 @@ class MonitoringService {
    * Create a new monitoring session
    * @param {string} employeeSocketId - Socket ID of the employee
    * @param {string} employeeName - Name of the employee
+   * @param {string} connectionCode - Code for admin to connect
+   * @param {number} expirationMinutes - Session expiration time
    * @returns {string} Session ID
    */
-  createSession(employeeSocketId, employeeName, expirationMinutes = 30) {
+  createSession(employeeSocketId, employeeName, connectionCode, expirationMinutes = 30) {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const expiresAt = new Date(Date.now() + expirationMinutes * 60 * 1000);
-    
+
     this.sessions.set(sessionId, {
       employeeSocketId,
       employeeName,
+      connectionCode,
       adminSocketIds: new Set(),
       streamActive: false,
       createdAt: new Date(),
@@ -42,6 +45,23 @@ class MonitoringService {
     }
 
     return sessionId;
+  }
+
+  /**
+   * Find session by connection code only
+   * @param {string} connectionCode - Connection code to validate
+   * @returns {Object|null} { sessionId, session } or null if not found
+   */
+  getSessionByCode(connectionCode) {
+    for (const [sessionId, session] of this.sessions.entries()) {
+      if (
+        session.connectionCode === connectionCode &&
+        !this.isSessionExpired(sessionId)
+      ) {
+        return { sessionId, session };
+      }
+    }
+    return null;
   }
 
   /**

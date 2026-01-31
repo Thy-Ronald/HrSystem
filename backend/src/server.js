@@ -93,7 +93,7 @@ async function startServer() {
     console.log(`[Socket.IO] Client connected: ${socket.id}`);
 
     // Handle user authentication with JWT
-    socket.on('monitoring:auth', ({ role, name, token }) => {
+    socket.on('monitoring:auth', ({ role, name, token, connectionCode }) => {
       // Rate limiting: 10 auth attempts per 15 minutes
       if (!socketRateLimiter.checkLimit(socket.id, 10, 15 * 60 * 1000)) {
         socket.emit('monitoring:error', {
@@ -130,8 +130,17 @@ async function startServer() {
       console.log(`[Monitoring] ${sanitized.role} authenticated: ${sanitized.name} (${socket.id})`);
 
       if (sanitized.role === 'employee') {
+        // Validate connection code for employees
+        if (!connectionCode || connectionCode.trim().length < 4) {
+          socket.emit('monitoring:error', {
+            message: 'Connection code must be at least 4 characters.',
+          });
+          return;
+        }
+
+        const sanitizedCode = connectionCode.trim();
+
         // Check if employee already has an active session by name (reconnection scenario)
-        // This handles the case where socket ID changed due to reconnection
         const existingSessionId = monitoringService.getSessionByEmployeeName(sanitized.name);
         let sessionId;
 
@@ -143,6 +152,8 @@ async function startServer() {
           if (session) {
             const oldSocketId = session.employeeSocketId;
             session.employeeSocketId = socket.id;
+            // Update connection code if provided
+            session.connectionCode = sanitizedCode;
             console.log(`[Monitoring] Employee ${sanitized.name} reconnected (${oldSocketId} -> ${socket.id}), reusing session ${sessionId}`);
           }
         } else {
@@ -154,34 +165,77 @@ async function startServer() {
             return;
           }
 
-          // Create new session for employee
-          sessionId = monitoringService.createSession(socket.id, sanitized.name);
-          console.log(`[Monitoring] Created new session ${sessionId} for employee ${sanitized.name}`);
+          // Create new session for employee with connection code
+          sessionId = monitoringService.createSession(socket.id, sanitized.name, sanitizedCode);
+          console.log(`[Monitoring] Created new session ${sessionId} for employee ${sanitized.name} with connection code`);
         }
 
         socket.data.sessionId = sessionId;
+        socket.data.connectionCode = sanitizedCode;
         const timeRemaining = monitoringService.getTimeRemaining(sessionId);
         socket.emit('monitoring:session-created', {
           sessionId,
           timeRemaining,
+          connectionCode: sanitizedCode,
           token: jwtToken,
         });
 
-        // Only broadcast if it's a new session
-        if (!existingSessionId) {
-          socket.broadcast.emit('monitoring:session-available', {
-            sessionId,
-            employeeName: sanitized.name,
-          });
-        }
+        // No longer auto-broadcast sessions - admins connect via code
       } else if (sanitized.role === 'admin') {
-        // Send list of available sessions
-        const sessions = monitoringService.getAllSessions();
-        socket.emit('monitoring:sessions-list', {
-          sessions,
+        // Admin authenticated - they will connect to sessions via code
+        socket.emit('monitoring:auth-success', {
           token: jwtToken,
+          message: 'Authenticated. Use connection code to join employee sessions.',
         });
       }
+    });
+
+    // Admin: Connect to employee session by code
+    socket.on('monitoring:connect-by-code', ({ connectionCode }) => {
+      if (!socket.data.authenticated || socket.data.role !== 'admin') {
+        socket.emit('monitoring:error', { message: 'Unauthorized' });
+        return;
+      }
+
+      if (!connectionCode) {
+        socket.emit('monitoring:error', { message: 'Connection code is required' });
+        return;
+      }
+
+      console.log(`[Monitoring] Admin ${socket.data.name} attempting to connect with code: ${connectionCode}`);
+
+      // Find session by code only
+      const result = monitoringService.getSessionByCode(connectionCode.trim());
+
+      if (!result) {
+        console.log(`[Monitoring] Connection failed: Invalid code ${connectionCode}`);
+        socket.emit('monitoring:connect-error', {
+          message: 'Invalid connection code'
+        });
+        return;
+      }
+
+      const { sessionId, session } = result;
+
+      // Add admin to session
+      monitoringService.addAdminToSession(sessionId, socket.id, socket.data.name);
+      socket.data.sessionId = sessionId;
+      socket.join(sessionId);
+
+      console.log(`[Monitoring] Admin ${socket.data.name} connected to ${session.employeeName}'s session (${sessionId})`);
+
+      // Notify admin of successful connection (includes employee name)
+      socket.emit('monitoring:connect-success', {
+        sessionId,
+        employeeName: session.employeeName,
+        streamActive: session.streamActive,
+        timeRemaining: monitoringService.getTimeRemaining(sessionId),
+      });
+
+      // Notify employee that admin joined
+      io.to(session.employeeSocketId).emit('monitoring:admin-joined', {
+        adminName: socket.data.name,
+      });
     });
 
     // Employee: Start sharing
