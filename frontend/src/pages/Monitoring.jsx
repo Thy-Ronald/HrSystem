@@ -266,7 +266,7 @@ const Monitoring = () => {
                     <Box sx={{ width: 64, height: 64, borderRadius: '50%', bgcolor: 'rgba(25, 118, 210, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
                       <MonitorIcon sx={{ fontSize: 32, color: '#1976d2' }} />
                     </Box>
-                    <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>
+                    <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
                       {justReconnected ? 'Session Restored' : 'Ready to Share'}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
@@ -357,8 +357,7 @@ const Monitoring = () => {
       <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
       <Box sx={{ borderBottom: '1px solid #eee', p: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: 'white' }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 800 }}>Monitoring</Typography>
-          <Typography variant="body2" color="text.secondary">Active employee screen sessions</Typography>
+          <Typography variant="h6" sx={{ color: '#333', fontWeight: 500 }}>Monitoring</Typography>
         </Box>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowAddModal(true)} sx={{ borderRadius: 2 }}>Add New</Button>
       </Box>

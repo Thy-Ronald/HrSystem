@@ -149,9 +149,6 @@ function ContractForm({ searchQuery = '' }) {
           <Typography variant="h6" sx={{ color: '#333', fontWeight: 500 }}>
             Employees
           </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Manage employee contracts and payroll information
-          </Typography>
         </Box>
       </Box>
 

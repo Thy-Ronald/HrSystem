@@ -73,22 +73,6 @@ export default function StaffRanking() {
   return (
     <Box sx={{ width: '100%', minHeight: '100%', bgcolor: 'white' }}>
       {/* Page Header */}
-      <Box sx={{
-        p: 3,
-        borderBottom: '1px solid #eee',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <Box>
-          <Typography variant="h6" sx={{ color: '#333', fontWeight: 500 }}>
-            Staff Ranking
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            GitHub repository staff ranking based on issue assignments
-          </Typography>
-        </Box>
-      </Box>
 
       {/* Page Content */}
       <Box sx={{ p: 4 }}>

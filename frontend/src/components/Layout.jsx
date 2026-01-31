@@ -24,7 +24,6 @@ import { NotificationDropdown } from './NotificationDropdown';
 import { useNotifications } from '../hooks/useNotifications';
 import { useAuth } from '../contexts/AuthContext';
 
-import logo from '../assets/logo.png';
 
 const Layout = ({ children, currentPath, onNavigate }) => {
   const [anchorEl, setAnchorEl] = useState(null);
@@ -79,12 +78,6 @@ const Layout = ({ children, currentPath, onNavigate }) => {
             sx={{ display: 'flex', alignItems: 'center', mr: 2, cursor: 'pointer' }}
             onClick={() => onNavigate('dashboard')}
           >
-            <Box
-              component="img"
-              src={logo}
-              alt="THY Logo"
-              sx={{ height: 28, width: 'auto', mr: 1 }}
-            />
             <Typography
               variant="h6"
               component="div"
