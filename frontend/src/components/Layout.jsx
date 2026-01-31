@@ -198,12 +198,6 @@ const Layout = ({ children, currentPath, onNavigate }) => {
         </Container>
       </Box>
 
-      {/* Footer */}
-      <Box sx={{ py: 2, textAlign: 'center', borderTop: '1px solid #eee', bgcolor: 'white' }}>
-        <Typography variant="caption" sx={{ color: '#666' }}>
-          © 2026 RWS v3.9.0
-        </Typography>
-      </Box>
     </Box>
   );
 };
