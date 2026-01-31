@@ -35,7 +35,7 @@ import {
 // Sub-components
 // ─────────────────────────────────────────────────────────────
 
-const MonitoringSessionCard = ({ session, adminName, onRemove }) => {
+const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
   const {
     error: shareError,
     remoteStream,
@@ -48,8 +48,26 @@ const MonitoringSessionCard = ({ session, adminName, onRemove }) => {
   const [loading, setLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showFullView, setShowFullView] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
   const { emit } = useSocket();
   const fullVideoRef = useRef(null);
+  const containerRef = useRef(null);
+
+  // Intersection Observer to detect visibility
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+      },
+      { threshold: 0.1 } // 10% visible is enough to start
+    );
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
 
   // Attach remote stream to video element
   useEffect(() => {
@@ -62,33 +80,33 @@ const MonitoringSessionCard = ({ session, adminName, onRemove }) => {
   useEffect(() => {
     let timeoutId;
     if (showFullView && remoteStream) {
-      // Use a small timeout to ensure the component has mounted and the ref is available
       timeoutId = setTimeout(() => {
         if (fullVideoRef.current) {
-          console.log(`[CCTV] Syncing stream to fullscreen view for ${session.employeeName}`);
           fullVideoRef.current.srcObject = remoteStream;
-          // Explicitly call play to ensure it starts
           fullVideoRef.current.play().catch(err => console.error('[CCTV] Fullscreen play error:', err));
         }
       }, 200);
     }
     return () => clearTimeout(timeoutId);
-  }, [showFullView, remoteStream, session.employeeName]);
+  }, [showFullView, remoteStream]);
 
-  // Automatically start viewing if stream becomes active
+  // Viewport-aware streaming logic (Scalability Optimization)
   useEffect(() => {
-    if (session.streamActive && !shareConnected) {
-      console.log(`[CCTV] Auto-starting view for ${session.employeeName}`);
+    // Only start viewing if session is active AND card is visible in viewport
+    if (session.streamActive && isVisible && !shareConnected) {
+      console.log(`[CCTV] Viewport enter: Starting view for ${session.employeeName}`);
       setLoading(true);
       emit('monitoring:join-session', { sessionId: session.sessionId });
       startViewing(session.sessionId);
-    } else if (!session.streamActive && shareConnected) {
-      console.log(`[CCTV] Stream stopped for ${session.employeeName}, cleaning up`);
+    }
+    // Stop viewing if card is NOT visible OR stream becomes inactive
+    else if ((!isVisible || !session.streamActive) && shareConnected) {
+      console.log(`[CCTV] Viewport exit/Stream stop: Cleaning up for ${session.employeeName}`);
       stopViewing();
       setLoading(false);
-      setShowFullView(false);
+      if (!session.streamActive) setShowFullView(false);
     }
-  }, [session.streamActive, shareConnected, startViewing, stopViewing, session.sessionId, session.employeeName, emit]);
+  }, [session.streamActive, isVisible, shareConnected, startViewing, stopViewing, session.sessionId, session.employeeName, emit]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -107,7 +125,7 @@ const MonitoringSessionCard = ({ session, adminName, onRemove }) => {
   };
 
   return (
-    <>
+    <div ref={containerRef} style={{ height: '100%' }}>
       <Card
         variant="outlined"
         sx={{
@@ -309,9 +327,9 @@ const MonitoringSessionCard = ({ session, adminName, onRemove }) => {
       <style>
         {`@keyframes pulse { 0% { transform: scale(0.9); opacity: 0.7; } 50% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(0.9); opacity: 0.7; } }`}
       </style>
-    </>
+    </div>
   );
-};
+});
 
 const Monitoring = () => {
   const { user, token } = useAuth();
