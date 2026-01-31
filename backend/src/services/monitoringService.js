@@ -14,12 +14,10 @@ class MonitoringService {
    * @param {string} employeeSocketId - Socket ID of the employee
    * @param {string} employeeName - Name of the employee
    * @param {string} connectionCode - Code for admin to connect
-   * @param {number} expirationMinutes - Session expiration time
    * @returns {string} Session ID
    */
-  createSession(employeeSocketId, employeeName, connectionCode, expirationMinutes = 30) {
+  createSession(employeeSocketId, employeeName, connectionCode) {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const expiresAt = new Date(Date.now() + expirationMinutes * 60 * 1000);
 
     this.sessions.set(sessionId, {
       employeeSocketId,
@@ -28,21 +26,7 @@ class MonitoringService {
       adminSocketIds: new Set(),
       streamActive: false,
       createdAt: new Date(),
-      expiresAt,
     });
-
-    // Auto-cleanup after expiration
-    const timeoutId = setTimeout(() => {
-      if (this.sessions.has(sessionId)) {
-        this.deleteSession(sessionId);
-      }
-    }, expirationMinutes * 60 * 1000);
-
-    // Store timeout ID for potential cancellation
-    const session = this.sessions.get(sessionId);
-    if (session) {
-      session.timeoutId = timeoutId;
-    }
 
     return sessionId;
   }

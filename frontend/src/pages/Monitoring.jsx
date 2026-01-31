@@ -13,7 +13,6 @@ const Monitoring = () => {
   const [selectedSession, setSelectedSession] = useState(null);
   const [streamActive, setStreamActive] = useState(false);
   const [adminCount, setAdminCount] = useState(0);
-  const [sessionTimeRemaining, setSessionTimeRemaining] = useState(null);
   const [loading, setLoading] = useState(false);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -90,9 +89,8 @@ const Monitoring = () => {
 
   // Handle session creation (employee)
   useEffect(() => {
-    const handleSessionCreated = ({ sessionId: newSessionId, timeRemaining, connectionCode: code }) => {
+    const handleSessionCreated = ({ sessionId: newSessionId, connectionCode: code }) => {
       setSessionId(newSessionId);
-      setSessionTimeRemaining(timeRemaining || 30);
       setLoading(false);
       setIsAuthenticated(true);
       setShowConnectionCodeSetup(false);
@@ -396,23 +394,7 @@ const Monitoring = () => {
     }
   }, [isConnected, user, toast]);
 
-  // Update session time remaining (employee)
-  useEffect(() => {
-    if (role === 'employee' && sessionId && sessionTimeRemaining !== null) {
-      const interval = setInterval(() => {
-        setSessionTimeRemaining((prev) => {
-          if (prev === null) return null;
-          if (prev <= 1) {
-            toast.warning('Session will expire in 1 minute');
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 60000); // Update every minute
 
-      return () => clearInterval(interval);
-    }
-  }, [role, sessionId, sessionTimeRemaining, toast]);
 
   // Not authenticated - show login form
   if (!role) {
@@ -525,11 +507,7 @@ const Monitoring = () => {
                       ({adminCount} admin{adminCount !== 1 ? 's' : ''} viewing)
                     </span>
                   )}
-                  {sessionTimeRemaining !== null && (
-                    <span className="text-sm ml-2 opacity-90">
-                      • {sessionTimeRemaining} min remaining
-                    </span>
-                  )}
+
                 </div>
                 <button
                   onClick={stopSharing}

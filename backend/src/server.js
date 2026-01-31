@@ -172,10 +172,8 @@ async function startServer() {
 
         socket.data.sessionId = sessionId;
         socket.data.connectionCode = sanitizedCode;
-        const timeRemaining = monitoringService.getTimeRemaining(sessionId);
         socket.emit('monitoring:session-created', {
           sessionId,
-          timeRemaining,
           connectionCode: sanitizedCode,
           token: jwtToken,
         });
@@ -229,7 +227,6 @@ async function startServer() {
         sessionId,
         employeeName: session.employeeName,
         streamActive: session.streamActive,
-        timeRemaining: monitoringService.getTimeRemaining(sessionId),
       });
 
       // Notify employee that admin joined
