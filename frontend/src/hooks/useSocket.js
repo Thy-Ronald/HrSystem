@@ -2,18 +2,106 @@
  * useSocket Hook
  * 
  * Manages Socket.IO connection to the backend for real-time updates.
+ * Uses a SINGLETON socket instance so all components share the same connection.
  * Features:
  * - Automatic connection on mount
  * - Automatic reconnection with exponential backoff
- * - Cleanup on unmount
+ * - Cleanup on unmount (only when last consumer unmounts)
  * - Connection status tracking
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useSyncExternalStore } from 'react';
 import { io } from 'socket.io-client';
+import { getToken } from '../utils/auth';
 
 // Backend URL - matches the API base
 const SOCKET_URL = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
+
+// Singleton socket instance
+let socketInstance = null;
+let connectionCount = 0;
+let isConnectedState = false;
+let connectionErrorState = null;
+let listeners = new Set();
+
+// Notify all subscribers of state changes
+function notifyListeners() {
+  listeners.forEach((listener) => listener());
+}
+
+// Get or create the singleton socket
+function getSocket() {
+  if (!socketInstance) {
+    const token = getToken();
+
+    socketInstance = io(SOCKET_URL, {
+      // Reconnection settings
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 30000,
+      randomizationFactor: 0.5,
+
+      // Connection settings
+      timeout: 20000,
+      transports: ['websocket', 'polling'],
+
+      // Authentication (for production JWT auth)
+      auth: token ? { token } : {},
+    });
+
+    // Connection event handlers
+    socketInstance.on('connect', () => {
+      console.log('[Socket.IO] Connected:', socketInstance.id);
+      isConnectedState = true;
+      connectionErrorState = null;
+      notifyListeners();
+    });
+
+    socketInstance.on('disconnect', (reason) => {
+      console.log('[Socket.IO] Disconnected:', reason);
+      isConnectedState = false;
+      notifyListeners();
+
+      // If server disconnected us, try to reconnect
+      if (reason === 'io server disconnect') {
+        socketInstance.connect();
+      }
+    });
+
+    socketInstance.on('connect_error', (error) => {
+      console.error('[Socket.IO] Connection error:', error.message);
+      connectionErrorState = error.message;
+      notifyListeners();
+    });
+
+    socketInstance.on('reconnect', (attemptNumber) => {
+      console.log(`[Socket.IO] Reconnected after ${attemptNumber} attempts, new socket ID: ${socketInstance.id}`);
+      connectionErrorState = null;
+      notifyListeners();
+    });
+
+    socketInstance.on('reconnect_failed', () => {
+      console.error('[Socket.IO] Reconnection failed after max attempts');
+      connectionErrorState = 'Unable to connect to server. Please refresh the page.';
+      notifyListeners();
+    });
+  }
+
+  return socketInstance;
+}
+
+// Cleanup the socket when no consumers remain
+function cleanupSocket() {
+  if (socketInstance && connectionCount === 0) {
+    console.log('[Socket.IO] Cleaning up socket connection (no active consumers)');
+    socketInstance.removeAllListeners();
+    socketInstance.disconnect();
+    socketInstance = null;
+    isConnectedState = false;
+    connectionErrorState = null;
+  }
+}
 
 /**
  * Custom hook for Socket.IO connection management
@@ -24,72 +112,49 @@ const SOCKET_URL = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
  * - connectionError: Error message if connection failed
  * - subscribe: Function to subscribe to events
  * - unsubscribe: Function to unsubscribe from events
+ * - emit: Function to emit events
  */
 export function useSocket() {
-  const [isConnected, setIsConnected] = useState(false);
-  const [connectionError, setConnectionError] = useState(null);
-  const socketRef = useRef(null);
-  const reconnectAttemptRef = useRef(0);
+  const [, forceUpdate] = useState({});
+
+  // Use useSyncExternalStore for proper subscription to external state
+  const isConnected = useSyncExternalStore(
+    (callback) => {
+      listeners.add(callback);
+      return () => listeners.delete(callback);
+    },
+    () => isConnectedState
+  );
+
+  const connectionError = useSyncExternalStore(
+    (callback) => {
+      listeners.add(callback);
+      return () => listeners.delete(callback);
+    },
+    () => connectionErrorState
+  );
 
   useEffect(() => {
-    // Initialize Socket.IO connection with reconnection options
-    const socket = io(SOCKET_URL, {
-      // Reconnection settings
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,      // Start with 1 second
-      reconnectionDelayMax: 30000,  // Max 30 seconds between attempts
-      randomizationFactor: 0.5,     // Add randomness to prevent thundering herd
-      
-      // Connection settings
-      timeout: 20000,               // Connection timeout
-      transports: ['websocket', 'polling'], // Prefer WebSocket, fallback to polling
-    });
+    // Get or create the singleton socket
+    const socket = getSocket();
+    connectionCount++;
+    console.log(`[Socket.IO] Consumer connected (total: ${connectionCount}), socket ID: ${socket.id}`);
 
-    socketRef.current = socket;
+    // Force update to ensure component has latest socket reference
+    forceUpdate({});
 
-    // Connection event handlers
-    socket.on('connect', () => {
-      console.log('[Socket.IO] Connected:', socket.id);
-      setIsConnected(true);
-      setConnectionError(null);
-      reconnectAttemptRef.current = 0;
-    });
-
-    socket.on('disconnect', (reason) => {
-      console.log('[Socket.IO] Disconnected:', reason);
-      setIsConnected(false);
-      
-      // If server disconnected us, try to reconnect
-      if (reason === 'io server disconnect') {
-        socket.connect();
-      }
-    });
-
-    socket.on('connect_error', (error) => {
-      console.error('[Socket.IO] Connection error:', error.message);
-      setConnectionError(error.message);
-      reconnectAttemptRef.current++;
-      
-      // Log reconnection attempts
-      console.log(`[Socket.IO] Reconnection attempt ${reconnectAttemptRef.current}`);
-    });
-
-    socket.on('reconnect', (attemptNumber) => {
-      console.log(`[Socket.IO] Reconnected after ${attemptNumber} attempts`);
-      setConnectionError(null);
-    });
-
-    socket.on('reconnect_failed', () => {
-      console.error('[Socket.IO] Reconnection failed after max attempts');
-      setConnectionError('Unable to connect to server. Please refresh the page.');
-    });
-
-    // Cleanup on unmount - disconnect socket
+    // Cleanup on unmount
     return () => {
-      console.log('[Socket.IO] Cleaning up socket connection');
-      socket.disconnect();
-      socketRef.current = null;
+      connectionCount--;
+      console.log(`[Socket.IO] Consumer disconnected (remaining: ${connectionCount})`);
+
+      // Only cleanup socket if no consumers remain
+      // Use a timeout to handle React StrictMode double-mount
+      setTimeout(() => {
+        if (connectionCount === 0) {
+          cleanupSocket();
+        }
+      }, 100);
     };
   }, []);
 
@@ -99,8 +164,8 @@ export function useSocket() {
    * @param {Function} callback - Event handler
    */
   const subscribe = useCallback((event, callback) => {
-    if (socketRef.current) {
-      socketRef.current.on(event, callback);
+    if (socketInstance) {
+      socketInstance.on(event, callback);
     }
   }, []);
 
@@ -110,11 +175,11 @@ export function useSocket() {
    * @param {Function} callback - Event handler (optional, removes all if not provided)
    */
   const unsubscribe = useCallback((event, callback) => {
-    if (socketRef.current) {
+    if (socketInstance) {
       if (callback) {
-        socketRef.current.off(event, callback);
+        socketInstance.off(event, callback);
       } else {
-        socketRef.current.off(event);
+        socketInstance.off(event);
       }
     }
   }, []);
@@ -125,13 +190,15 @@ export function useSocket() {
    * @param {any} data - Data to send
    */
   const emit = useCallback((event, data) => {
-    if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit(event, data);
+    if (socketInstance && socketInstance.connected) {
+      socketInstance.emit(event, data);
+    } else {
+      console.warn(`[Socket.IO] Cannot emit '${event}': socket not connected`);
     }
   }, []);
 
   return {
-    socket: socketRef.current,
+    socket: socketInstance,
     isConnected,
     connectionError,
     subscribe,

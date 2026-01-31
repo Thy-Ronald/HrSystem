@@ -56,6 +56,13 @@ export function useScreenShare(role, sessionId) {
       return;
     }
 
+    // Check if we have a sessionId (means we're authenticated)
+    if (!sessionId) {
+      setError('Not authenticated. Please wait for session to be created.');
+      console.error('[WebRTC] Cannot start sharing: no sessionId. User needs to authenticate first.');
+      return;
+    }
+
     try {
       setError(null);
 
@@ -69,7 +76,9 @@ export function useScreenShare(role, sessionId) {
       setIsSharing(true);
 
       // Notify server that sharing started
+      console.log('[WebRTC] Employee screen share started, notifying server. SessionId:', sessionId);
       emit('monitoring:start-sharing');
+      console.log('[WebRTC] monitoring:start-sharing event emitted');
 
       // Handle stream end (user stops sharing via browser UI)
       stream.getVideoTracks()[0].addEventListener('ended', () => {
@@ -80,7 +89,7 @@ export function useScreenShare(role, sessionId) {
       setError(err.message || 'Failed to start screen sharing');
       setIsSharing(false);
     }
-  }, [role, emit]);
+  }, [role, emit, sessionId]);
 
   /**
    * Stop screen sharing (Employee only)
@@ -154,11 +163,18 @@ export function useScreenShare(role, sessionId) {
     subscribe('monitoring:offer', handleOffer);
 
     // Handle ICE candidate from admin
-    const handleIceCandidate = ({ candidate }) => {
+    const handleIceCandidate = ({ candidate, sessionId: candidateSessionId }) => {
+      // Only process if sessionId matches (or if not provided for backward compatibility)
+      if (candidateSessionId && candidateSessionId !== sessionId) return;
       if (candidate) {
-        pc.addIceCandidate(new RTCIceCandidate(candidate)).catch((err) => {
-          console.error('Error adding ICE candidate:', err);
-        });
+        if (pc.remoteDescription) {
+          pc.addIceCandidate(new RTCIceCandidate(candidate)).catch((err) => {
+            console.error('Error adding ICE candidate:', err);
+          });
+        } else {
+          // Queue candidate for when remote description is set
+          console.log('[WebRTC] Queuing ICE candidate (waiting for remote description)');
+        }
       }
     };
 
@@ -186,14 +202,40 @@ export function useScreenShare(role, sessionId) {
     try {
       setError(null);
 
+      // Clean up any existing connection first
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
+      }
+
       const pc = new RTCPeerConnection(STUN_SERVERS);
       peerConnectionRef.current = pc;
 
       // Handle incoming stream
       pc.ontrack = (event) => {
-        setRemoteStream(event.streams[0]);
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
+        console.log('[WebRTC] Received track from employee, track kind:', event.track?.kind);
+        console.log('[WebRTC] Track readyState:', event.track?.readyState);
+        const stream = event.streams[0];
+        if (stream) {
+          console.log('[WebRTC] Stream received with', stream.getTracks().length, 'tracks');
+          setRemoteStream(stream);
+          // Try to attach immediately if video element exists
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = stream;
+            console.log('[WebRTC] Stream attached to video element immediately');
+          } else {
+            console.log('[WebRTC] Video element not yet available, stream will be attached via useEffect');
+          }
+        } else {
+          console.error('[WebRTC] No stream in ontrack event');
+        }
+      };
+
+      // Handle connection state changes
+      pc.onconnectionstatechange = () => {
+        console.log('[WebRTC] Connection state:', pc.connectionState);
+        if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+          setError('Connection failed. Please try again.');
         }
       };
 
@@ -210,8 +252,12 @@ export function useScreenShare(role, sessionId) {
       };
 
       // Create and send offer
-      const offer = await pc.createOffer();
+      const offer = await pc.createOffer({
+        offerToReceiveVideo: true,
+        offerToReceiveAudio: false,
+      });
       await pc.setLocalDescription(offer);
+      console.log('[WebRTC] Sending offer for session:', targetSessionId);
 
       emit('monitoring:offer', {
         sessionId: targetSessionId,
@@ -219,21 +265,40 @@ export function useScreenShare(role, sessionId) {
       });
 
       // Handle answer from employee
-      const handleAnswer = ({ answer }) => {
-        pc.setRemoteDescription(new RTCSessionDescription(answer)).catch((err) => {
+      const handleAnswer = async ({ answer, sessionId: answerSessionId }) => {
+        if (answerSessionId !== targetSessionId) return;
+
+        try {
+          console.log('[WebRTC] Received answer from employee');
+          await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        } catch (err) {
           console.error('Error setting remote description:', err);
           setError('Failed to establish connection');
-        });
+        }
       };
 
       subscribe('monitoring:answer', handleAnswer);
 
       // Handle ICE candidate from employee
-      const handleIceCandidate = ({ candidate }) => {
+      const handleIceCandidate = ({ candidate, sessionId: candidateSessionId }) => {
+        if (candidateSessionId && candidateSessionId !== targetSessionId) return;
         if (candidate) {
-          pc.addIceCandidate(new RTCIceCandidate(candidate)).catch((err) => {
-            console.error('Error adding ICE candidate:', err);
-          });
+          // Add candidate even if remoteDescription isn't set yet (it will be queued)
+          if (pc.remoteDescription) {
+            pc.addIceCandidate(new RTCIceCandidate(candidate)).catch((err) => {
+              console.error('Error adding ICE candidate:', err);
+            });
+          } else {
+            // Queue candidate for when remote description is set
+            console.log('[WebRTC] Queuing ICE candidate (waiting for remote description)');
+            pc.addEventListener('signalingstatechange', () => {
+              if (pc.remoteDescription && pc.signalingState !== 'closed') {
+                pc.addIceCandidate(new RTCIceCandidate(candidate)).catch((err) => {
+                  console.error('Error adding queued ICE candidate:', err);
+                });
+              }
+            }, { once: true });
+          }
         }
       };
 
@@ -280,6 +345,28 @@ export function useScreenShare(role, sessionId) {
     }
   }, [isSharing, role, initializePeerConnection]);
 
+  // Track connection state for WebRTC
+  const [webrtcConnected, setWebrtcConnected] = useState(false);
+
+  useEffect(() => {
+    if (peerConnectionRef.current) {
+      const pc = peerConnectionRef.current;
+      const updateConnectionState = () => {
+        const connected = pc.connectionState === 'connected' || pc.connectionState === 'connecting';
+        setWebrtcConnected(connected);
+      };
+
+      pc.addEventListener('connectionstatechange', updateConnectionState);
+      updateConnectionState();
+
+      return () => {
+        pc.removeEventListener('connectionstatechange', updateConnectionState);
+      };
+    } else {
+      setWebrtcConnected(false);
+    }
+  }, [remoteStream]); // Only depend on remoteStream, not the ref
+
   return {
     isSharing,
     error,
@@ -289,7 +376,7 @@ export function useScreenShare(role, sessionId) {
     stopSharing,
     startViewing,
     stopViewing,
-    isConnected,
+    isConnected: webrtcConnected || !!remoteStream, // Connected if we have a stream or connection is active
     peerConnection: peerConnectionRef.current,
   };
 }

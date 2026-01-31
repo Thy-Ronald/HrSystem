@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../hooks/useSocket';
 import { useScreenShare } from '../hooks/useScreenShare';
 import { useToast, ToastContainer } from '../components/Toast';
 import { useConnectionQuality } from '../hooks/useConnectionQuality';
 
 const Monitoring = () => {
+  const { user, token } = useAuth();
   const { socket, isConnected, emit, subscribe, unsubscribe } = useSocket();
-  const [role, setRole] = useState(null);
-  const [name, setName] = useState('');
   const [sessionId, setSessionId] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
@@ -16,8 +16,11 @@ const Monitoring = () => {
   const [sessionTimeRemaining, setSessionTimeRemaining] = useState(null);
   const [loading, setLoading] = useState(false);
   const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const toast = useToast();
+  const role = user?.role || null;
+  const name = user?.name || '';
 
   const {
     isSharing,
@@ -35,21 +38,30 @@ const Monitoring = () => {
   // Connection quality monitoring
   const connectionQuality = useConnectionQuality(peerConnection, shareConnected);
 
-  // Handle authentication
-  const handleAuth = useCallback(() => {
-    if (!name.trim() || !role) {
-      toast.error('Please enter your name and select a role');
-      return;
+  // Attach remoteStream to video element when both are available (admin)
+  useEffect(() => {
+    if (role === 'admin' && remoteStream && remoteVideoRef.current) {
+      console.log('[Monitoring] Attaching remoteStream to video element via useEffect');
+      remoteVideoRef.current.srcObject = remoteStream;
+      // Force loading to false and ensure stream is considered active
+      setLoading(false);
     }
+  }, [role, remoteStream, remoteVideoRef]);
 
-    if (name.trim().length < 2) {
-      toast.error('Name must be at least 2 characters long');
-      return;
+  // Handle Socket.IO authentication (after login and on reconnect)
+  useEffect(() => {
+    if (user && token && isConnected) {
+      // Always re-authenticate on connection (handles reconnections)
+      // The backend will reuse existing sessions for employees
+      console.log('[Monitoring] Authenticating with Socket.IO:', { role: user.role, name: user.name, hasSessionId: !!sessionId, socketId: socket?.id });
+      setIsAuthenticated(false); // Reset auth state while authenticating
+      setLoading(true);
+      // Send auth request with existing user info
+      emit('monitoring:auth', { role: user.role, name: user.name });
+    } else {
+      setIsAuthenticated(false);
     }
-
-    setLoading(true);
-    emit('monitoring:auth', { role, name: name.trim() });
-  }, [role, name, emit, toast]);
+  }, [user, token, isConnected, emit, role, sessionId, socket]);
 
   // Handle session creation (employee)
   useEffect(() => {
@@ -57,6 +69,7 @@ const Monitoring = () => {
       setSessionId(newSessionId);
       setSessionTimeRemaining(timeRemaining || 30);
       setLoading(false);
+      setIsAuthenticated(true);
       toast.success('Session created successfully');
     };
 
@@ -80,6 +93,7 @@ const Monitoring = () => {
       setSessions(sessionsList);
       setSessionsLoading(false);
       setLoading(false);
+      setIsAuthenticated(true);
     };
 
     const handleSessionAvailable = ({ sessionId: newSessionId, employeeName }) => {
@@ -116,30 +130,68 @@ const Monitoring = () => {
     };
   }, [subscribe, unsubscribe, selectedSession, stopViewing]);
 
-  // Handle stream status updates
+  // Handle stream status updates (admin)
   useEffect(() => {
-    const handleStreamStarted = ({ sessionId: targetSessionId }) => {
-      if (targetSessionId === sessionId) {
-        setStreamActive(true);
-        toast.success('Screen sharing started');
-      }
-      setSessions((prev) =>
-        prev.map((s) =>
+    if (role !== 'admin') return;
+
+    // Debug: Log all Socket.IO events for admin
+    const debugListener = (...args) => {
+      console.log('[Monitoring] Socket.IO event received:', args);
+    };
+    socket?.onAny(debugListener);
+
+    const handleStreamStarted = ({ sessionId: targetSessionId, employeeName }) => {
+      console.log('========== STREAM STARTED EVENT RECEIVED ==========');
+      console.log('[Monitoring] Stream started event received:', { targetSessionId, employeeName, currentSelectedSession: selectedSession });
+
+      // Update session list
+      setSessions((prev) => {
+        const updated = prev.map((s) =>
           s.sessionId === targetSessionId ? { ...s, streamActive: true } : s
-        )
-      );
+        );
+        console.log('[Monitoring] Updated sessions list:', updated);
+        return updated;
+      });
+
+      // Check if admin is viewing this session and update accordingly
+      setSelectedSession((prev) => {
+        const isViewing = prev?.sessionId === targetSessionId;
+        console.log('[Monitoring] Checking if admin is viewing:', { isViewing, prevSessionId: prev?.sessionId, targetSessionId, prev });
+
+        if (isViewing) {
+          console.log('[Monitoring] Admin is viewing this session, updating streamActive and starting WebRTC connection');
+          // Update streamActive state immediately
+          setStreamActive(true);
+          setLoading(true);
+          // Small delay to ensure employee's peer connection is ready
+          setTimeout(() => {
+            console.log('[Monitoring] Initiating startViewing for session:', targetSessionId);
+            startViewing(targetSessionId);
+          }, 500);
+          toast.success(`${employeeName || 'Employee'} started sharing`);
+          // Return updated session with streamActive: true
+          return { ...prev, streamActive: true };
+        } else {
+          console.log('[Monitoring] Admin is not viewing this session. Current selectedSession:', prev);
+          return prev;
+        }
+      });
     };
 
     const handleStreamStopped = ({ sessionId: targetSessionId }) => {
-      if (targetSessionId === sessionId) {
-        setStreamActive(false);
-        toast.info('Screen sharing stopped');
-      }
+      // Update session list
       setSessions((prev) =>
         prev.map((s) =>
           s.sessionId === targetSessionId ? { ...s, streamActive: false } : s
         )
       );
+
+      // If admin is viewing this session, stop viewing
+      if (selectedSession?.sessionId === targetSessionId) {
+        setStreamActive(false);
+        stopViewing();
+        toast.info('Screen sharing stopped');
+      }
     };
 
     subscribe('monitoring:stream-started', handleStreamStarted);
@@ -148,25 +200,51 @@ const Monitoring = () => {
     return () => {
       unsubscribe('monitoring:stream-started', handleStreamStarted);
       unsubscribe('monitoring:stream-stopped', handleStreamStopped);
+      socket?.offAny(debugListener);
     };
-  }, [sessionId, subscribe, unsubscribe]);
+  }, [role, selectedSession, startViewing, stopViewing, subscribe, unsubscribe, toast, socket]);
 
   // Handle session joined (admin)
   useEffect(() => {
-    const handleSessionJoined = ({ streamActive: active, employeeName }) => {
+    if (role !== 'admin') return;
+
+    const handleSessionJoined = ({ streamActive: active, employeeName, sessionId: joinedSessionId }) => {
+      console.log('[Monitoring] Session joined event received:', { active, employeeName, joinedSessionId, selectedSessionId: selectedSession?.sessionId });
+
+      // Update selectedSession with streamActive status
+      setSelectedSession((prev) => {
+        if (prev?.sessionId === joinedSessionId) {
+          console.log('[Monitoring] Updating selectedSession with streamActive:', active);
+          return { ...prev, streamActive: active };
+        }
+        return prev;
+      });
+
       setStreamActive(active);
       setLoading(false);
-      if (active && selectedSession) {
-        startViewing(selectedSession.sessionId);
-        toast.success(`Connected to ${employeeName}'s stream`);
+
+      // If stream is already active when joining, start viewing immediately
+      if (active) {
+        // Use a small delay to ensure selectedSession is updated
+        setTimeout(() => {
+          setSelectedSession((current) => {
+            if (current?.sessionId === joinedSessionId) {
+              console.log('[Monitoring] Stream already active, starting WebRTC connection');
+              startViewing(current.sessionId);
+              toast.success(`Connected to ${employeeName}'s stream`);
+            }
+            return current;
+          });
+        }, 50);
       } else {
+        console.log('[Monitoring] Stream not active yet, waiting for employee to start sharing');
         toast.info(`Joined ${employeeName}'s session. Waiting for stream...`);
       }
     };
 
     subscribe('monitoring:session-joined', handleSessionJoined);
     return () => unsubscribe('monitoring:session-joined', handleSessionJoined);
-  }, [selectedSession, startViewing, subscribe, unsubscribe, toast]);
+  }, [role, selectedSession, startViewing, subscribe, unsubscribe, toast]);
 
   // Handle admin join/leave notifications (employee)
   useEffect(() => {
@@ -191,12 +269,30 @@ const Monitoring = () => {
     };
   }, [role, subscribe, unsubscribe, toast]);
 
+  // Sync selectedSession with sessions list (admin) - ensures streamActive status is always current
+  useEffect(() => {
+    if (role !== 'admin' || !selectedSession) return;
+
+    const latestSession = sessions.find(s => s.sessionId === selectedSession.sessionId);
+    if (latestSession && latestSession.streamActive !== selectedSession.streamActive) {
+      console.log('[Monitoring] Syncing selectedSession streamActive status:', {
+        old: selectedSession.streamActive,
+        new: latestSession.streamActive
+      });
+      setSelectedSession({ ...selectedSession, streamActive: latestSession.streamActive });
+      if (latestSession.streamActive) {
+        setStreamActive(true);
+      }
+    }
+  }, [role, sessions, selectedSession]);
+
   // Join session (admin)
   const handleJoinSession = (session) => {
     if (selectedSession?.sessionId === session.sessionId) {
       // Already viewing this session, leave it
       stopViewing();
       setSelectedSession(null);
+      setStreamActive(false);
       emit('monitoring:leave-session');
       toast.info('Left session');
     } else {
@@ -205,23 +301,31 @@ const Monitoring = () => {
         stopViewing();
         emit('monitoring:leave-session');
       }
-      setSelectedSession(session);
+      // Get latest session from sessions list to ensure we have current streamActive status
+      const latestSession = sessions.find(s => s.sessionId === session.sessionId) || session;
+      setSelectedSession(latestSession);
+      setStreamActive(latestSession.streamActive || false); // Use session's streamActive status
       setLoading(true);
-      emit('monitoring:join-session', { sessionId: session.sessionId });
-      toast.info(`Joining ${session.employeeName}'s session...`);
+      console.log('[Monitoring] Joining session:', latestSession.sessionId, 'streamActive:', latestSession.streamActive);
+      emit('monitoring:join-session', { sessionId: latestSession.sessionId });
+      toast.info(`Joining ${latestSession.employeeName}'s session...`);
     }
   };
 
-  // Reset on disconnect
+  // Reset on disconnect (only show error if we were previously connected)
+  const wasConnectedRef = useRef(false);
   useEffect(() => {
-    if (!isConnected && role) {
+    if (isConnected) {
+      wasConnectedRef.current = true;
+    } else if (!isConnected && wasConnectedRef.current && user) {
+      // Only show error if we were connected before and now disconnected
       toast.error('Connection lost. Please refresh the page.');
-      setRole(null);
       setSessionId(null);
       setSelectedSession(null);
       setSessions([]);
+      wasConnectedRef.current = false;
     }
-  }, [isConnected, role, toast]);
+  }, [isConnected, user, toast]);
 
   // Update session time remaining (employee)
   useEffect(() => {
@@ -323,17 +427,21 @@ const Monitoring = () => {
         <div className="p-8">
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">
-                Screen Sharing - Employee View
-              </h2>
-              {/* Connection Status */}
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">
+                  Screen Sharing - Employee View
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">Logged in as {name}</p>
+              </div>
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  isConnected ? 'bg-green-500' : 'bg-red-500'
-                }`}></div>
-                <span className="text-sm text-gray-600">
-                  {isConnected ? 'Connected' : 'Disconnected'}
-                </span>
+                {/* Connection Status */}
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'
+                    }`}></div>
+                  <span className="text-sm text-gray-600">
+                    {isConnected ? 'Connected' : 'Disconnected'}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -363,79 +471,94 @@ const Monitoring = () => {
               </div>
             )}
 
-          {/* Error message */}
-          {shareError && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex items-center gap-2">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              <span>{shareError}</span>
-            </div>
-          )}
+            {/* Error message */}
+            {shareError && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex items-center gap-2">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <span>{shareError}</span>
+              </div>
+            )}
 
-          {/* Main content */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            {!isSharing ? (
-              <div className="text-center py-12">
-                <div className="mb-6">
-                  <svg
-                    className="w-24 h-24 mx-auto text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+            {/* Main content */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+              {!isSharing ? (
+                <div className="text-center py-12">
+                  <div className="mb-6">
+                    <svg
+                      className="w-24 h-24 mx-auto text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2 text-gray-800">
+                    Ready to Share
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    Click the button below to start sharing your screen. You'll be
+                    asked to select which screen or window to share.
+                  </p>
+                  <button
+                    onClick={() => {
+                      console.log('[Monitoring] Start sharing clicked', {
+                        isConnected,
+                        sessionId,
+                        loading,
+                        isSharing,
+                        role,
+                        user
+                      });
+                      startSharing();
+                    }}
+                    disabled={!isConnected || !sessionId || !isAuthenticated || loading || isSharing}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium flex items-center gap-2 mx-auto"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                    />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold mb-2 text-gray-800">
-                  Ready to Share
-                </h3>
-                <p className="text-gray-600 mb-6">
-                  Click the button below to start sharing your screen. You'll be
-                  asked to select which screen or window to share.
-                </p>
-                <button
-                  onClick={startSharing}
-                  disabled={!shareConnected || loading}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium flex items-center gap-2 mx-auto"
-                >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Starting...
-                    </>
-                  ) : (
-                    'Start Sharing'
+                    {loading ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Starting...
+                      </>
+                    ) : (
+                      'Start Sharing'
+                    )}
+                  </button>
+                  {(!isConnected || !sessionId || !isAuthenticated) && (
+                    <p className="text-sm text-gray-500 mt-2 text-center">
+                      {!isConnected ? 'Connecting to server...' : !sessionId ? 'Authenticating...' : !isAuthenticated ? 'Waiting for authentication...' : ''}
+                    </p>
                   )}
-                </button>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-600">
-                  Your screen is being shared. Admins can now view your screen.
-                </p>
-                <p className="text-sm text-gray-500 mt-2">
-                  Session ID: {sessionId}
-                </p>
-              </div>
-            )}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">
+                    Your screen is being shared. Admins can now view your screen.
+                  </p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Session ID: {sessionId}
+                  </p>
+                </div>
+              )}
 
-            {!shareConnected && (
-              <div className="mt-4 bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
-                Connection lost. Please refresh the page.
-              </div>
-            )}
+              {shareError && (
+                <div className="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                  {shareError}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
       </>
     );
   }
@@ -447,11 +570,14 @@ const Monitoring = () => {
       <div className="p-8">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">
-              Screen Sharing - Admin View
-            </h2>
-            {/* Connection Status */}
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800">
+                Screen Sharing - Admin View
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">Logged in as {name}</p>
+            </div>
             <div className="flex items-center gap-4">
+              {/* Connection Status */}
               {connectionQuality.isConnecting && (
                 <div className="flex items-center gap-2 text-sm text-blue-600">
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -463,12 +589,11 @@ const Monitoring = () => {
               )}
               {connectionQuality.isConnected && (
                 <div className="flex items-center gap-2 text-sm">
-                  <div className={`w-2 h-2 rounded-full ${
-                    connectionQuality.quality === 'excellent' ? 'bg-green-500' :
+                  <div className={`w-2 h-2 rounded-full ${connectionQuality.quality === 'excellent' ? 'bg-green-500' :
                     connectionQuality.quality === 'good' ? 'bg-green-400' :
-                    connectionQuality.quality === 'fair' ? 'bg-yellow-500' :
-                    'bg-red-500'
-                  }`}></div>
+                      connectionQuality.quality === 'fair' ? 'bg-yellow-500' :
+                        'bg-red-500'
+                    }`}></div>
                   <span className="text-gray-600">
                     {connectionQuality.quality.charAt(0).toUpperCase() + connectionQuality.quality.slice(1)}
                     {connectionQuality.latency && ` • ${connectionQuality.latency}ms`}
@@ -476,9 +601,8 @@ const Monitoring = () => {
                 </div>
               )}
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  isConnected ? 'bg-green-500' : 'bg-red-500'
-                }`}></div>
+                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'
+                  }`}></div>
                 <span className="text-sm text-gray-600">
                   {isConnected ? 'Connected' : 'Disconnected'}
                 </span>
@@ -486,155 +610,181 @@ const Monitoring = () => {
             </div>
           </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Sessions list */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-semibold mb-4 text-gray-800">
-                Active Sessions
-              </h3>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Sessions list */}
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h3 className="text-lg font-semibold mb-4 text-gray-800">
+                  Active Sessions
+                </h3>
 
-              {sessionsLoading ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="animate-pulse bg-gray-200 h-16 rounded-md"></div>
-                  ))}
-                </div>
-              ) : sessions.length === 0 ? (
-                <p className="text-gray-500 text-sm">
-                  No active sessions. Employees can start sharing to appear here.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {sessions.map((session) => (
-                    <button
-                      key={session.sessionId}
-                      onClick={() => handleJoinSession(session)}
-                      className={`w-full text-left p-3 rounded-md border transition-colors ${
-                        selectedSession?.sessionId === session.sessionId
+                {sessionsLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="animate-pulse bg-gray-200 h-16 rounded-md"></div>
+                    ))}
+                  </div>
+                ) : sessions.length === 0 ? (
+                  <p className="text-gray-500 text-sm">
+                    No active sessions. Employees can start sharing to appear here.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {sessions.map((session) => (
+                      <button
+                        key={session.sessionId}
+                        onClick={() => handleJoinSession(session)}
+                        className={`w-full text-left p-3 rounded-md border transition-colors ${selectedSession?.sessionId === session.sessionId
                           ? 'bg-blue-50 border-blue-500'
                           : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-gray-800">
-                            {session.employeeName}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <p className="text-xs text-gray-500">
-                              {session.streamActive ? (
-                                <span className="text-green-600">● Sharing</span>
-                              ) : (
-                                <span className="text-gray-400">○ Waiting</span>
-                              )}
+                          }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-gray-800">
+                              {session.employeeName}
                             </p>
-                            {session.timeRemaining !== undefined && (
-                              <span className="text-xs text-gray-400">
-                                • {session.timeRemaining}m left
-                              </span>
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-xs text-gray-500">
+                                {session.streamActive ? (
+                                  <span className="text-green-600">● Sharing</span>
+                                ) : (
+                                  <span className="text-gray-400">○ Waiting</span>
+                                )}
+                              </p>
+                              {session.timeRemaining !== undefined && (
+                                <span className="text-xs text-gray-400">
+                                  • {session.timeRemaining}m left
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {selectedSession?.sessionId === session.sessionId && (
+                            <span className="text-blue-600 text-sm">Viewing</span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Video viewer */}
+            <div className="lg:col-span-2">
+              <div className="bg-white rounded-lg shadow-md p-6">
+                {selectedSession ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-800">
+                        Viewing: {selectedSession.employeeName}
+                      </h3>
+                      <button
+                        onClick={() => {
+                          stopViewing();
+                          setSelectedSession(null);
+                        }}
+                        className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
+                      >
+                        Stop Viewing
+                      </button>
+                    </div>
+
+                    {(() => {
+                      // Use session's streamActive status if available, otherwise use local state
+                      // Also check if we actually have a remoteStream
+                      const isStreamActive = selectedSession?.streamActive ?? streamActive;
+                      const hasStream = !!remoteStream;
+                      const isConnecting = loading && !hasStream;
+                      const showVideo = isStreamActive || hasStream;
+
+                      return (
+                        <>
+                          {/* Always mount video element to capture the stream, control visibility with CSS */}
+                          <div className={`bg-black rounded-lg overflow-hidden relative ${showVideo ? '' : 'hidden'}`}>
+                            <video
+                              ref={remoteVideoRef}
+                              autoPlay
+                              playsInline
+                              muted={false}
+                              className="w-full h-auto"
+                              style={{ maxHeight: '70vh' }}
+                              onLoadedMetadata={() => {
+                                console.log('[Monitoring] Video metadata loaded');
+                                setLoading(false);
+                              }}
+                              onPlay={() => {
+                                console.log('[Monitoring] Video started playing');
+                                setLoading(false);
+                              }}
+                            />
+                            {connectionQuality.isConnecting && (
+                              <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded text-sm">
+                                Connecting...
+                              </div>
                             )}
                           </div>
-                        </div>
-                        {selectedSession?.sessionId === session.sessionId && (
-                          <span className="text-blue-600 text-sm">Viewing</span>
-                        )}
+
+                          {/* Show connecting spinner */}
+                          {isConnecting && !showVideo && (
+                            <div className="bg-gray-100 rounded-lg p-12 text-center">
+                              <svg className="animate-spin h-12 w-12 mx-auto text-gray-400 mb-4" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                              <p className="text-gray-600">Connecting to stream...</p>
+                            </div>
+                          )}
+
+                          {/* Show waiting message */}
+                          {!isStreamActive && !hasStream && !isConnecting && (
+                            <div className="bg-gray-100 rounded-lg p-12 text-center">
+                              <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              <p className="text-gray-600">
+                                Waiting for {selectedSession.employeeName} to start sharing...
+                              </p>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+
+                    {shareError && (
+                      <div className="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                        <span>{shareError}</span>
                       </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Video viewer */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              {selectedSession ? (
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-800">
-                      Viewing: {selectedSession.employeeName}
-                    </h3>
-                    <button
-                      onClick={() => {
-                        stopViewing();
-                        setSelectedSession(null);
-                      }}
-                      className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
-                    >
-                      Stop Viewing
-                    </button>
+                    )}
                   </div>
-
-                  {loading && !streamActive ? (
-                    <div className="bg-gray-100 rounded-lg p-12 text-center">
-                      <svg className="animate-spin h-12 w-12 mx-auto text-gray-400 mb-4" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      <p className="text-gray-600">Connecting to stream...</p>
-                    </div>
-                  ) : streamActive ? (
-                    <div className="bg-black rounded-lg overflow-hidden relative">
-                      <video
-                        ref={remoteVideoRef}
-                        autoPlay
-                        playsInline
-                        className="w-full h-auto"
-                        style={{ maxHeight: '70vh' }}
+                ) : (
+                  <div className="text-center py-12">
+                    <svg
+                      className="w-24 h-24 mx-auto text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
                       />
-                      {connectionQuality.isConnecting && (
-                        <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded text-sm">
-                          Connecting...
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="bg-gray-100 rounded-lg p-12 text-center">
-                      <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                      <p className="text-gray-600">
-                        Waiting for {selectedSession.employeeName} to start sharing...
-                      </p>
-                    </div>
-                  )}
-
-                  {shareError && (
-                    <div className="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded flex items-center gap-2">
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                      </svg>
-                      <span>{shareError}</span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <svg
-                    className="w-24 h-24 mx-auto text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                    />
-                  </svg>
-                  <p className="text-gray-600 mt-4">
-                    Select a session from the list to start viewing
-                  </p>
-                </div>
-              )}
+                    </svg>
+                    <p className="text-gray-600 mt-4">
+                      Select a session from the list to start viewing
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
     </>
   );
 };

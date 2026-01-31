@@ -6,12 +6,14 @@
 const express = require('express');
 const router = express.Router();
 const monitoringService = require('../services/monitoringService');
+const { httpAuth, requireRole } = require('../middlewares/monitoringAuth');
+const { sessionCreationLimiter } = require('../middlewares/rateLimiter');
 
 /**
  * GET /api/monitoring/sessions
  * Get all active monitoring sessions (admin only)
  */
-router.get('/sessions', (req, res) => {
+router.get('/sessions', httpAuth, requireRole(['admin']), (req, res) => {
   try {
     const sessions = monitoringService.getAllSessions();
     res.json({ success: true, data: sessions });

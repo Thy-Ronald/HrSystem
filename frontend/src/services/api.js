@@ -1,4 +1,18 @@
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
+import { getToken } from '../utils/auth';
+
+/**
+ * Get authorization headers with JWT token
+ * @returns {Object} Headers object with Authorization header
+ */
+function getAuthHeaders() {
+  const token = getToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
 
 /**
  * Handle API response with consistent format
@@ -28,7 +42,7 @@ async function handleResponse(res) {
 export async function submitContract(payload) {
   const res = await fetch(`${API_BASE}/api/contracts`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
 
@@ -40,7 +54,9 @@ export async function submitContract(payload) {
  * @returns {Promise<Array>} - Array of contracts
  */
 export async function fetchContracts() {
-  const res = await fetch(`${API_BASE}/api/contracts`);
+  const res = await fetch(`${API_BASE}/api/contracts`, {
+    headers: getAuthHeaders(),
+  });
   return handleResponse(res);
 }
 
@@ -50,7 +66,9 @@ export async function fetchContracts() {
  * @returns {Promise<Object>} - Contract object
  */
 export async function fetchContractById(id) {
-  const res = await fetch(`${API_BASE}/api/contracts/${id}`);
+  const res = await fetch(`${API_BASE}/api/contracts/${id}`, {
+    headers: getAuthHeaders(),
+  });
   return handleResponse(res);
 }
 
@@ -63,7 +81,7 @@ export async function fetchContractById(id) {
 export async function updateContract(id, payload) {
   const res = await fetch(`${API_BASE}/api/contracts/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
 
@@ -78,6 +96,7 @@ export async function updateContract(id, payload) {
 export async function deleteContract(id) {
   const res = await fetch(`${API_BASE}/api/contracts/${id}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
   });
 
   return handleResponse(res);
@@ -89,7 +108,9 @@ export async function deleteContract(id) {
  * @returns {Promise<Array>} - Array of expiring contracts
  */
 export async function fetchExpiringContracts(days = 7) {
-  const res = await fetch(`${API_BASE}/api/contracts/expiring?days=${days}`);
+  const res = await fetch(`${API_BASE}/api/contracts/expiring?days=${days}`, {
+    headers: getAuthHeaders(),
+  });
   return handleResponse(res);
 }
 
@@ -100,6 +121,7 @@ export async function fetchExpiringContracts(days = 7) {
 export async function testExpirationNotifications() {
   const res = await fetch(`${API_BASE}/api/contracts/test-expiration-notifications`, {
     method: 'POST',
+    headers: getAuthHeaders(),
   });
   return handleResponse(res);
 }
@@ -111,6 +133,7 @@ export async function testExpirationNotifications() {
 export async function testDirectEmail() {
   const res = await fetch(`${API_BASE}/api/contracts/test-email`, {
     method: 'POST',
+    headers: getAuthHeaders(),
   });
   return handleResponse(res);
 }

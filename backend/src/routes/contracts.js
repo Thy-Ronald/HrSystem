@@ -18,8 +18,12 @@ const {
   validateId,
 } = require('../middlewares/validation');
 
+const { httpAuth, requireRole } = require('../middlewares/monitoringAuth');
+
 /**
  * REST API Routes for Contracts
+ * 
+ * All routes require admin authentication
  * 
  * POST   /api/contracts              - Create a new contract
  * GET    /api/contracts              - Get all contracts
@@ -27,6 +31,10 @@ const {
  * PUT    /api/contracts/:id          - Update a contract by ID
  * DELETE /api/contracts/:id          - Delete a contract by ID
  */
+
+// All contract routes require admin authentication
+router.use(httpAuth);
+router.use(requireRole(['admin']));
 
 // Create contract
 router.post('/', validateCreateContract, createContract);

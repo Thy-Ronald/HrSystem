@@ -59,6 +59,23 @@ class MonitoringService {
   }
 
   /**
+   * Get active session by employee name (for reconnection handling)
+   * @param {string} employeeName - Name of the employee
+   * @returns {string|null} Session ID or null
+   */
+  getSessionByEmployeeName(employeeName) {
+    for (const [sessionId, session] of this.sessions.entries()) {
+      if (session.employeeName === employeeName) {
+        // Check if session is not expired
+        if (session.expiresAt && session.expiresAt > new Date()) {
+          return sessionId;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
    * Add admin to a session
    * @param {string} sessionId - Session ID
    * @param {string} adminSocketId - Socket ID of the admin
@@ -182,6 +199,55 @@ class MonitoringService {
     if (sessionId) {
       this.deleteSession(sessionId);
     }
+  }
+
+  /**
+   * Clean up expired sessions
+   * Should be called periodically
+   * @returns {number} Number of sessions cleaned up
+   */
+  cleanupExpiredSessions() {
+    let cleaned = 0;
+    const now = new Date();
+
+    for (const [sessionId, session] of this.sessions.entries()) {
+      if (now > session.expiresAt) {
+        this.deleteSession(sessionId);
+        cleaned++;
+      }
+    }
+
+    return cleaned;
+  }
+
+  /**
+   * Extend session expiration
+   * @param {string} sessionId - Session ID
+   * @param {number} additionalMinutes - Minutes to add
+   * @returns {boolean} Success
+   */
+  extendSession(sessionId, additionalMinutes = 30) {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return false;
+    }
+
+    // Clear existing timeout
+    if (session.timeoutId) {
+      clearTimeout(session.timeoutId);
+    }
+
+    // Extend expiration
+    session.expiresAt = new Date(Date.now() + additionalMinutes * 60 * 1000);
+
+    // Set new timeout
+    session.timeoutId = setTimeout(() => {
+      if (this.sessions.has(sessionId)) {
+        this.deleteSession(sessionId);
+      }
+    }, additionalMinutes * 60 * 1000);
+
+    return true;
   }
 }
 

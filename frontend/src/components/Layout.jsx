@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NotificationDropdown } from './NotificationDropdown';
 import { useNotifications } from '../hooks/useNotifications';
+import { useAuth } from '../contexts/AuthContext';
 import logo from '../assets/logo.png';
 
 const Layout = ({ children, currentPath, onNavigate }) => {
@@ -8,6 +9,8 @@ const Layout = ({ children, currentPath, onNavigate }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [notificationOpen, setNotificationOpen] = useState(false);
   const { notifications, loading, count, markAsRead, isRead } = useNotifications();
+  const { user, logout } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   return (
     <div className="flex flex-col h-screen bg-[#f6f8fc]">
@@ -112,25 +115,28 @@ const Layout = ({ children, currentPath, onNavigate }) => {
               {sidebarOpen && <span>Dashboard</span>}
             </div>
             
-            <div 
-              onClick={() => onNavigate('contract-form')}
-              className={`${
-                sidebarOpen 
-                  ? `gmail-sidebar-item ${currentPath === 'contract-form' ? 'active' : ''}`
-                  : `flex items-center justify-center w-14 h-11 mx-auto mb-1 rounded-r-full cursor-pointer transition-colors ${
-                      currentPath === 'contract-form' ? 'bg-[#d3e3fd] text-[#041e49] font-medium' : 'hover:bg-[#eaebef]'
-                    }`
-              }`}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-                <polyline points="10 9 9 9 8 9" />
-              </svg>
-              {sidebarOpen && <span>Employees</span>}
-            </div>
+            {/* Only show Employees link for admins */}
+            {isAdmin && (
+              <div 
+                onClick={() => onNavigate('contract-form')}
+                className={`${
+                  sidebarOpen 
+                    ? `gmail-sidebar-item ${currentPath === 'contract-form' ? 'active' : ''}`
+                    : `flex items-center justify-center w-14 h-11 mx-auto mb-1 rounded-r-full cursor-pointer transition-colors ${
+                        currentPath === 'contract-form' ? 'bg-[#d3e3fd] text-[#041e49] font-medium' : 'hover:bg-[#eaebef]'
+                      }`
+                }`}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                  <polyline points="10 9 9 9 8 9" />
+                </svg>
+                {sidebarOpen && <span>Employees</span>}
+              </div>
+            )}
             
             <div 
               onClick={() => onNavigate('staff-ranking')}
@@ -163,12 +169,33 @@ const Layout = ({ children, currentPath, onNavigate }) => {
               </svg>
               {sidebarOpen && <span>Monitoring</span>}
             </div>
+
+            {/* Logout button */}
+            <div className="mt-auto pt-4 border-t border-gray-200">
+              <div 
+                onClick={logout}
+                className={`${
+                  sidebarOpen 
+                    ? `gmail-sidebar-item text-red-600 hover:bg-red-50`
+                    : `flex items-center justify-center w-14 h-11 mx-auto mb-1 rounded-r-full cursor-pointer transition-colors hover:bg-red-50`
+                }`}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+                </svg>
+                {sidebarOpen && <span>Logout</span>}
+              </div>
+            </div>
           </nav>
         </aside>
 
         {/* Main Content */}
         <main className="flex-1 overflow-auto bg-white rounded-3xl mr-4 mb-4 shadow-sm border border-[#eaf1fb] transition-all duration-300">
-          {React.isValidElement(children) ? React.cloneElement(children, { searchQuery }) : children}
+          {React.isValidElement(children) && typeof children.type === 'function'
+            ? (children.type.name === 'ContractForm' 
+                ? React.cloneElement(children, { searchQuery })
+                : children)
+            : children}
         </main>
       </div>
     </div>

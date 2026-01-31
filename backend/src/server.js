@@ -8,7 +8,12 @@ const contractRouter = require('./routes/contracts');
 const issuesRouter = require('./routes/issues');
 const analyticsRouter = require('./routes/analytics');
 const monitoringRouter = require('./routes/monitoring');
+const authRouter = require('./routes/auth');
 const { errorHandler } = require('./middlewares/errorHandler');
+const { socketAuth } = require('./middlewares/monitoringAuth');
+const { validateAuthPayload, validateSessionId, validateSDP, validateICECandidate } = require('./middlewares/monitoringValidation');
+const { socketRateLimiter } = require('./middlewares/rateLimiter');
+const { generateToken } = require('./utils/jwt');
 const { initializeEmailJS } = require('./services/emailService');
 const { startContractExpirationJob } = require('./jobs/contractExpirationJob');
 const { startCacheRefreshJob, stopCacheRefreshJob } = require('./jobs/cacheRefreshJob');
@@ -34,8 +39,8 @@ app.use(express.json());
 
 app.get('/api/health', async (_req, res) => {
   const dbStatus = await testConnection();
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     database: dbStatus ? 'connected' : 'disconnected',
   });
@@ -45,6 +50,7 @@ app.use('/api/github', githubRouter);
 app.use('/api/contracts', contractRouter);
 app.use('/api/issues', issuesRouter);
 app.use('/api/analytics', analyticsRouter);
+app.use('/api/auth', authRouter);
 app.use('/api/monitoring', monitoringRouter);
 
 app.use(errorHandler);
@@ -66,63 +72,181 @@ async function startServer() {
 
   // Test database connection
   const dbConnected = await testConnection();
-  
+
   if (!dbConnected) {
     console.warn('⚠ Warning: Database connection failed. The application may not work correctly.');
     console.warn('⚠ Please ensure MySQL is running and database credentials are correct.');
     console.warn('⚠ Run: npm run migrate (or node src/database/migrate.js) to set up the database schema.');
   }
 
-  // Socket.IO connection handling
+  // Socket.IO connection handling with authentication
+  io.use((socket, next) => {
+    // For development: allow connection without auth, but require auth for monitoring events
+    // For production: use socketAuth(socket, next) to require JWT on connection
+    if (process.env.NODE_ENV === 'production') {
+      return socketAuth(socket, next);
+    }
+    next();
+  });
+
   io.on('connection', (socket) => {
     console.log(`[Socket.IO] Client connected: ${socket.id}`);
 
-    // Handle user authentication (simple dev auth)
-    socket.on('monitoring:auth', ({ role, name }) => {
-      socket.data.role = role;
-      socket.data.name = name;
-      socket.data.authenticated = true;
-      console.log(`[Monitoring] ${role} authenticated: ${name} (${socket.id})`);
+    // Handle user authentication with JWT
+    socket.on('monitoring:auth', ({ role, name, token }) => {
+      // Rate limiting: 10 auth attempts per 15 minutes
+      if (!socketRateLimiter.checkLimit(socket.id, 10, 15 * 60 * 1000)) {
+        socket.emit('monitoring:error', {
+          message: 'Too many authentication attempts. Please wait before trying again.',
+        });
+        return;
+      }
 
-      if (role === 'employee') {
-        // Create session for employee
-        const sessionId = monitoringService.createSession(socket.id, name);
+      // Validate and sanitize input
+      const validation = validateAuthPayload({ role, name });
+      if (!validation.valid) {
+        socket.emit('monitoring:error', {
+          message: validation.errors.join(', '),
+        });
+        return;
+      }
+
+      const { sanitized } = validation;
+
+      // Generate JWT token
+      const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const jwtToken = generateToken({
+        userId,
+        role: sanitized.role,
+        name: sanitized.name,
+      });
+
+      socket.data.role = sanitized.role;
+      socket.data.name = sanitized.name;
+      socket.data.userId = userId;
+      socket.data.authenticated = true;
+      socket.data.token = jwtToken;
+
+      console.log(`[Monitoring] ${sanitized.role} authenticated: ${sanitized.name} (${socket.id})`);
+
+      if (sanitized.role === 'employee') {
+        // Check if employee already has an active session by name (reconnection scenario)
+        // This handles the case where socket ID changed due to reconnection
+        const existingSessionId = monitoringService.getSessionByEmployeeName(sanitized.name);
+        let sessionId;
+
+        if (existingSessionId) {
+          // Employee reconnected, reuse existing session
+          sessionId = existingSessionId;
+          // Update employee socket ID in the session
+          const session = monitoringService.getSession(sessionId);
+          if (session) {
+            const oldSocketId = session.employeeSocketId;
+            session.employeeSocketId = socket.id;
+            console.log(`[Monitoring] Employee ${sanitized.name} reconnected (${oldSocketId} -> ${socket.id}), reusing session ${sessionId}`);
+          }
+        } else {
+          // Rate limiting: 5 sessions per 15 minutes
+          if (!socketRateLimiter.checkLimit(`${socket.id}_sessions`, 5, 15 * 60 * 1000)) {
+            socket.emit('monitoring:error', {
+              message: 'Too many session creation attempts. Please wait before creating another session.',
+            });
+            return;
+          }
+
+          // Create new session for employee
+          sessionId = monitoringService.createSession(socket.id, sanitized.name);
+          console.log(`[Monitoring] Created new session ${sessionId} for employee ${sanitized.name}`);
+        }
+
         socket.data.sessionId = sessionId;
         const timeRemaining = monitoringService.getTimeRemaining(sessionId);
-        socket.emit('monitoring:session-created', { sessionId, timeRemaining });
-        socket.broadcast.emit('monitoring:session-available', {
+        socket.emit('monitoring:session-created', {
           sessionId,
-          employeeName: name,
+          timeRemaining,
+          token: jwtToken,
         });
-      } else if (role === 'admin') {
+
+        // Only broadcast if it's a new session
+        if (!existingSessionId) {
+          socket.broadcast.emit('monitoring:session-available', {
+            sessionId,
+            employeeName: sanitized.name,
+          });
+        }
+      } else if (sanitized.role === 'admin') {
         // Send list of available sessions
         const sessions = monitoringService.getAllSessions();
-        socket.emit('monitoring:sessions-list', { sessions });
+        socket.emit('monitoring:sessions-list', {
+          sessions,
+          token: jwtToken,
+        });
       }
     });
 
     // Employee: Start sharing
     socket.on('monitoring:start-sharing', async () => {
-      if (socket.data.role !== 'employee' || !socket.data.sessionId) {
+      console.log(`[Monitoring] ========== START SHARING EVENT ==========`);
+      console.log(`[Monitoring] Received monitoring:start-sharing from socket ${socket.id}`);
+      console.log(`[Monitoring] Socket data:`, {
+        authenticated: socket.data.authenticated,
+        role: socket.data.role,
+        sessionId: socket.data.sessionId,
+        name: socket.data.name
+      });
+
+      if (!socket.data.authenticated || socket.data.role !== 'employee' || !socket.data.sessionId) {
+        console.log(`[Monitoring] Unauthorized: authenticated=${socket.data.authenticated}, role=${socket.data.role}, sessionId=${socket.data.sessionId}`);
         socket.emit('monitoring:error', { message: 'Unauthorized' });
         return;
       }
 
+      // Validate session
       const sessionId = socket.data.sessionId;
-      monitoringService.setStreamActive(sessionId, true);
-      
-      // Notify all admins
+      if (!validateSessionId(sessionId)) {
+        console.log(`[Monitoring] Invalid session ID format: ${sessionId}`);
+        socket.emit('monitoring:error', { message: 'Invalid session ID' });
+        return;
+      }
+
       const session = monitoringService.getSession(sessionId);
-      if (session) {
+      if (!session) {
+        console.log(`[Monitoring] Session not found: ${sessionId}`);
+        socket.emit('monitoring:error', { message: 'Session not found or expired' });
+        return;
+      }
+
+      console.log(`[Monitoring] Session found: ${sessionId}`);
+      console.log(`[Monitoring] Session details:`, {
+        employeeSocketId: session.employeeSocketId,
+        employeeName: session.employeeName,
+        adminCount: session.adminSocketIds.size,
+        adminSocketIds: Array.from(session.adminSocketIds),
+        streamActive: session.streamActive
+      });
+
+      monitoringService.setStreamActive(sessionId, true);
+      console.log(`[Monitoring] Stream active set to true for session ${sessionId}`);
+
+      // Notify all admins
+      const adminCount = session.adminSocketIds.size;
+      console.log(`[Monitoring] Notifying ${adminCount} admin(s) about stream start`);
+
+      if (adminCount > 0) {
         session.adminSocketIds.forEach((adminId) => {
+          console.log(`[Monitoring] >>> Emitting stream-started to admin socket: ${adminId}`);
           io.to(adminId).emit('monitoring:stream-started', {
             sessionId,
             employeeName: session.employeeName,
           });
         });
+        console.log(`[Monitoring] All admins notified`);
+      } else {
+        console.log('[Monitoring] WARNING: No admins in session to notify!');
       }
 
       socket.emit('monitoring:sharing-started', { sessionId });
+      console.log(`[Monitoring] ========== END START SHARING EVENT ==========`);
     });
 
     // Employee: Stop sharing
@@ -148,20 +272,29 @@ async function startServer() {
 
     // Admin: Join session
     socket.on('monitoring:join-session', ({ sessionId }) => {
-      if (socket.data.role !== 'admin') {
+      if (!socket.data.authenticated || socket.data.role !== 'admin') {
         socket.emit('monitoring:error', { message: 'Unauthorized' });
+        return;
+      }
+
+      // Validate session ID
+      if (!validateSessionId(sessionId)) {
+        socket.emit('monitoring:error', { message: 'Invalid session ID format' });
         return;
       }
 
       const session = monitoringService.getSession(sessionId);
       if (!session) {
-        socket.emit('monitoring:error', { message: 'Session not found' });
+        socket.emit('monitoring:error', { message: 'Session not found or expired' });
         return;
       }
 
       monitoringService.addAdminToSession(sessionId, socket.id, socket.data.name);
       socket.data.sessionId = sessionId;
       socket.join(sessionId);
+
+      console.log(`[Monitoring] Admin ${socket.data.name} (${socket.id}) joined session ${sessionId}`);
+      console.log(`[Monitoring] Session now has ${session.adminSocketIds.size} admin(s): ${Array.from(session.adminSocketIds).join(', ')}`);
 
       // Notify employee that admin joined
       io.to(session.employeeSocketId).emit('monitoring:admin-joined', {
@@ -174,6 +307,7 @@ async function startServer() {
         employeeName: session.employeeName,
         streamActive: session.streamActive,
       });
+      console.log(`[Monitoring] Sent session-joined to admin ${socket.id}, streamActive: ${session.streamActive}`);
     });
 
     // Admin: Leave session
@@ -184,11 +318,11 @@ async function startServer() {
 
       const sessionId = socket.data.sessionId;
       const session = monitoringService.getSession(sessionId);
-      
+
       if (session) {
         monitoringService.removeAdminFromSession(sessionId, socket.id);
         socket.leave(sessionId);
-        
+
         // Notify employee that admin left
         io.to(session.employeeSocketId).emit('monitoring:admin-left', {
           adminName: socket.data.name,
@@ -200,9 +334,31 @@ async function startServer() {
 
     // WebRTC signaling: Offer
     socket.on('monitoring:offer', ({ sessionId, offer }) => {
+      if (!socket.data.authenticated) {
+        socket.emit('monitoring:error', { message: 'Unauthorized' });
+        return;
+      }
+
+      // Rate limiting for signaling
+      if (!socketRateLimiter.checkLimit(`${socket.id}_signaling`, 100, 60 * 1000)) {
+        socket.emit('monitoring:error', { message: 'Too many signaling requests' });
+        return;
+      }
+
+      // Validate session and SDP
+      if (!validateSessionId(sessionId)) {
+        socket.emit('monitoring:error', { message: 'Invalid session ID' });
+        return;
+      }
+
+      if (!validateSDP(offer)) {
+        socket.emit('monitoring:error', { message: 'Invalid offer format' });
+        return;
+      }
+
       const session = monitoringService.getSession(sessionId);
       if (!session) {
-        socket.emit('monitoring:error', { message: 'Session not found' });
+        socket.emit('monitoring:error', { message: 'Session not found or expired' });
         return;
       }
 
@@ -215,18 +371,38 @@ async function startServer() {
 
     // WebRTC signaling: Answer
     socket.on('monitoring:answer', ({ sessionId, answer, toSocketId }) => {
-      const session = monitoringService.getSession(sessionId);
-      if (!session) {
-        socket.emit('monitoring:error', { message: 'Session not found' });
+      if (!socket.data.authenticated) {
+        socket.emit('monitoring:error', { message: 'Unauthorized' });
         return;
       }
 
-      // Forward answer to admin
-      io.to(toSocketId).emit('monitoring:answer', { answer });
+      // Validate SDP
+      if (!validateSDP(answer)) {
+        socket.emit('monitoring:error', { message: 'Invalid answer format' });
+        return;
+      }
+
+      const session = monitoringService.getSession(sessionId);
+      if (!session) {
+        socket.emit('monitoring:error', { message: 'Session not found or expired' });
+        return;
+      }
+
+      // Forward answer to admin with sessionId for filtering
+      io.to(toSocketId).emit('monitoring:answer', { answer, sessionId });
     });
 
     // WebRTC signaling: ICE candidate
     socket.on('monitoring:ice-candidate', ({ sessionId, candidate, toSocketId }) => {
+      if (!socket.data.authenticated) {
+        return;
+      }
+
+      // Validate ICE candidate
+      if (!validateICECandidate(candidate)) {
+        return; // Silently ignore invalid candidates
+      }
+
       const session = monitoringService.getSession(sessionId);
       if (!session) {
         return;
@@ -235,16 +411,16 @@ async function startServer() {
       // If employee sends ICE candidate, forward to all admins in the session
       if (socket.data.role === 'employee') {
         session.adminSocketIds.forEach((adminId) => {
-          io.to(adminId).emit('monitoring:ice-candidate', { candidate });
+          io.to(adminId).emit('monitoring:ice-candidate', { candidate, sessionId });
         });
       }
       // If admin sends ICE candidate, forward to employee
       else if (socket.data.role === 'admin') {
-        io.to(session.employeeSocketId).emit('monitoring:ice-candidate', { candidate });
+        io.to(session.employeeSocketId).emit('monitoring:ice-candidate', { candidate, sessionId });
       }
       // Fallback: if toSocketId is provided, forward to that socket
       else if (toSocketId) {
-        io.to(toSocketId).emit('monitoring:ice-candidate', { candidate });
+        io.to(toSocketId).emit('monitoring:ice-candidate', { candidate, sessionId });
       }
     });
 
@@ -273,7 +449,15 @@ async function startServer() {
   server.listen(PORT, () => {
     console.log(`Backend listening on port ${PORT}`);
     console.log(`Socket.IO server ready`);
-    
+
+    // Clean up expired monitoring sessions every 5 minutes
+    setInterval(() => {
+      const cleaned = monitoringService.cleanupExpiredSessions();
+      if (cleaned > 0) {
+        console.log(`[Monitoring] Cleaned up ${cleaned} expired session(s)`);
+      }
+    }, 5 * 60 * 1000);
+
     if (initializeEmailJS()) {
       startContractExpirationJob();
     } else {
