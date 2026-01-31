@@ -1,47 +1,74 @@
 import { useState } from 'react';
 import Chart from 'react-apexcharts';
+import {
+  Box,
+  Typography,
+  Grid,
+  Card,
+  CardContent,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  CircularProgress,
+  Divider
+} from '@mui/material';
+import {
+  TrendingUp as TrendingUpIcon,
+  CheckCircle as CheckCircleIcon,
+  Code as CodeIcon,
+  People as PeopleIcon
+} from '@mui/icons-material';
 import { useDailyActivityTrends, useLanguageDistribution } from '../hooks/useAnalytics';
 
 // ─────────────────────────────────────────────────────────────
-// Shared UI Components
+// Shared UI Components (MUI versions)
 // ─────────────────────────────────────────────────────────────
 
 function StatCard({ title, value, subtitle, icon, loading }) {
   return (
-    <div className="bg-white border border-[#dadce0] rounded-xl p-6 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <p className="text-sm font-medium text-[#5f6368] mb-1">{title}</p>
-          <p className="text-3xl font-normal text-[#202124]">
-            {loading ? '...' : value}
-          </p>
-          {subtitle && (
-            <p className="text-xs text-[#70757a] mt-2 flex items-center gap-1">
-              {subtitle}
-            </p>
+    <Card variant="outlined" sx={{ height: '100%', borderRadius: 1 }}>
+      <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <Box>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500, display: 'block', mb: 0.5 }}>
+            {title}
+          </Typography>
+          {loading ? (
+            <CircularProgress size={24} sx={{ my: 1 }} />
+          ) : (
+            <Typography variant="h4" sx={{ color: 'text.primary', fontWeight: 500 }}>
+              {value}
+            </Typography>
           )}
-        </div>
-        {icon && (
-          <div className="p-3 bg-[#f8f9fa] rounded-full text-[#5f6368]">
-            {icon}
-          </div>
-        )}
-      </div>
-    </div>
+          {subtitle && (
+            <Typography variant="caption" sx={{ color: 'text.secondary', mt: 1, display: 'block' }}>
+              {subtitle}
+            </Typography>
+          )}
+        </Box>
+        <Box sx={{ p: 1, bgcolor: '#f5f7f9', borderRadius: 1.5, color: 'text.secondary' }}>
+          {icon}
+        </Box>
+      </CardContent>
+    </Card>
   );
 }
 
 function SectionHeader({ title, description, action }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6">
-      <div>
-        <h2 className="text-xl font-normal text-[#202124]">{title}</h2>
+    <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Box>
+        <Typography variant="h6" sx={{ fontWeight: 500 }}>
+          {title}
+        </Typography>
         {description && (
-          <p className="text-sm text-[#5f6368] mt-1">{description}</p>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            {description}
+          </Typography>
         )}
-      </div>
-      {action && <div>{action}</div>}
-    </div>
+      </Box>
+      {action && <Box>{action}</Box>}
+    </Box>
   );
 }
 
@@ -53,63 +80,46 @@ function DashboardStats({ filter, overview, loading }) {
   const periodLabel = filter === 'this-month' ? 'this month' : filter === 'this-week' ? 'this week' : filter;
 
   return (
-    <section className="mb-10">
-      <SectionHeader
-        title="Overview"
-        description={`Performance snapshot for ${periodLabel}`}
-      />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Active Contributors"
-          value={overview?.activeContributors || 0}
-          subtitle={`${periodLabel}`}
-          loading={loading}
-          icon={
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-          }
-        />
-        <StatCard
-          title="Issues Completed"
-          value={overview?.totalIssuesCompleted || 0}
-          subtitle={`${periodLabel}`}
-          loading={loading}
-          icon={
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-              <polyline points="22 4 12 14.01 9 11.01" />
-            </svg>
-          }
-        />
-        <StatCard
-          title="Total Commits"
-          value={overview?.totalCommits || 0}
-          subtitle={`${periodLabel}`}
-          loading={loading}
-          icon={
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 11l3 3L22 4" />
-              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-            </svg>
-          }
-        />
-        <StatCard
-          title="Completion Rate"
-          value={overview?.averageCompletionRate || 0}
-          subtitle={`${periodLabel}`}
-          loading={loading}
-          icon={
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-          }
-        />
-      </div>
-    </section>
+    <Box sx={{ mb: 6 }}>
+      <Grid container spacing={3}>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            title="Active Contributors"
+            value={overview?.activeContributors || 0}
+            subtitle={periodLabel}
+            loading={loading}
+            icon={<PeopleIcon />}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            title="Issues Completed"
+            value={overview?.totalIssuesCompleted || 0}
+            subtitle={periodLabel}
+            loading={loading}
+            icon={<CheckCircleIcon />}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            title="Total Commits"
+            value={overview?.totalCommits || 0}
+            subtitle={periodLabel}
+            loading={loading}
+            icon={<CodeIcon />}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            title="Completion Rate"
+            value={overview?.averageCompletionRate || 0}
+            subtitle={periodLabel}
+            loading={loading}
+            icon={<TrendingUpIcon />}
+          />
+        </Grid>
+      </Grid>
+    </Box>
   );
 }
 
@@ -144,100 +154,73 @@ function DailyActivityChart({ trends, loading }) {
         labels: {
           style: {
             colors: '#5f6368',
-            fontSize: '12px',
+            fontSize: '11px',
           },
         },
-        axisBorder: {
-          show: false,
-        },
-        axisTicks: {
-          show: false,
-        },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
       },
       yaxis: {
         labels: {
           style: {
             colors: '#5f6368',
-            fontSize: '12px',
+            fontSize: '11px',
           },
         },
       },
       colors: ['#1a73e8', '#34a853'],
       legend: {
         position: 'top',
-        fontSize: '14px',
-        labels: {
-          colors: '#5f6368',
-        },
-        markers: {
-          width: 12,
-          height: 12,
-          radius: 6,
-        },
+        fontSize: '12px',
+        labels: { colors: '#5f6368' },
+        markers: { width: 10, height: 10, radius: 2 },
       },
       grid: {
         borderColor: '#e8eaed',
         strokeDashArray: 4,
-        xaxis: {
-          lines: {
-            show: false,
-          },
-        },
-        yaxis: {
-          lines: {
-            show: true,
-          },
-        },
-      },
-      tooltip: {
-        theme: 'light',
-        shared: true,
-        intersect: false,
+        xaxis: { lines: { show: false } },
+        yaxis: { lines: { show: true } },
       },
     },
     series: [
-      {
-        name: 'Commits',
-        data: trends.map(item => item.commits || 0),
-      },
-      {
-        name: 'Issues Completed',
-        data: trends.map(item => item.issues || 0),
-      },
+      { name: 'Commits', data: trends.map(item => item.commits || 0) },
+      { name: 'Issues Completed', data: trends.map(item => item.issues || 0) },
     ],
   };
 
   return (
-    <section className="mb-10">
+    <Box sx={{ mb: 6 }}>
       <SectionHeader
         title="Daily Activity Trends"
         description="Last 10 days of commits and issues completed"
       />
-      <div className="bg-white border border-[#dadce0] rounded-xl p-6">
-        {loading ? (
-          <div className="h-64 flex items-center justify-center">
-            <div className="text-[#70757a]">Loading chart data...</div>
-          </div>
-        ) : trends.length === 0 ? (
-          <div className="h-64 flex items-center justify-center">
-            <div className="text-[#70757a]">No data available</div>
-          </div>
-        ) : (
-          <Chart
-            options={chartData.options}
-            series={chartData.series}
-            type="area"
-            height={300}
-          />
-        )}
-      </div>
-    </section>
+      <Card variant="outlined" sx={{ borderRadius: 1 }}>
+        <CardContent>
+          {loading ? (
+            <Box sx={{ h: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CircularProgress size={30} />
+            </Box>
+          ) : trends.length === 0 ? (
+            <Box sx={{ h: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Typography variant="body2" color="text.secondary">No data available</Typography>
+            </Box>
+          ) : (
+            <Chart
+              options={chartData.options}
+              series={chartData.series}
+              type="area"
+              height={300}
+            />
+          )}
+        </CardContent>
+      </Card>
+    </Box>
   );
 }
 
 function LanguageDistributionChart({ languages, loading }) {
   const topLanguages = languages.slice(0, 10);
-  
+
   const chartData = {
     options: {
       chart: {
@@ -250,69 +233,66 @@ function LanguageDistributionChart({ languages, loading }) {
       legend: {
         position: 'bottom',
         fontSize: '12px',
-        labels: {
-          colors: '#5f6368',
-        },
+        labels: { colors: '#5f6368' },
       },
       dataLabels: {
         enabled: true,
-        formatter: function (val) {
-          return Math.round(val) + '%';
-        },
+        formatter: (val) => Math.round(val) + '%',
       },
       tooltip: {
         theme: 'light',
-        y: {
-          formatter: function (val) {
-            return val + ' files';
-          },
-        },
+        y: { formatter: (val) => val + ' files' },
       },
     },
     series: topLanguages.map(lang => lang.count),
   };
 
   return (
-    <section className="mb-10">
+    <Box sx={{ mb: 6 }}>
       <SectionHeader
         title="Language Distribution"
         description="Top programming languages used across repositories"
       />
-      <div className="bg-white border border-[#dadce0] rounded-xl p-6">
-        {loading ? (
-          <div className="h-64 flex items-center justify-center">
-            <div className="text-[#70757a]">Loading chart data...</div>
-          </div>
-        ) : topLanguages.length === 0 ? (
-          <div className="h-64 flex items-center justify-center">
-            <div className="text-[#70757a]">No language data available</div>
-          </div>
-        ) : (
-          <Chart
-            options={chartData.options}
-            series={chartData.series}
-            type="donut"
-            height={350}
-          />
-        )}
-      </div>
-    </section>
+      <Card variant="outlined" sx={{ borderRadius: 1 }}>
+        <CardContent>
+          {loading ? (
+            <Box sx={{ h: 350, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CircularProgress size={30} />
+            </Box>
+          ) : topLanguages.length === 0 ? (
+            <Box sx={{ h: 350, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Typography variant="body2" color="text.secondary">No data available</Typography>
+            </Box>
+          ) : (
+            <Chart
+              options={chartData.options}
+              series={chartData.series}
+              type="donut"
+              height={350}
+            />
+          )}
+        </CardContent>
+      </Card>
+    </Box>
   );
 }
 
-function FilterDropdown({ value, onChange }) {
+function FilterSelect({ value, onChange }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="px-3 py-1.5 text-sm border border-[#dadce0] rounded-lg bg-white text-[#202124] focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:border-[#1a73e8]"
-    >
-      <option value="today">Today</option>
-      <option value="yesterday">Yesterday</option>
-      <option value="this-week">This Week</option>
-      <option value="last-week">Last Week</option>
-      <option value="this-month">This Month</option>
-    </select>
+    <FormControl size="small" sx={{ minWidth: 150 }}>
+      <Select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        displayEmpty
+        sx={{ bgcolor: 'white' }}
+      >
+        <MenuItem value="today">Today</MenuItem>
+        <MenuItem value="yesterday">Yesterday</MenuItem>
+        <MenuItem value="this-week">This Week</MenuItem>
+        <MenuItem value="last-week">Last Week</MenuItem>
+        <MenuItem value="this-month">This Month</MenuItem>
+      </Select>
+    </FormControl>
   );
 }
 
@@ -321,33 +301,35 @@ function FilterDropdown({ value, onChange }) {
 // ─────────────────────────────────────────────────────────────
 
 function Dashboard() {
-  const [filter, setFilter] = useState('this-month');
-  const { data: trends, loading: trendsLoading } = useDailyActivityTrends(filter);
-  const { data: languages, loading: languagesLoading } = useLanguageDistribution('all');
-
   return (
-    <main className="flex flex-col h-full bg-[#ffffff]">
-      <div className="flex-1 overflow-auto p-4 sm:p-6 md:p-10">
-        <div className="max-w-7xl mx-auto">
-          <header className="mb-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-normal text-[#202124]">Analytics Dashboard</h1>
-              <p className="text-sm text-[#5f6368] mt-1">
-                Team performance metrics and insights
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-[#5f6368]">Period:</label>
-              <FilterDropdown value={filter} onChange={setFilter} />
-            </div>
-          </header>
+    <Box sx={{ width: '100%', minHeight: '100%', bgcolor: 'white' }}>
+      {/* Page Header */}
+      <Box sx={{
+        p: 3,
+        borderBottom: '1px solid #eee',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <Box>
+          <Typography variant="h6" sx={{ color: '#333', fontWeight: 500 }}>
+            Dashboard
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Welcome to THY HR System
+          </Typography>
+        </Box>
+      </Box>
 
-          <DailyActivityChart trends={trends} loading={trendsLoading} />
-          <LanguageDistributionChart languages={languages} loading={languagesLoading} />
-        </div>
-      </div>
-    </main>
+      {/* Page Content */}
+      <Box sx={{ p: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
+        <Typography color="text.secondary">
+          Dashboard content is currently hidden.
+        </Typography>
+      </Box>
+    </Box>
   );
 }
 
 export default Dashboard;
+

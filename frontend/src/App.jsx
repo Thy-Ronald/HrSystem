@@ -1,4 +1,12 @@
 import { useState, useEffect } from 'react';
+import {
+  Box,
+  CircularProgress,
+  Typography,
+  Button,
+  Container
+} from '@mui/material';
+import { Warning as WarningIcon } from '@mui/icons-material';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ContractForm from './pages/ContractForm';
 import Dashboard from './pages/Dashboard';
@@ -69,15 +77,12 @@ function AppContent() {
   // Show loading state while checking authentication
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <svg className="animate-spin h-12 w-12 mx-auto text-blue-600 mb-4" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f5f7f9' }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress size={40} sx={{ mb: 2 }} />
+          <Typography color="text.secondary">Loading...</Typography>
+        </Box>
+      </Box>
     );
   }
 
@@ -90,23 +95,22 @@ function AppContent() {
   if (currentPage === 'contract-form' && user?.role !== 'admin') {
     return (
       <Layout currentPath={currentPage} onNavigate={handleNavigate}>
-        <div className="p-8 flex items-center justify-center min-h-[60vh]">
-          <div className="text-center max-w-md">
-            <svg className="w-24 h-24 mx-auto text-red-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h2>
-            <p className="text-gray-600 mb-6">
+        <Container maxWidth="sm" sx={{ py: 10 }}>
+          <Box sx={{ textAlign: 'center' }}>
+            <WarningIcon sx={{ fontSize: 64, color: 'error.main', mb: 2, opacity: 0.8 }} />
+            <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>Access Denied</Typography>
+            <Typography color="text.secondary" sx={{ mb: 4 }}>
               Only administrators can access the employee contract management screen.
-            </p>
-            <button
+            </Typography>
+            <Button
+              variant="contained"
               onClick={() => handleNavigate('dashboard')}
-              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+              sx={{ borderRadius: 1.5, textTransform: 'none', px: 4 }}
             >
               Go to Dashboard
-            </button>
-          </div>
-        </div>
+            </Button>
+          </Box>
+        </Container>
       </Layout>
     );
   }
@@ -130,3 +134,4 @@ function App() {
 }
 
 export default App;
+

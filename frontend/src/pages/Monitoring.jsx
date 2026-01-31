@@ -4,6 +4,29 @@ import { useSocket } from '../hooks/useSocket';
 import { useScreenShare } from '../hooks/useScreenShare';
 import { useToast, ToastContainer } from '../components/Toast';
 import { useConnectionQuality } from '../hooks/useConnectionQuality';
+import {
+  Box,
+  Typography,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  IconButton,
+  Card,
+  CardContent,
+  CircularProgress,
+  Chip
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon,
+  SignalCellularAlt as SignalIcon
+} from '@mui/icons-material';
 
 const Monitoring = () => {
   const { user, token } = useAuth();
@@ -675,321 +698,229 @@ const Monitoring = () => {
 
   // Admin view
   return (
-    <>
+    <Box sx={{ width: '100%', minHeight: '100%', p: 0 }}>
       <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
-      <div className="p-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">
-                Screen Sharing - Admin View
-              </h2>
-              <p className="text-sm text-gray-500 mt-1">Logged in as {name}</p>
-            </div>
-            <div className="flex items-center gap-4">
-              {/* Connection Status */}
-              {connectionQuality.isConnecting && (
-                <div className="flex items-center gap-2 text-sm text-blue-600">
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Connecting...
-                </div>
-              )}
-              {connectionQuality.isConnected && (
-                <div className="flex items-center gap-2 text-sm">
-                  <div className={`w-2 h-2 rounded-full ${connectionQuality.quality === 'excellent' ? 'bg-green-500' :
-                    connectionQuality.quality === 'good' ? 'bg-green-400' :
-                      connectionQuality.quality === 'fair' ? 'bg-yellow-500' :
-                        'bg-red-500'
-                    }`}></div>
-                  <span className="text-gray-600">
-                    {connectionQuality.quality.charAt(0).toUpperCase() + connectionQuality.quality.slice(1)}
-                    {connectionQuality.latency && ` • ${connectionQuality.latency}ms`}
-                  </span>
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'
-                  }`}></div>
-                <span className="text-sm text-gray-600">
-                  {isConnected ? 'Connected' : 'Disconnected'}
-                </span>
-              </div>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Sessions list */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    Active Sessions
-                  </h3>
-                  <button
-                    onClick={() => setShowAddModal(true)}
-                    className="bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 text-sm font-medium flex items-center gap-1"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Add New
-                  </button>
-                </div>
+      {/* Header Section */}
+      <Box sx={{
+        borderBottom: '1px solid #eee',
+        p: 3,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <Typography variant="h6" sx={{ color: '#333', fontWeight: 500 }}>
+          Monitoring
+        </Typography>
+      </Box>
 
-                {sessions.length === 0 ? (
-                  <div className="text-center py-8">
-                    <svg className="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                    <p className="text-gray-500 text-sm">
-                      No active connections
-                    </p>
-                    <p className="text-gray-400 text-xs mt-1">
-                      Click "Add New" to connect to an employee
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {sessions.map((session) => (
-                      <button
-                        key={session.sessionId}
-                        onClick={() => handleJoinSession(session)}
-                        className={`w-full text-left p-3 rounded-md border transition-colors ${selectedSession?.sessionId === session.sessionId
-                          ? 'bg-blue-50 border-blue-500'
-                          : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                          }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium text-gray-800">
-                              {session.employeeName}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <p className="text-xs text-gray-500">
-                                {session.streamActive ? (
-                                  <span className="text-green-600">● Sharing</span>
-                                ) : (
-                                  <span className="text-gray-400">○ Waiting</span>
-                                )}
-                              </p>
-                              {session.timeRemaining !== undefined && (
-                                <span className="text-xs text-gray-400">
-                                  • {session.timeRemaining}m left
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          {selectedSession?.sessionId === session.sessionId && (
-                            <span className="text-blue-600 text-sm">Viewing</span>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Video viewer */}
-            <div className="lg:col-span-2">
-              <div className="bg-white rounded-lg shadow-md p-6">
-                {selectedSession ? (
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-gray-800">
-                        Viewing: {selectedSession.employeeName}
-                      </h3>
-                      <button
-                        onClick={() => {
-                          stopViewing();
-                          setSelectedSession(null);
-                        }}
-                        className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
-                      >
-                        Stop Viewing
-                      </button>
-                    </div>
-
-                    {(() => {
-                      // Use session's streamActive status if available, otherwise use local state
-                      // Also check if we actually have a remoteStream
-                      const isStreamActive = selectedSession?.streamActive ?? streamActive;
-                      const hasStream = !!remoteStream;
-                      const isConnecting = loading && !hasStream;
-                      const showVideo = isStreamActive || hasStream;
-
-                      return (
-                        <>
-                          {/* Always mount video element to capture the stream, control visibility with CSS */}
-                          <div className={`bg-black rounded-lg overflow-hidden relative ${showVideo ? '' : 'hidden'}`}>
-                            <video
-                              ref={remoteVideoRef}
-                              autoPlay
-                              playsInline
-                              muted={false}
-                              className="w-full h-auto"
-                              style={{ maxHeight: '70vh' }}
-                              onLoadedMetadata={() => {
-                                console.log('[Monitoring] Video metadata loaded');
-                                setLoading(false);
-                              }}
-                              onPlay={() => {
-                                console.log('[Monitoring] Video started playing');
-                                setLoading(false);
-                              }}
-                            />
-                            {connectionQuality.isConnecting && (
-                              <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded text-sm">
-                                Connecting...
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Show connecting spinner */}
-                          {isConnecting && !showVideo && (
-                            <div className="bg-gray-100 rounded-lg p-12 text-center">
-                              <svg className="animate-spin h-12 w-12 mx-auto text-gray-400 mb-4" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                              </svg>
-                              <p className="text-gray-600">Connecting to stream...</p>
-                            </div>
-                          )}
-
-                          {/* Show waiting message */}
-                          {!isStreamActive && !hasStream && !isConnecting && (
-                            <div className="bg-gray-100 rounded-lg p-12 text-center">
-                              <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                              </svg>
-                              <p className="text-gray-600">
-                                Waiting for {selectedSession.employeeName} to start sharing...
-                              </p>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-
-                    {shareError && (
-                      <div className="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded flex items-center gap-2">
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                        </svg>
-                        <span>{shareError}</span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <svg
-                      className="w-24 h-24 mx-auto text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                      />
-                    </svg>
-                    <p className="text-gray-600 mt-4">
-                      Select a session from the list to start viewing
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Add Connection Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Connect to Employee</h3>
-              <button
-                onClick={() => {
-                  setShowAddModal(false);
-                  setAddFormCode('');
-                  setAddFormError('');
+      <Box sx={{ p: 4 }}>
+        <Card variant="outlined" sx={{ borderRadius: 1, border: '1px solid #eee' }}>
+          <CardContent sx={{ p: '0 !important' }}>
+            {/* Action Bar */}
+            <Box sx={{ p: 2, display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid #eee' }}>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setShowAddModal(true)}
+                sx={{
+                  textTransform: 'none',
+                  bgcolor: '#1976d2',
+                  '&:hover': { bgcolor: '#1565c0' }
                 }}
-                className="text-gray-400 hover:text-gray-600"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+                Add New
+              </Button>
+            </Box>
 
-            <p className="text-sm text-gray-600 mb-4">
-              Enter the employee's connection code to view their screen.
-            </p>
+            {/* Table */}
+            <TableContainer component={Box}>
+              <Table sx={{ minWidth: 650 }} aria-label="monitoring table">
+                <TableHead>
+                  <TableRow sx={{ '& th': { color: '#888', fontWeight: 500, borderBottom: '1px solid #eee' } }}>
+                    <TableCell>Group Name</TableCell>
+                    <TableCell align="center">Connection</TableCell>
+                    <TableCell align="center">Count</TableCell>
+                    <TableCell align="center">View</TableCell>
+                    <TableCell align="center">Action</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {sessions.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center" sx={{ py: 10 }}>
+                        <Typography variant="body2" sx={{ color: '#999' }}>
+                          No Data
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    sessions.map((session) => (
+                      <TableRow key={session.sessionId} hover sx={{ '& td': { borderBottom: '1px solid #f9f9f9' } }}>
+                        <TableCell component="th" scope="row">
+                          {session.employeeName}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                            <SignalIcon sx={{ fontSize: 16, color: session.streamActive ? '#4caf50' : '#bdbdbd' }} />
+                            {session.connectionCode || '-'}
+                          </Box>
+                        </TableCell>
+                        <TableCell align="center">
+                          {session.sessionId === selectedSession?.sessionId ? adminCount : (session.streamActive ? '1' : '0')}
+                        </TableCell>
+                        <TableCell align="center">
+                          {session.streamActive ? (
+                            <Chip
+                              label="Live"
+                              size="small"
+                              sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontWeight: 500, fontSize: '0.7rem' }}
+                            />
+                          ) : (
+                            <Typography variant="caption" sx={{ color: '#999' }}>Offline</Typography>
+                          )}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Button
+                            size="small"
+                            variant={selectedSession?.sessionId === session.sessionId ? "outlined" : "text"}
+                            color={selectedSession?.sessionId === session.sessionId ? "error" : "primary"}
+                            onClick={() => {
+                              if (selectedSession?.sessionId === session.sessionId) {
+                                stopViewing();
+                                setSelectedSession(null);
+                              } else {
+                                handleJoinSession(session);
+                              }
+                            }}
+                            sx={{ textTransform: 'none' }}
+                          >
+                            {selectedSession?.sessionId === session.sessionId ? "Stop" : "View"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+        {/* Video Viewer Section */}
+        {selectedSession && (
+          <Box sx={{ mt: 4 }}>
+            <Card variant="outlined" sx={{ borderRadius: 1, border: '1px solid #eee' }}>
+              <Box sx={{
+                p: 2,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: '1px solid #eee'
+              }}>
+                <Typography variant="subtitle1" fontWeight={500}>
+                  Live Stream: {selectedSession.employeeName}
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  {loading && <CircularProgress size={20} />}
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    size="small"
+                    onClick={() => {
+                      stopViewing();
+                      setSelectedSession(null);
+                    }}
+                  >
+                    Close Viewer
+                  </Button>
+                </Box>
+              </Box>
+              <CardContent sx={{ p: 0, bgcolor: 'black', position: 'relative', display: 'flex', justifyContent: 'center' }}>
+                <video
+                  ref={remoteVideoRef}
+                  autoPlay
+                  playsInline
+                  style={{
+                    width: '100%',
+                    maxHeight: '70vh',
+                    display: (selectedSession?.streamActive || !!remoteStream) ? 'block' : 'none'
+                  }}
+                  onLoadedMetadata={() => setLoading(false)}
+                  onPlay={() => setLoading(false)}
+                />
+                {!selectedSession?.streamActive && !remoteStream && (
+                  <Box sx={{ py: 10, textAlign: 'center', color: '#666' }}>
+                    <VisibilityOffIcon sx={{ fontSize: 48, mb: 1, opacity: 0.5 }} />
+                    <Typography>Waiting for stream to start...</Typography>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Box>
+        )}
+      </Box>
+
+      {/* Connection Code Modal */}
+      {showAddModal && (
+        <Box sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          bgcolor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1300
+        }}>
+          <Card sx={{ width: 400, borderRadius: 1 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2 }}>Connect to Employee</Typography>
+              <Typography variant="body2" sx={{ mb: 3, color: '#666' }}>
+                Enter the employee's connection code to view their screen.
+              </Typography>
+
+              <Box component="div" sx={{ mb: 3 }}>
+                <Typography variant="caption" sx={{ display: 'block', mb: 1, color: '#333', fontWeight: 500 }}>
                   Connection Code
-                </label>
+                </Typography>
                 <input
                   type="text"
                   value={addFormCode}
                   onChange={(e) => setAddFormCode(e.target.value)}
-                  placeholder="Enter employee's connection code"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 tracking-wider text-center text-lg"
-                  disabled={addFormLoading}
-                  autoFocus
+                  placeholder="Enter code"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                  style={{ fontSize: '0.9rem' }}
                 />
-              </div>
+                {addFormError && (
+                  <Typography variant="caption" sx={{ color: 'error.main', mt: 0.5, display: 'block' }}>
+                    {addFormError}
+                  </Typography>
+                )}
+              </Box>
 
-              {addFormError && (
-                <div className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-md text-sm">
-                  {addFormError}
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setAddFormCode('');
-                    setAddFormError('');
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
-                  disabled={addFormLoading}
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                <Button
+                  onClick={() => { setShowAddModal(false); setAddFormCode(''); setAddFormError(''); }}
+                  sx={{ color: '#666' }}
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="contained"
+                  disabled={addFormLoading}
                   onClick={handleAddConnection}
-                  disabled={addFormLoading || !addFormCode.trim()}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
                 >
-                  {addFormLoading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Connecting...
-                    </span>
-                  ) : (
-                    'Connect'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+                  {addFormLoading ? <CircularProgress size={20} /> : 'Connect'}
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
       )}
-    </>
+    </Box>
   );
 };
 

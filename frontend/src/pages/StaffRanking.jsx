@@ -1,10 +1,5 @@
-/**
- * Staff Ranking Page (Refactored with Clean Architecture)
- * 
- * Displays GitHub repository staff ranking based on issue assignments
- */
-
 import { useState, useCallback, useEffect } from 'react';
+import { Box, Typography } from '@mui/material';
 import {
   RankingHeader,
   RankingFilters,
@@ -76,8 +71,27 @@ export default function StaffRanking() {
   }, [selectedRepo, activeQuickFilter, loadData]);
 
   return (
-    <div className="min-h-screen bg-white px-4 sm:px-6 md:px-8 py-6">
-      <main className="max-w-7xl mx-auto">
+    <Box sx={{ width: '100%', minHeight: '100%', bgcolor: 'white' }}>
+      {/* Page Header */}
+      <Box sx={{
+        p: 3,
+        borderBottom: '1px solid #eee',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <Box>
+          <Typography variant="h6" sx={{ color: '#333', fontWeight: 500 }}>
+            Staff Ranking
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            GitHub repository staff ranking based on issue assignments
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* Page Content */}
+      <Box sx={{ p: 4 }}>
         <RankingHeader
           viewMode={viewMode}
           onViewChange={setViewMode}
@@ -101,9 +115,9 @@ export default function StaffRanking() {
             error={error}
           />
         ) : (
-          <div className="flex items-center justify-center py-16 text-[#70757a]">
-            <p>Graph view coming soon...</p>
-          </div>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 10, color: 'text.secondary' }}>
+            <Typography>Graph view coming soon...</Typography>
+          </Box>
         )}
 
         <RankingModal
@@ -112,7 +126,7 @@ export default function StaffRanking() {
           repositories={repositories}
           sharedCacheData={null}
         />
-      </main>
-    </div>
+      </Box>
+    </Box>
   );
 }

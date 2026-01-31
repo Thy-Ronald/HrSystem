@@ -1,4 +1,15 @@
 import React, { useState } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  Button,
+  CircularProgress,
+  Link,
+  Container
+} from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast, ToastContainer } from '../components/Toast';
 
@@ -73,116 +84,120 @@ const Auth = ({ onLogin }) => {
   };
 
   return (
-    <>
+    <Box sx={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      bgcolor: '#f5f7f9',
+      p: 2
+    }}>
       <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">
-              {isLogin ? 'Sign In' : 'Sign Up'}
-            </h1>
-            <p className="text-gray-600">
-              {isLogin ? 'Welcome back! Please sign in to continue' : 'Create a new account to get started'}
-            </p>
-          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {!isLogin && (
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                  Full Name
-                </label>
-                <input
-                  id="name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter your full name"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+      <Container maxWidth="sm">
+        <Card sx={{ borderRadius: 2, boxShadow: '0 8px 24px rgba(0,0,0,0.05)' }}>
+          <CardContent sx={{ p: 4 }}>
+            <Box sx={{ textAlign: 'center', mb: 4 }}>
+              <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a2027', mb: 1 }}>
+                {isLogin ? 'Sign In' : 'Sign Up'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {isLogin ? 'Welcome back! Please sign in to continue' : 'Create a new account to get started'}
+              </Typography>
+            </Box>
+
+            <form onSubmit={handleSubmit}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {!isLogin && (
+                  <TextField
+                    label="Full Name"
+                    variant="outlined"
+                    fullWidth
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Enter your full name"
+                    required
+                    disabled={loading}
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
+                  />
+                )}
+
+                <TextField
+                  label="Email"
+                  type="email"
+                  variant="outlined"
+                  fullWidth
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
                   required
-                  minLength={2}
-                  maxLength={50}
                   disabled={loading}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
                 />
-              </div>
-            )}
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                required
+                <TextField
+                  label="Password"
+                  type="password"
+                  variant="outlined"
+                  fullWidth
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={isLogin ? "Enter your password" : "Min. 6 characters"}
+                  required
+                  disabled={loading}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
+                />
+
+                <Button
+                  type="submit"
+                  variant="contained"
+                  fullWidth
+                  size="large"
+                  disabled={loading || (isLogin ? !email.trim() || !password : !email.trim() || !password || !name.trim())}
+                  sx={{
+                    py: 1.5,
+                    borderRadius: 1.5,
+                    textTransform: 'none',
+                    fontSize: '1rem',
+                    boxShadow: 'none',
+                    '&:hover': { boxShadow: 'none' }
+                  }}
+                >
+                  {loading ? (
+                    <CircularProgress size={24} sx={{ color: 'white' }} />
+                  ) : (
+                    isLogin ? 'Sign In' : 'Sign Up'
+                  )}
+                </Button>
+              </Box>
+            </form>
+
+            <Box sx={{ mt: 3, textAlign: 'center' }}>
+              <Link
+                component="button"
+                variant="body2"
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setEmail('');
+                  setPassword('');
+                  setName('');
+                }}
                 disabled={loading}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={isLogin ? "Enter your password" : "Create a password (min. 6 characters)"}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                required
-                minLength={6}
-                disabled={loading}
-              />
-            </div>
-
-
-            <button
-              type="submit"
-              disabled={loading || (isLogin ? !email.trim() || !password : !email.trim() || !password || !name.trim())}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium transition-colors flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  {isLogin ? 'Signing in...' : 'Creating account...'}
-                </>
-              ) : (
-                isLogin ? 'Sign In' : 'Sign Up'
-              )}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setEmail('');
-                setPassword('');
-                setName('');
-              }}
-              className="text-blue-600 hover:text-blue-700 font-medium text-sm"
-              disabled={loading}
-            >
-              {isLogin ? (
-                <>Don't have an account? <span className="underline">Sign Up</span></>
-              ) : (
-                <>Already have an account? <span className="underline">Sign In</span></>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    </>
+                sx={{ textDecoration: 'none', fontWeight: 500 }}
+              >
+                {isLogin ? (
+                  <>Don't have an account? Sign Up</>
+                ) : (
+                  <>Already have an account? Sign In</>
+                )}
+              </Link>
+            </Box>
+          </CardContent>
+        </Card>
+      </Container>
+    </Box>
   );
 };
 
 export default Auth;
+

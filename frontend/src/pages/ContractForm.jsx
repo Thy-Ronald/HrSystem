@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Box, Typography } from '@mui/material';
 import { useContracts } from '../features/contracts/hooks/useContracts';
 import { useContractForm } from '../features/contracts/hooks/useContractForm';
 import { useContractStatus } from '../features/contracts/hooks/useContractStatus';
@@ -90,7 +91,7 @@ function ContractForm({ searchQuery = '' }) {
     const { contractId } = deleteConfirm;
     try {
       await remove(contractId);
-      
+
       // Adjust page if current page becomes empty after deletion
       const filteredLength = contracts.length - 1;
       const totalPages = Math.ceil(filteredLength / ITEMS_PER_PAGE);
@@ -99,7 +100,7 @@ function ContractForm({ searchQuery = '' }) {
       } else if (filteredLength === 0) {
         setCurrentPage(1);
       }
-      
+
       setDeleteConfirm({ open: false, contractId: null, contractName: '' });
       setStatus({ state: 'success', message: 'Contract deleted successfully!' });
       setTimeout(() => setStatus({ state: 'idle', message: '' }), 2000);
@@ -114,10 +115,10 @@ function ContractForm({ searchQuery = '' }) {
     if (success) {
       // Reload contracts list
       await refresh();
-      
+
       // Reset to first page after reload
       setCurrentPage(1);
-      
+
       // Close modal after short delay
       setTimeout(() => {
         setOpen(false);
@@ -135,7 +136,26 @@ function ContractForm({ searchQuery = '' }) {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <Box sx={{ width: '100%', minHeight: '100%', bgcolor: 'white' }}>
+      {/* Page Header */}
+      <Box sx={{
+        p: 3,
+        borderBottom: '1px solid #eee',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <Box>
+          <Typography variant="h6" sx={{ color: '#333', fontWeight: 500 }}>
+            Employees
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Manage employee contracts and payroll information
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* Toolbar */}
       <ContractToolbar
         onNewContract={handleNewContract}
         onRefresh={refresh}
@@ -144,19 +164,20 @@ function ContractForm({ searchQuery = '' }) {
         currentTime={currentTime}
       />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {loading && <div className="p-4 text-center text-[#5f6368]">Loading...</div>}
-        {loadError && <div className="p-4 text-center text-rose-600">{loadError}</div>}
-        
+      {/* Page Content */}
+      <Box sx={{ p: 4, flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {loading && <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>Loading...</Box>}
+        {loadError && <Box sx={{ p: 4, textAlign: 'center', color: 'error.main' }}>{loadError}</Box>}
+
         {!loading && contracts.length === 0 && !loadError && (
-          <div className="p-8 text-center text-[#5f6368]">
-            <p className="text-lg">Your contract list is empty</p>
-            <p className="text-sm">Click "New Contract" to get started.</p>
-          </div>
+          <Box sx={{ p: 8, textAlign: 'center', color: 'text.secondary' }}>
+            <Typography variant="h6">Your contract list is empty</Typography>
+            <Typography variant="body2">Click "New" to get started.</Typography>
+          </Box>
         )}
 
         {!loading && contracts.length > 0 && (
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <Box sx={{ flex: 1, overflow: 'hidden' }}>
             <ContractList
               contracts={contracts}
               searchQuery={searchQuery}
@@ -167,9 +188,9 @@ function ContractForm({ searchQuery = '' }) {
               onEdit={handleEdit}
               onDelete={handleDelete}
             />
-          </div>
+          </Box>
         )}
-      </div>
+      </Box>
 
       <ContractModal
         open={open}
@@ -192,8 +213,9 @@ function ContractForm({ searchQuery = '' }) {
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeleteConfirm({ open: false, contractId: null, contractName: '' })}
       />
-    </div>
+    </Box>
   );
 }
 
 export default ContractForm;
+
