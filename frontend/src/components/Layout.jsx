@@ -126,17 +126,33 @@ const Layout = ({ children, currentPath, onNavigate }) => {
           </Box>
 
           {/* User Section */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <IconButton
-              size="small"
-              color="inherit"
-              onClick={() => setNotificationOpen(!notificationOpen)}
-              sx={{ color: '#5f6368' }}
-            >
-              <Badge badgeContent={count} color="error" sx={{ '& .MuiBadge-badge': { fontSize: 10, height: 16, minWidth: 16 } }}>
-                <NotificationsIcon fontSize="small" />
-              </Badge>
-            </IconButton>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, position: 'relative' }}>
+            {isAdmin && (
+              <>
+                <IconButton
+                  size="small"
+                  color="inherit"
+                  onClick={() => setNotificationOpen(!notificationOpen)}
+                  sx={{ color: '#5f6368' }}
+                >
+                  <Badge badgeContent={count} color="error" sx={{ '& .MuiBadge-badge': { fontSize: 10, height: 16, minWidth: 16 } }}>
+                    <NotificationsIcon fontSize="small" />
+                  </Badge>
+                </IconButton>
+
+                {notificationOpen && (
+                  <NotificationDropdown
+                    open={notificationOpen}
+                    onClose={() => setNotificationOpen(false)}
+                    notifications={notifications}
+                    loading={loading}
+                    onNotificationClick={markAsRead}
+                    isRead={isRead}
+                    onNavigate={onNavigate}
+                  />
+                )}
+              </>
+            )}
 
             <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', ml: 1 }} onClick={handleMenu}>
               <Typography variant="body2" sx={{ color: '#333', fontWeight: 500, mr: 0.5 }}>
@@ -167,17 +183,6 @@ const Layout = ({ children, currentPath, onNavigate }) => {
 
       {/* Main Content */}
       <Box sx={{ flexGrow: 1, overflow: 'auto', p: 0 }}>
-        {notificationOpen && (
-          <NotificationDropdown
-            open={notificationOpen}
-            onClose={() => setNotificationOpen(false)}
-            notifications={notifications}
-            loading={loading}
-            onNotificationClick={markAsRead}
-            isRead={isRead}
-            onNavigate={onNavigate}
-          />
-        )}
         <Container maxWidth={false} sx={{ py: 3, height: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
           <Box sx={{
             bgcolor: 'white',

@@ -26,19 +26,19 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
     if (onNotificationClick && !isRead(contract.id)) {
       onNotificationClick(contract.id);
     }
-    
+
     // Navigate to contracts screen
     if (onNavigate) {
       onNavigate('contract-form');
-      
+
       // Trigger edit modal for this contract after a short delay to allow navigation
       setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('openContractEditModal', { 
-          detail: { contractId: contract.id } 
+        window.dispatchEvent(new CustomEvent('openContractEditModal', {
+          detail: { contractId: contract.id }
         }));
       }, 100);
     }
-    
+
     // Close dropdown
     onClose();
   };
@@ -46,24 +46,24 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
   if (!open) return null;
 
   const getDaysUntilExpiry = (contract) => {
-    const expirationDate = calculateExpirationDate(contract.assessmentDate, contract.termMonths) 
+    const expirationDate = calculateExpirationDate(contract.assessmentDate, contract.termMonths)
       || (contract.expirationDate ? new Date(contract.expirationDate) : null);
-    
+
     if (!expirationDate) return null;
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const expiry = new Date(expirationDate);
     expiry.setHours(0, 0, 0, 0);
-    
+
     const days = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
     return days;
   };
 
   return (
-    <div 
+    <div
       ref={dropdownRef}
-      className="absolute top-full right-0 mt-2 w-96 bg-white rounded-lg shadow-2xl border border-[#dadce0] z-50 max-h-[600px] overflow-hidden flex flex-col"
+      className="absolute top-full right-0 mt-2 w-96 bg-white rounded-lg shadow-2xl border border-[#dadce0] z-[1000] max-h-[600px] overflow-hidden flex flex-col"
       style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
     >
       {/* Header */}
@@ -99,17 +99,16 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
           <div className="divide-y divide-[#e4e6eb]">
             {notifications.map((contract) => {
               const daysUntilExpiry = getDaysUntilExpiry(contract);
-              const expirationDate = calculateExpirationDate(contract.assessmentDate, contract.termMonths) 
+              const expirationDate = calculateExpirationDate(contract.assessmentDate, contract.termMonths)
                 || (contract.expirationDate ? new Date(contract.expirationDate) : null);
               const read = isRead ? isRead(contract.id) : false;
-              
+
               return (
                 <div
                   key={contract.id}
                   onClick={() => handleNotificationClick(contract)}
-                  className={`px-4 py-3 transition-colors cursor-pointer ${
-                    read ? 'bg-white' : 'bg-[#e7f3ff] hover:bg-[#d0e7ff]'
-                  }`}
+                  className={`px-4 py-3 transition-colors cursor-pointer ${read ? 'bg-white' : 'bg-[#e7f3ff] hover:bg-[#d0e7ff]'
+                    }`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 mt-1">
