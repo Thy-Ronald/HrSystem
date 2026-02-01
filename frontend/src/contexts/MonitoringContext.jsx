@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from './AuthContext';
 import { useSocket } from '../hooks/useSocket';
 import { useScreenShare } from '../hooks/useScreenShare';
@@ -21,6 +21,7 @@ export const MonitoringProvider = ({ children }) => {
         const saved = localStorage.getItem('monitoring_sessions');
         return saved ? JSON.parse(saved) : [];
     });
+    const [connectError, setConnectError] = useState(null);
 
     // Employee state
     const [adminCount, setAdminCount] = useState(0);
@@ -37,7 +38,9 @@ export const MonitoringProvider = ({ children }) => {
         else localStorage.removeItem('monitoring_connectionCode');
     }, [connectionCode]);
 
+    const sessionsRef = useRef(sessions);
     useEffect(() => {
+        sessionsRef.current = sessions;
         localStorage.setItem('monitoring_sessions', JSON.stringify(sessions));
     }, [sessions]);
 
@@ -80,23 +83,25 @@ export const MonitoringProvider = ({ children }) => {
             }
         };
 
-        const handleConnectSuccess = ({ sessionId: sid, employeeName, streamActive: active }) => {
+        const handleConnectSuccess = ({ sessionId: sid, employeeName, connectionCode: code, streamActive: active }) => {
             setSessions(prev => {
                 const exists = prev.find(s => s.sessionId === sid);
                 if (exists) {
-                    return prev.map(s => s.sessionId === sid ? { ...s, streamActive: active } : s);
+                    return prev.map(s => s.sessionId === sid ? { ...s, streamActive: active, connectionCode: code || s.connectionCode } : s);
                 }
-                return [...prev, { sessionId: sid, employeeName, streamActive: active }];
+                return [...prev, { sessionId: sid, employeeName, connectionCode: code, streamActive: active }];
             });
+            setConnectError(null);
             toast.success(`Connected to ${employeeName}`);
         };
 
-        const handleSessionJoined = ({ sessionId: sid, streamActive: active }) => {
+        const handleSessionJoined = ({ sessionId: sid, connectionCode: code, streamActive: active }) => {
             console.log(`[MonitoringContext] Joined session ${sid}, active: ${active}`);
-            setSessions(prev => prev.map(s => s.sessionId === sid ? { ...s, streamActive: active } : s));
+            setSessions(prev => prev.map(s => s.sessionId === sid ? { ...s, streamActive: active, connectionCode: code || s.connectionCode } : s));
         };
 
         const handleConnectError = ({ message }) => {
+            setConnectError(message);
             toast.error(message);
         };
 
@@ -146,17 +151,12 @@ export const MonitoringProvider = ({ children }) => {
         };
     }, [isConnected, subscribe, unsubscribe, toast]);
 
-    // Re-auth on refresh/navigation if we have a sessionId or connectionCode
+    // Re-auth on refresh/navigation
     useEffect(() => {
         if (user && isConnected) {
             if (role === 'admin') {
                 emit('monitoring:auth', { role: user.role, name: user.name });
-                // Attempt to re-join existing sessions
-                sessions.forEach(s => {
-                    emit('monitoring:join-session', { sessionId: s.sessionId });
-                });
             } else if (role === 'employee' && connectionCode && !sessionId) {
-                // If employee re-authenticates after refresh, server should reuse session by name
                 emit('monitoring:auth', {
                     role: user.role,
                     name: user.name,
@@ -164,7 +164,16 @@ export const MonitoringProvider = ({ children }) => {
                 });
             }
         }
-    }, [user, isConnected, role, emit]); // connectionCode and sessions omitted from deps to avoid loop
+    }, [user, isConnected, role]); // connectionCode and sessions omitted from deps to avoid loop
+
+    // Join all sessions when admin re-authenticates or sessions list changes
+    useEffect(() => {
+        if (role === 'admin' && isConnected) {
+            sessions.forEach(s => {
+                emit('monitoring:join-session', { sessionId: s.sessionId });
+            });
+        }
+    }, [isConnected, role, sessions.length]); // Re-join if length changes or reconnected
 
     const resetSession = useCallback(() => {
         stopSharing();
@@ -176,7 +185,9 @@ export const MonitoringProvider = ({ children }) => {
         toast.info('Session reset. You can now set a new code.');
     }, [stopSharing, toast]);
 
-    const value = {
+    const clearConnectError = useCallback(() => setConnectError(null), []);
+
+    const value = useMemo(() => ({
         sessionId,
         connectionCode,
         setConnectionCode,
@@ -184,6 +195,8 @@ export const MonitoringProvider = ({ children }) => {
         setLoading,
         sessions,
         setSessions,
+        connectError,
+        clearConnectError,
         justReconnected,
         setJustReconnected,
         resetSession,
@@ -192,7 +205,21 @@ export const MonitoringProvider = ({ children }) => {
         startSharing,
         stopSharing,
         emit
-    };
+    }), [
+        sessionId,
+        connectionCode,
+        loading,
+        sessions,
+        connectError,
+        clearConnectError,
+        justReconnected,
+        resetSession,
+        isSharing,
+        shareError,
+        startSharing,
+        stopSharing,
+        emit
+    ]);
 
     return (
         <MonitoringContext.Provider value={value}>

@@ -348,9 +348,7 @@ export function useScreenShare(role, sessionId) {
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = null;
     }
-
-    emit('monitoring:leave-session');
-  }, [emit]);
+  }, []);
 
   // Initialize peer connection when sharing starts (employee)
   useEffect(() => {
@@ -364,12 +362,12 @@ export function useScreenShare(role, sessionId) {
   const [webrtcConnected, setWebrtcConnected] = useState(false);
 
   useEffect(() => {
-    // For admins, we track the 'active' connection
-    // For employees, we don't track a single connection state this way
+    let active = true;
     const pc = peerConnectionsRef.current.get('active');
 
     if (pc) {
       const updateConnectionState = () => {
+        if (!active) return;
         const connected = pc.connectionState === 'connected' || pc.connectionState === 'connecting';
         setWebrtcConnected(connected);
       };
@@ -378,12 +376,13 @@ export function useScreenShare(role, sessionId) {
       updateConnectionState();
 
       return () => {
+        active = false;
         pc.removeEventListener('connectionstatechange', updateConnectionState);
       };
     } else {
       setWebrtcConnected(false);
     }
-  }, [remoteStream]); // remoteStream changes when startViewing/stopViewing is called
+  }, [remoteStream, isConnected]); // remoteStream changes when startViewing/stopViewing is called
 
   return {
     isSharing,

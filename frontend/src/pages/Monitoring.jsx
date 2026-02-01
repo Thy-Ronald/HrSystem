@@ -38,6 +38,23 @@ import {
 } from '@mui/icons-material';
 
 // ─────────────────────────────────────────────────────────────
+// Styles & Animations
+// ─────────────────────────────────────────────────────────────
+
+const GLOBAL_STYLES = `
+  @keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
+    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+  }
+  @keyframes pulse-red {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(234, 67, 53, 0.4); }
+    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(234, 67, 53, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(234, 67, 53, 0); }
+  }
+`;
+
+// ─────────────────────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────────────────────
 
@@ -98,17 +115,20 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
 
   // Viewport-aware streaming logic (Scalability Optimization)
   useEffect(() => {
-    if (session.streamActive && isVisible && !shareConnected) {
+    let active = true;
+    // Only start viewing if stream is active AND (visible OR in full view)
+    if (session.streamActive && (isVisible || showFullView) && !shareConnected) {
       setLoading(true);
-      emit('monitoring:join-session', { sessionId: session.sessionId });
       startViewing(session.sessionId);
     }
-    else if ((!isVisible || !session.streamActive) && shareConnected) {
+    // Stop viewing if (NOT visible AND NOT in full view) OR stream stopped
+    else if (((!isVisible && !showFullView) || !session.streamActive) && shareConnected) {
       stopViewing();
       setLoading(false);
-      if (!session.streamActive) setShowFullView(false);
+      if (!session.streamActive && active) setShowFullView(false);
     }
-  }, [session.streamActive, isVisible, shareConnected, startViewing, stopViewing, session.sessionId, emit]);
+    return () => { active = false; };
+  }, [session.streamActive, isVisible, showFullView, shareConnected, startViewing, stopViewing, session.sessionId]);
 
   useEffect(() => {
     return () => stopViewing();
@@ -195,6 +215,8 @@ const Monitoring = () => {
     setJustReconnected,
     isSharing,
     shareError,
+    connectError,
+    clearConnectError,
     startSharing,
     stopSharing,
     resetSession,
@@ -219,20 +241,47 @@ const Monitoring = () => {
   }, [user, socketConnected, connectionCode, emit, toast, setLoading]);
 
   const handleAddConnection = () => {
-    if (!addFormCode.trim()) return setAddFormError('Code required');
+    const code = addFormCode.trim();
+    if (!code) return setAddFormError('Code required');
+
+    // Local check for duplicate connection
+    const isDuplicate = sessions.some(s => s.connectionCode === code);
+    if (isDuplicate) {
+      return setAddFormError('Already connected to this session');
+    }
+
+    if (clearConnectError) clearConnectError();
     setAddFormLoading(true);
-    emit('monitoring:connect-by-code', { connectionCode: addFormCode.trim() });
+    emit('monitoring:connect-by-code', { connectionCode: code });
   };
 
   // Close modal when sessions update (if we just added one)
   useEffect(() => {
-    if (showAddModal) {
+    if (showAddModal && sessions.length > 0) {
       setShowAddModal(false);
       setAddFormLoading(false);
       setAddFormCode('');
       setAddFormError('');
     }
   }, [sessions.length]);
+
+  // Handle connection errors from context
+  useEffect(() => {
+    if (connectError && showAddModal) {
+      setAddFormError(connectError);
+      setAddFormLoading(false);
+      // We don't clear context error here yet, maybe on modal close
+    }
+  }, [connectError, showAddModal]);
+
+  // Clear errors when opening modal or changing code
+  useEffect(() => {
+    if (showAddModal) {
+      setAddFormError('');
+      setAddFormLoading(false);
+      if (clearConnectError) clearConnectError();
+    }
+  }, [showAddModal]);
 
   const handleRemoveSession = (id) => {
     setSessions(prev => prev.filter(s => s.sessionId !== id));
@@ -307,7 +356,6 @@ const Monitoring = () => {
                     <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Sharing Active</Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>Your screen is live for connected administrators.</Typography>
                     <Box sx={{ mb: 4, display: 'flex', justifyContent: 'center', gap: 3 }}>
-                      <Box sx={{ textAlign: 'left' }}><Typography variant="caption" color="text.secondary">Viewers</Typography><Typography variant="body2" sx={{ fontWeight: 700 }}>{adminCount}</Typography></Box>
                       <Box sx={{ textAlign: 'left', position: 'relative' }}>
                         <Typography variant="caption" color="text.secondary">Code</Typography>
                         <Typography variant="body2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -347,13 +395,13 @@ const Monitoring = () => {
             </Button>
           </DialogActions>
         </Dialog>
-        <style>{`@keyframes pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); } }`}</style>
       </Box>
     );
   }
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f8f9fa' }}>
+      <style>{GLOBAL_STYLES}</style>
       <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
       <Box sx={{ borderBottom: '1px solid #eee', p: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: 'white' }}>
         <Box>
@@ -379,7 +427,16 @@ const Monitoring = () => {
       <Dialog open={showAddModal} onClose={() => setShowAddModal(false)}>
         <DialogTitle sx={{ fontWeight: 800 }}>Connect to Employee</DialogTitle>
         <DialogContent>
-          <input type="text" value={addFormCode} onChange={e => setAddFormCode(e.target.value)} placeholder="Enter code" style={{ width: '100%', padding: '12px', marginTop: '8px', borderRadius: '8px', border: '1px solid #ccc' }} />
+          <input
+            type="text"
+            value={addFormCode}
+            onChange={e => {
+              setAddFormCode(e.target.value);
+              if (addFormError) setAddFormError('');
+            }}
+            placeholder="Enter code"
+            style={{ width: '100%', padding: '12px', marginTop: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+          />
           {addFormError && <Typography color="error" variant="caption">{addFormError}</Typography>}
         </DialogContent>
         <DialogActions sx={{ p: 3 }}>

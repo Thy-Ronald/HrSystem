@@ -225,6 +225,7 @@ async function startServer() {
       // Notify admin of successful connection (includes employee name)
       socket.emit('monitoring:connect-success', {
         sessionId,
+        connectionCode: connectionCode.trim(),
         employeeName: session.employeeName,
         streamActive: session.streamActive,
       });
@@ -341,11 +342,9 @@ async function startServer() {
       }
 
       monitoringService.addAdminToSession(sessionId, socket.id, socket.data.name);
-      socket.data.sessionId = sessionId;
       socket.join(sessionId);
 
       console.log(`[Monitoring] Admin ${socket.data.name} (${socket.id}) joined session ${sessionId}`);
-      console.log(`[Monitoring] Session now has ${session.adminSocketIds.size} admin(s): ${Array.from(session.adminSocketIds).join(', ')}`);
 
       // Notify employee that admin joined
       io.to(session.employeeSocketId).emit('monitoring:admin-joined', {
@@ -355,6 +354,7 @@ async function startServer() {
       // Send current stream status to admin
       socket.emit('monitoring:session-joined', {
         sessionId,
+        connectionCode: session.connectionCode,
         employeeName: session.employeeName,
         streamActive: session.streamActive,
       });
@@ -362,12 +362,11 @@ async function startServer() {
     });
 
     // Admin: Leave session
-    socket.on('monitoring:leave-session', () => {
-      if (socket.data.role !== 'admin' || !socket.data.sessionId) {
+    socket.on('monitoring:leave-session', ({ sessionId }) => {
+      if (socket.data.role !== 'admin' || !sessionId) {
         return;
       }
 
-      const sessionId = socket.data.sessionId;
       const session = monitoringService.getSession(sessionId);
 
       if (session) {
@@ -379,8 +378,6 @@ async function startServer() {
           adminName: socket.data.name,
         });
       }
-
-      socket.data.sessionId = null;
     });
 
     // WebRTC signaling: Offer
