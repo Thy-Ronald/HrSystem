@@ -140,6 +140,15 @@ async function startServer() {
 
         const sanitizedCode = connectionCode.trim();
 
+        // Check if this code is already used by SOMEONE ELSE
+        const existingWithCode = monitoringService.getSessionByCode(sanitizedCode);
+        if (existingWithCode && existingWithCode.session.employeeName !== sanitized.name) {
+          socket.emit('monitoring:error', {
+            message: 'This connection code is already in use by another employee. Please choose a different one.',
+          });
+          return;
+        }
+
         // Check if employee already has an active session by name (reconnection scenario)
         const existingSessionId = monitoringService.getSessionByEmployeeName(sanitized.name);
         let sessionId;

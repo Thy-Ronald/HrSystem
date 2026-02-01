@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, createContext, useContext, useState, useCallback } from 'react';
 
 /**
  * Toast Notification Component
@@ -62,7 +62,7 @@ export function Toast({ message, type = 'info', duration = 3000, onClose }) {
 
   return (
     <div
-      className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border ${typeStyles[type]} animate-slide-in`}
+      className={`fixed top-4 right-4 z-[9999] flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border ${typeStyles[type]} animate-slide-in`}
       role="alert"
     >
       <div className="flex-shrink-0">{iconStyles[type]}</div>
@@ -88,60 +88,66 @@ export function Toast({ message, type = 'info', duration = 3000, onClose }) {
  * Toast Container - Manages multiple toasts
  */
 export function ToastContainer({ toasts, removeToast }) {
+  if (!toasts || toasts.length === 0) return null;
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
-      {toasts.map((toast) => (
-        <Toast
-          key={toast.id}
-          message={toast.message}
-          type={toast.type}
-          duration={toast.duration}
-          onClose={() => removeToast(toast.id)}
-        />
+    <div className="fixed top-4 right-4 z-[9999] space-y-2 pointer-events-none">
+      {toasts.map((toast, index) => (
+        <div key={toast.id} className="pointer-events-auto" style={{ marginTop: index === 0 ? 0 : '10px' }}>
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            duration={toast.duration}
+            onClose={() => removeToast(toast.id)}
+          />
+        </div>
       ))}
     </div>
   );
 }
 
-/**
- * Hook for managing toasts
- */
-export function useToast() {
-  const [toasts, setToasts] = React.useState([]);
+const ToastContext = createContext();
 
-  const showToast = React.useCallback((message, type = 'info', duration = 3000) => {
+/**
+ * Toast Provider - Singleton toast management
+ */
+export function ToastProvider({ children }) {
+  const [toasts, setToasts] = useState([]);
+
+  const showToast = useCallback((message, type = 'info', duration = 3000) => {
     const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, message, type, duration }]);
     return id;
   }, []);
 
-  const removeToast = React.useCallback((id) => {
+  const removeToast = useCallback((id) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
-  const success = React.useCallback((message, duration) => {
-    return showToast(message, 'success', duration);
-  }, [showToast]);
-
-  const error = React.useCallback((message, duration) => {
-    return showToast(message, 'error', duration);
-  }, [showToast]);
-
-  const warning = React.useCallback((message, duration) => {
-    return showToast(message, 'warning', duration);
-  }, [showToast]);
-
-  const info = React.useCallback((message, duration) => {
-    return showToast(message, 'info', duration);
-  }, [showToast]);
-
-  return {
+  const value = {
     toasts,
     showToast,
     removeToast,
-    success,
-    error,
-    warning,
-    info,
+    success: useCallback((m, d) => showToast(m, 'success', d), [showToast]),
+    error: useCallback((m, d) => showToast(m, 'error', d), [showToast]),
+    warning: useCallback((m, d) => showToast(m, 'warning', d), [showToast]),
+    info: useCallback((m, d) => showToast(m, 'info', d), [showToast]),
   };
+
+  return (
+    <ToastContext.Provider value={value}>
+      {children}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+    </ToastContext.Provider>
+  );
+}
+
+/**
+ * Hook for using the global toast system
+ */
+export function useToast() {
+  const context = useContext(ToastContext);
+  if (!context) {
+    throw new Error('useToast must be used within a ToastProvider');
+  }
+  return context;
 }

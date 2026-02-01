@@ -126,13 +126,16 @@ function AppContent() {
 }
 
 import { MonitoringProvider } from './contexts/MonitoringContext';
+import { ToastProvider } from './components/Toast';
 
 function App() {
   return (
     <AuthProvider>
-      <MonitoringProvider>
-        <AppContent />
-      </MonitoringProvider>
+      <ToastProvider>
+        <MonitoringProvider>
+          <AppContent />
+        </MonitoringProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }

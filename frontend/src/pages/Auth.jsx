@@ -11,7 +11,7 @@ import {
   Container
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast, ToastContainer } from '../components/Toast';
+import { useToast } from '../components/Toast';
 
 const Auth = ({ onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -92,7 +92,6 @@ const Auth = ({ onLogin }) => {
       bgcolor: '#f5f7f9',
       p: 2
     }}>
-      <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
 
       <Container maxWidth="sm">
         <Card sx={{ borderRadius: 2, boxShadow: '0 8px 24px rgba(0,0,0,0.05)' }}>

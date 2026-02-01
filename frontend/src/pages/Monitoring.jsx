@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../hooks/useSocket';
 import { useScreenShare } from '../hooks/useScreenShare';
-import { useToast, ToastContainer } from '../components/Toast';
+import { useToast } from '../components/Toast';
 import { useMonitoring } from '../contexts/MonitoringContext';
 import {
   Box,
@@ -293,7 +293,6 @@ const Monitoring = () => {
   if (role === 'employee') {
     return (
       <Box sx={{ minHeight: 'calc(100vh - 64px)', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f5f7f9', p: 3 }}>
-        <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
         <Box sx={{ maxWidth: 500, width: '100%' }}>
           {!sessionId ? (
             <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid #e0e6ed', p: 4, textAlign: 'center' }}>
@@ -402,7 +401,6 @@ const Monitoring = () => {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f8f9fa' }}>
       <style>{GLOBAL_STYLES}</style>
-      <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
       <Box sx={{ borderBottom: '1px solid #eee', p: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: 'white' }}>
         <Box>
           <Typography variant="h6" sx={{ color: '#333', fontWeight: 500 }}>Monitoring</Typography>
