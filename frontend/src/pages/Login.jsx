@@ -2,7 +2,17 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 import { Button } from "@/components/ui/button"
-import { Loader2 } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Loader2, User, ShieldCheck, ArrowRight, Monitor } from "lucide-react"
+import { StarsBackground } from "@/components/animate-ui/components/backgrounds/stars"
 
 const Login = ({ onLogin }) => {
   const [role, setRole] = useState('');
@@ -46,96 +56,114 @@ const Login = ({ onLogin }) => {
   };
 
   return (
-    <>
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2 tracking-tight">Remote Support</h1>
-            <p className="text-slate-500 font-medium">Sign in to continue</p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">
-                Select Your Role
-              </label>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  onClick={() => setRole('employee')}
-                  className={`p-5 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-2 group ${role === 'employee'
-                    ? 'border-[#1a3e62] bg-slate-50 text-[#1a3e62] ring-4 ring-[#1a3e62]/10'
-                    : 'border-slate-100 bg-white hover:border-slate-200 text-slate-500 hover:text-slate-700 shadow-sm'
-                    }`}
-                >
-                  <div className={`p-3 rounded-full transition-colors ${role === 'employee' ? 'bg-[#1a3e62] text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'}`}>
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  </div>
-                  <span className="font-bold">Employee</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRole('admin')}
-                  className={`p-5 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-2 group ${role === 'admin'
-                    ? 'border-[#1a3e62] bg-slate-50 text-[#1a3e62] ring-4 ring-[#1a3e62]/10'
-                    : 'border-slate-100 bg-white hover:border-slate-200 text-slate-500 hover:text-slate-700 shadow-sm'
-                    }`}
-                >
-                  <div className={`p-3 rounded-full transition-colors ${role === 'admin' ? 'bg-[#1a3e62] text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'}`}>
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                  </div>
-                  <span className="font-bold">Admin</span>
-                </button>
+    <StarsBackground className="flex items-center justify-center p-4">
+      <div className="w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500">
+        <Card className="border-slate-200 bg-white/90 backdrop-blur-xl shadow-2xl rounded-3xl overflow-hidden border">
+          <CardHeader className="space-y-1 pb-6 text-center bg-gradient-to-b from-slate-50 to-transparent">
+            <div className="flex justify-center mb-4">
+              <div className="p-3 bg-blue-50 rounded-2xl border border-blue-100">
+                <Monitor className="h-8 w-8 text-[#1a3e62]" />
               </div>
             </div>
+            <CardTitle className="text-3xl font-bold tracking-tight text-slate-900">
+              Remote Support
+            </CardTitle>
+            <CardDescription className="text-slate-500 font-medium">
+              Select your role and enter your name to continue
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-8">
+            <form onSubmit={handleSubmit} className="space-y-8">
+              <div className="space-y-4">
+                <Label className="text-slate-500 font-semibold uppercase tracking-wider text-[10px] block text-center">
+                  Select Your Role
+                </Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setRole('employee')}
+                    className={`p-5 rounded-2xl border-2 transition-all duration-300 flex flex-col items-center gap-3 group relative overflow-hidden ${role === 'employee'
+                      ? 'border-[#1a3e62] bg-slate-50 text-[#1a3e62] shadow-md'
+                      : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:text-slate-600'
+                      }`}
+                  >
+                    <div className={`p-3 rounded-xl transition-all duration-300 ${role === 'employee' ? 'bg-[#1a3e62] text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'
+                      }`}>
+                      <User className="w-6 h-6" />
+                    </div>
+                    <span className="font-bold tracking-tight">Employee</span>
+                    {role === 'employee' && (
+                      <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-blue-500" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRole('admin')}
+                    className={`p-5 rounded-2xl border-2 transition-all duration-300 flex flex-col items-center gap-3 group relative overflow-hidden ${role === 'admin'
+                      ? 'border-[#1a3e62] bg-slate-50 text-[#1a3e62] shadow-md'
+                      : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:text-slate-600'
+                      }`}
+                  >
+                    <div className={`p-3 rounded-xl transition-all duration-300 ${role === 'admin' ? 'bg-[#1a3e62] text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'
+                      }`}>
+                      <ShieldCheck className="w-6 h-6" />
+                    </div>
+                    <span className="font-bold tracking-tight">Admin</span>
+                    {role === 'admin' && (
+                      <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-indigo-500" />
+                    )}
+                  </button>
+                </div>
+              </div>
 
-            <div className="space-y-2">
-              <label htmlFor="name" className="block text-sm font-semibold text-slate-700 uppercase tracking-wider">
-                Your Name
-              </label>
-              <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Enter your full name"
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-4 focus:ring-[#1a3e62]/10 focus:border-[#1a3e62] outline-none transition-all placeholder:text-slate-400 bg-white font-medium"
-                required
-                minLength={2}
-                maxLength={50}
-                disabled={loading}
-              />
+              <div className="space-y-4">
+                <Label htmlFor="name" className="text-slate-500 font-semibold uppercase tracking-wider text-[10px] block text-center">
+                  Your Full Name
+                </Label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    id="name"
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Enter your full name"
+                    className="pl-11 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 h-14 rounded-2xl focus:ring-blue-500/10 text-center font-medium"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={loading || !role || !name.trim()}
+                className="w-full bg-[#1a3e62] hover:bg-[#122c46] text-white h-16 rounded-2xl font-bold text-lg transition-all shadow-lg active:scale-95 group"
+              >
+                {loading ? (
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                    <span>Signing in...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span>Sign In</span>
+                    <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-8 text-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] leading-relaxed">
+                Secure Monitoring System
+                <span className="block mt-1 font-medium lowercase text-slate-500 tracking-normal opacity-70 italic">All sessions are recorded for security.</span>
+              </p>
             </div>
-
-            <Button
-              type="submit"
-              disabled={loading || !role || !name.trim()}
-              className="w-full bg-[#1a3e62] hover:bg-[#122c46] text-white py-6 rounded-xl font-bold transition-all shadow-md active:scale-[0.98] text-base"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                'Sign In'
-              )}
-            </Button>
-          </form>
-
-          <div className="mt-8 text-center">
-            <p className="text-xs text-slate-400 font-medium leading-relaxed">
-              Select your role and enter your name to access the monitoring system.
-              <br />All sessions are recorded for security.
-            </p>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
-    </>
+    </StarsBackground>
   );
 };
 

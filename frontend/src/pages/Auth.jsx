@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
-  Box,
   Card,
   CardContent,
-  Typography,
-  TextField,
-  CircularProgress,
-  Container
-} from '@mui/material';
-import { Button } from "@/components/ui/button"
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Loader2, Mail, Lock, User, ArrowRight } from "lucide-react"
+import { StarsBackground } from "@/components/animate-ui/components/backgrounds/stars"
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 
@@ -83,106 +86,114 @@ const Auth = ({ onLogin }) => {
   };
 
   return (
-    <Box sx={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      bgcolor: '#f5f7f9',
-      p: 2
-    }}>
-
-      <Container maxWidth="sm">
-        <Card sx={{ borderRadius: 2, boxShadow: '0 8px 24px rgba(0,0,0,0.05)' }}>
-          <CardContent sx={{ p: 4 }}>
-            <Box sx={{ textAlign: 'center', mb: 4 }}>
-              <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a2027', mb: 1 }}>
-                {isLogin ? 'Sign In' : 'Sign Up'}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {isLogin ? 'Welcome back! Please sign in to continue' : 'Create a new account to get started'}
-              </Typography>
-            </Box>
-
-            <form onSubmit={handleSubmit}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {!isLogin && (
-                  <TextField
-                    label="Full Name"
-                    variant="outlined"
-                    fullWidth
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Enter your full name"
-                    required
+    <StarsBackground className="flex items-center justify-center p-4">
+      <div className="w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500">
+        <Card className="border-slate-200 bg-white/90 backdrop-blur-xl shadow-2xl rounded-3xl overflow-hidden border">
+          <CardHeader className="space-y-1 pb-8 text-center bg-gradient-to-b from-slate-50 to-transparent">
+            <CardTitle className="text-3xl font-bold tracking-tight text-slate-900">
+              {isLogin ? 'Sign In' : 'Sign Up'}
+            </CardTitle>
+            <CardDescription className="text-slate-500 font-medium">
+              {isLogin ? 'Enter your credentials to access your account' : 'Fill in the information below to register'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-6 p-8">
+            <form onSubmit={handleSubmit} className="grid gap-6">
+              {!isLogin && (
+                <div className="grid gap-2">
+                  <Label htmlFor="name" className="text-slate-600 font-semibold uppercase tracking-wider text-[10px]">Full Name</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      id="name"
+                      placeholder="Jane Doe"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="pl-10 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 h-12 rounded-xl focus:ring-blue-500/10"
+                      disabled={loading}
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="grid gap-2">
+                <Label htmlFor="email" className="text-slate-600 font-semibold uppercase tracking-wider text-[10px]">Email Address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="name@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 h-12 rounded-xl focus:ring-blue-500/10"
                     disabled={loading}
-                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
+                    required
                   />
-                )}
-
-                <TextField
-                  label="Email"
-                  type="email"
-                  variant="outlined"
-                  fullWidth
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  required
-                  disabled={loading}
-                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
-                />
-
-                <TextField
-                  label="Password"
-                  type="password"
-                  variant="outlined"
-                  fullWidth
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={isLogin ? "Enter your password" : "Min. 6 characters"}
-                  required
-                  disabled={loading}
-                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
-                />
-
-                <Button
-                  type="submit"
-                  disabled={loading || (isLogin ? !email.trim() || !password : !email.trim() || !password || !name.trim())}
-                  className="w-full bg-[#1a3e62] hover:bg-[#122c46] text-white py-6 rounded-xl font-semibold text-base transition-all shadow-md active:scale-[0.98]"
-                >
-                  {loading ? (
-                    <CircularProgress size={24} sx={{ color: 'white' }} />
-                  ) : (
-                    isLogin ? 'Sign In' : 'Sign Up'
-                  )}
-                </Button>
-              </Box>
-            </form>
-
-            <Box sx={{ mt: 3, textAlign: 'center' }}>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="password" className="text-slate-600 font-semibold uppercase tracking-wider text-[10px]">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-10 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 h-12 rounded-xl focus:ring-blue-500/10"
+                    disabled={loading}
+                    required
+                  />
+                </div>
+              </div>
               <Button
-                variant="link"
-                onClick={() => {
-                  setIsLogin(!isLogin);
-                  setEmail('');
-                  setPassword('');
-                  setName('');
-                }}
-                disabled={loading}
-                className="text-[#1a3e62] hover:text-[#122c46] font-semibold"
+                type="submit"
+                disabled={loading || (isLogin ? !email.trim() || !password : !email.trim() || !password || !name.trim())}
+                className="w-full bg-[#1a3e62] hover:bg-[#122c46] text-white h-14 rounded-2xl font-bold text-lg transition-all shadow-lg active:scale-95 group"
               >
-                {isLogin ? (
-                  <>Don't have an account? Sign Up</>
+                {loading ? (
+                  <Loader2 className="h-6 w-6 animate-spin" />
                 ) : (
-                  <>Already have an account? Sign In</>
+                  <>
+                    <span>{isLogin ? 'Sign In' : 'Create Account'}</span>
+                    <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                  </>
                 )}
               </Button>
-            </Box>
+            </form>
           </CardContent>
+          <CardFooter className="flex flex-col gap-4 p-8 pt-0">
+            <div className="relative w-full">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-slate-100" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-slate-400 font-bold">Or continue with</span>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setEmail('');
+                setPassword('');
+                setName('');
+              }}
+              disabled={loading}
+              className="w-full text-[#1a3e62] hover:text-[#122c46] hover:bg-slate-50 rounded-xl h-12 font-semibold"
+            >
+              {isLogin ? (
+                "Don't have an account? Sign Up"
+              ) : (
+                "Already have an account? Sign In"
+              )}
+            </Button>
+          </CardFooter>
         </Card>
-      </Container>
-    </Box>
+      </div>
+    </StarsBackground>
   );
 };
 
