@@ -2,22 +2,18 @@
  * EmptyState Component
  * Displayed when no data is available
  */
+import { FileQuestion } from "lucide-react"
 
 export function EmptyState() {
   return (
-    <tr>
-      <td colSpan="100%" className="px-4 py-32">
-        <div className="flex flex-col items-center justify-center text-center">
-          <div className="w-20 h-20 mb-4 bg-[#f1f3f4] rounded-full flex items-center justify-center text-[#dadce0]">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-          </div>
-          <p className="text-sm text-[#70757a]">No data available for the selected period</p>
-        </div>
-      </td>
-    </tr>
+    <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+      <div className="bg-slate-50 p-4 rounded-full mb-4 shadow-inner">
+        <FileQuestion className="h-10 w-10 text-slate-400" />
+      </div>
+      <h3 className="text-lg font-semibold text-slate-900 mb-1">No Data Available</h3>
+      <p className="text-sm text-slate-500 max-w-[250px] mx-auto">
+        There are no ranking results for the selected repository and time period.
+      </p>
+    </div>
   );
 }

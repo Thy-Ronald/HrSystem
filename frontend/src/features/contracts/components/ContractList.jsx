@@ -58,14 +58,14 @@ export function ContractList({
         <Table>
           <TableHeader className="bg-slate-50/80 sticky top-0 z-10">
             <TableRow>
-              <TableHead className="font-bold text-[#1a3e62] py-4">Name</TableHead>
-              <TableHead className="font-bold text-[#1a3e62] py-4">Position</TableHead>
-              <TableHead className="font-bold text-[#1a3e62] py-4 text-center">Term</TableHead>
-              <TableHead className="font-bold text-[#1a3e62] py-4">Assessment</TableHead>
-              <TableHead className="font-bold text-[#1a3e62] py-4">Status</TableHead>
-              <TableHead className="font-bold text-[#1a3e62] py-4 text-right">Salary</TableHead>
-              <TableHead className="font-bold text-[#1a3e62] py-4 text-right">Expiration</TableHead>
-              <TableHead className="font-bold text-[#1a3e62] py-4 text-center">Actions</TableHead>
+              <TableHead className="font-bold text-[#1a3e62] py-4 whitespace-nowrap">Name</TableHead>
+              <TableHead className="font-bold text-[#1a3e62] py-4 whitespace-nowrap">Position</TableHead>
+              <TableHead className="font-bold text-[#1a3e62] py-4 text-center whitespace-nowrap">Term</TableHead>
+              <TableHead className="font-bold text-[#1a3e62] py-4 whitespace-nowrap">Assessment</TableHead>
+              <TableHead className="font-bold text-[#1a3e62] py-4 whitespace-nowrap">Status</TableHead>
+              <TableHead className="font-bold text-[#1a3e62] py-4 text-right whitespace-nowrap">Salary</TableHead>
+              <TableHead className="font-bold text-[#1a3e62] py-4 text-right whitespace-nowrap">Expiration</TableHead>
+              <TableHead className="font-bold text-[#1a3e62] py-4 text-center whitespace-nowrap">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

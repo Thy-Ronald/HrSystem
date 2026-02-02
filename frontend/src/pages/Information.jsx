@@ -133,12 +133,12 @@ const Information = () => {
                             <Table>
                                 <TableHeader className="bg-slate-50/80 sticky top-0 z-10">
                                     <TableRow className="hover:bg-transparent border-b border-slate-200">
-                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto">Employee Name</TableHead>
-                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto">Employee No.</TableHead>
-                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto">Date Started</TableHead>
-                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto">Contact Info</TableHead>
-                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto">Email</TableHead>
-                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto">Status</TableHead>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Employee Name</TableHead>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Employee No.</TableHead>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Date Started</TableHead>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Contact Info</TableHead>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Email</TableHead>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Status</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
