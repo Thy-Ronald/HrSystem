@@ -1,18 +1,27 @@
 import { useEffect } from 'react';
-import { ContractListHeader } from './ContractListHeader';
-import { ContractListItem } from './ContractListItem';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Pencil, Trash2 } from "lucide-react"
 import { ContractPagination } from './ContractPagination';
-import { filterContracts } from '../utils/contractHelpers';
+import { filterContracts, getContractStatus, calculateTotalSalary, calculateExpirationDate } from '../utils/contractHelpers';
 import { formatDate } from '../../../utils/format';
 
 /**
  * Contract list component with filtering and pagination
  */
-export function ContractList({ 
-  contracts, 
-  searchQuery, 
-  currentPage, 
-  itemsPerPage, 
+export function ContractList({
+  contracts,
+  searchQuery,
+  currentPage,
+  itemsPerPage,
   currentTime,
   onPageChange,
   onEdit,
@@ -20,20 +29,20 @@ export function ContractList({
 }) {
   // Filter contracts based on search query
   const filteredContracts = filterContracts(contracts, searchQuery, formatDate);
-  
+
   const totalPages = Math.ceil(filteredContracts.length / itemsPerPage);
-  
+
   // Reset to page 1 if current page is out of bounds after filtering
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) {
       onPageChange(1);
     }
   }, [filteredContracts.length, currentPage, totalPages, onPageChange]);
-  
+
   if (filteredContracts.length === 0 && searchQuery.trim()) {
     return (
       <div className="p-8 text-center text-[#5f6368]">
-        <p className="text-lg">No contracts found</p>
+        <p className="text-lg font-medium">No contracts found</p>
         <p className="text-sm">Try adjusting your search query.</p>
       </div>
     );
@@ -44,30 +53,111 @@ export function ContractList({
   const paginatedContracts = filteredContracts.slice(startIndex, endIndex);
 
   return (
-    <div className="w-full flex flex-col h-full">
+    <div className="w-full flex flex-col h-full bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="flex-1 overflow-auto">
-        <ContractListHeader />
-        
-        {paginatedContracts.map((contract) => (
-          <ContractListItem
-            key={contract.id}
-            contract={contract}
-            currentTime={currentTime}
-            onEdit={onEdit}
-            onDelete={onDelete}
-          />
-        ))}
+        <Table>
+          <TableHeader className="bg-slate-50/80 sticky top-0 z-10">
+            <TableRow>
+              <TableHead className="font-bold text-[#1a3e62] py-4">Name</TableHead>
+              <TableHead className="font-bold text-[#1a3e62] py-4">Position</TableHead>
+              <TableHead className="font-bold text-[#1a3e62] py-4 text-center">Term</TableHead>
+              <TableHead className="font-bold text-[#1a3e62] py-4">Assessment</TableHead>
+              <TableHead className="font-bold text-[#1a3e62] py-4">Status</TableHead>
+              <TableHead className="font-bold text-[#1a3e62] py-4 text-right">Salary</TableHead>
+              <TableHead className="font-bold text-[#1a3e62] py-4 text-right">Expiration</TableHead>
+              <TableHead className="font-bold text-[#1a3e62] py-4 text-center">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paginatedContracts.map((contract) => {
+              const contractTotalSalary = calculateTotalSalary(contract);
+              const label = getContractStatus(contract, currentTime);
+
+              // Calculate expiration date for display
+              const expirationDate = calculateExpirationDate(contract.assessmentDate, contract.termMonths);
+              const expirationDisplay = expirationDate
+                ? formatDate(expirationDate)
+                : (contract.expirationDate ? formatDate(contract.expirationDate) : 'N/A');
+
+              // Map current colors to badge variants or custom classes
+              let badgeClass = "font-semibold px-2.5 py-0.5 rounded-full capitalize border-none";
+              if (label.color.includes('bg-green-100')) badgeClass += " bg-emerald-50 text-emerald-700";
+              else if (label.color.includes('bg-red-100')) badgeClass += " bg-rose-50 text-rose-700";
+              else if (label.color.includes('bg-blue-100')) badgeClass += " bg-blue-50 text-blue-700";
+              else if (label.color.includes('bg-yellow-100')) badgeClass += " bg-amber-50 text-amber-700";
+              else badgeClass += ` ${label.color}`; // Fallback
+
+              return (
+                <TableRow key={contract.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <TableCell className="py-4 font-semibold text-slate-900">
+                    {contract.name}
+                  </TableCell>
+                  <TableCell className="py-4 text-slate-600">
+                    {contract.position}
+                  </TableCell>
+                  <TableCell className="py-4 text-slate-600 text-center">
+                    {contract.termMonths} mo
+                  </TableCell>
+                  <TableCell className="py-4 text-slate-600">
+                    {formatDate(contract.assessmentDate)}
+                  </TableCell>
+                  <TableCell className="py-4">
+                    <Badge variant="secondary" className={badgeClass}>
+                      {label.text}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="py-4 font-bold text-slate-900 text-right">
+                    ₱{contractTotalSalary.toLocaleString()}
+                  </TableCell>
+                  <TableCell className="py-4 text-slate-600 text-right text-sm">
+                    {expirationDisplay}
+                  </TableCell>
+                  <TableCell className="py-4">
+                    <div className="flex items-center justify-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEdit(contract.id);
+                        }}
+                        className="h-8 w-8 text-slate-500 hover:text-[#1a3e62] hover:bg-slate-100 rounded-full"
+                        title="Edit Contract"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(contract.id, contract.name);
+                        }}
+                        className="h-8 w-8 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-full"
+                        title="Delete Contract"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
-      
-      <ContractPagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        startIndex={startIndex}
-        endIndex={endIndex}
-        totalItems={filteredContracts.length}
-        searchQuery={searchQuery}
-        onPageChange={onPageChange}
-      />
+
+      <div className="border-t border-slate-100">
+        <ContractPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          startIndex={startIndex}
+          endIndex={endIndex}
+          totalItems={filteredContracts.length}
+          searchQuery={searchQuery}
+          onPageChange={onPageChange}
+        />
+      </div>
     </div>
   );
 }

@@ -3,13 +3,8 @@ import {
   AppBar,
   Toolbar,
   Typography,
-  Button,
   Box,
   IconButton,
-  Menu,
-  MenuItem,
-  Avatar,
-  Divider,
   Container,
   Tab,
   Tabs,
@@ -18,36 +13,23 @@ import {
 import {
   Notifications as NotificationsIcon,
   ArrowDropDown as ArrowDropDownIcon,
-  AccountCircle
 } from '@mui/icons-material';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { NotificationDropdown } from './NotificationDropdown';
 import { useNotifications } from '../hooks/useNotifications';
 import { useAuth } from '../contexts/AuthContext';
 
 
 const Layout = ({ children, currentPath, onNavigate }) => {
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [employeeAnchorEl, setEmployeeAnchorEl] = useState(null);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const { notifications, loading, count, markAsRead, isRead } = useNotifications();
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'admin';
-
-  const handleMenu = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleEmployeeMenu = (event) => {
-    setEmployeeAnchorEl(event.currentTarget);
-  };
-
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleEmployeeMenuClose = () => {
-    setEmployeeAnchorEl(null);
-  };
 
   const navItems = [
     { label: 'Dashboard', path: 'dashboard' },
@@ -134,66 +116,51 @@ const Layout = ({ children, currentPath, onNavigate }) => {
                 }
               }}
             >
-              {navItems.map((item, index) => (
-                <Tab
-                  key={index}
-                  onClick={(e) => {
-                    if (item.path === 'employee-dropdown') {
-                      handleEmployeeMenu(e);
+              {navItems.map((item, index) => {
+                const isEmployeeDropdown = item.path === 'employee-dropdown';
+
+                const tabContent = (
+                  <Tab
+                    key={index}
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        {item.label}
+                        {isEmployeeDropdown && (
+                          <ArrowDropDownIcon sx={{ fontSize: '1.2rem', mt: 0.2 }} />
+                        )}
+                      </Box>
                     }
-                  }}
-                  label={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      {item.label}
-                      {item.path === 'employee-dropdown' && (
-                        <ArrowDropDownIcon sx={{ fontSize: '1.2rem', mt: 0.2 }} />
-                      )}
-                    </Box>
-                  }
-                />
-              ))}
+                  />
+                );
+
+                if (isEmployeeDropdown) {
+                  return (
+                    <DropdownMenu key={index}>
+                      <DropdownMenuTrigger asChild>
+                        {tabContent}
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-48 bg-white border border-slate-200 shadow-lg p-1">
+                        <DropdownMenuItem
+                          className="text-slate-700 focus:bg-slate-100 cursor-pointer py-2 px-3 rounded-md text-sm transition-colors"
+                          onClick={() => onNavigate('contract-form')}
+                        >
+                          Contract
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-slate-700 focus:bg-slate-100 cursor-pointer py-2 px-3 rounded-md text-sm transition-colors"
+                          onClick={() => onNavigate('information')}
+                        >
+                          Information
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  );
+                }
+
+                return tabContent;
+              })}
             </Tabs>
 
-            {/* Employee Dropdown Menu */}
-            <Menu
-              anchorEl={employeeAnchorEl}
-              open={Boolean(employeeAnchorEl)}
-              onClose={handleEmployeeMenuClose}
-              anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'left',
-              }}
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'left',
-              }}
-              sx={{
-                '& .MuiPaper-root': {
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                  border: '1px solid #eee',
-                  mt: 0.5
-                }
-              }}
-            >
-              <MenuItem
-                onClick={() => {
-                  onNavigate('contract-form');
-                  handleEmployeeMenuClose();
-                }}
-                sx={{ fontSize: '0.85rem', py: 1, px: 2, minWidth: 160 }}
-              >
-                Contract
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  onNavigate('information');
-                  handleEmployeeMenuClose();
-                }}
-                sx={{ fontSize: '0.85rem', py: 1, px: 2, minWidth: 160 }}
-              >
-                Information
-              </MenuItem>
-            </Menu>
           </Box>
 
           {/* User Section */}
@@ -225,29 +192,27 @@ const Layout = ({ children, currentPath, onNavigate }) => {
               </>
             )}
 
-            <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', ml: 1 }} onClick={handleMenu}>
-              <Typography variant="body2" sx={{ color: '#333', fontWeight: 500, mr: 0.5 }}>
-                {user?.name || 'User'}
-              </Typography>
-              <ArrowDropDownIcon fontSize="small" sx={{ color: '#666' }} />
-            </Box>
-
-            <Menu
-              anchorEl={anchorEl}
-              open={Boolean(anchorEl)}
-              onClose={handleClose}
-              anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'right',
-              }}
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
-              }}
-            >
-              <MenuItem onClick={handleClose} disabled>Profile</MenuItem>
-              <MenuItem onClick={() => { handleClose(); logout(); }}>Logout</MenuItem>
-            </Menu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', ml: 1 }}>
+                  <Typography variant="body2" sx={{ color: '#333', fontWeight: 500, mr: 0.5 }}>
+                    {user?.name || 'User'}
+                  </Typography>
+                  <ArrowDropDownIcon fontSize="small" sx={{ color: '#666' }} />
+                </Box>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40 bg-white border border-slate-200 shadow-lg p-1">
+                <DropdownMenuItem className="text-slate-400 focus:bg-transparent cursor-default py-2 px-3 text-sm opacity-50">
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-rose-600 focus:bg-rose-50 cursor-pointer py-2 px-3 rounded-md text-sm transition-colors"
+                  onClick={() => logout()}
+                >
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </Box>
         </Toolbar>
       </AppBar>

@@ -131,14 +131,14 @@ const Information = () => {
                     <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white flex flex-col flex-1">
                         <div className="flex-1 overflow-auto">
                             <Table>
-                                <TableHeader className="bg-slate-50/80 sticky top-0">
-                                    <TableRow>
-                                        <TableHead className="font-bold text-[#1a3e62] py-4">Employee Name</TableHead>
-                                        <TableHead className="font-bold text-[#1a3e62] py-4">Employee No.</TableHead>
-                                        <TableHead className="font-bold text-[#1a3e62] py-4">Date Started</TableHead>
-                                        <TableHead className="font-bold text-[#1a3e62] py-4">Contact Info</TableHead>
-                                        <TableHead className="font-bold text-[#1a3e62] py-4">Email</TableHead>
-                                        <TableHead className="font-bold text-[#1a3e62] py-4">Status</TableHead>
+                                <TableHeader className="bg-slate-50/80 sticky top-0 z-10">
+                                    <TableRow className="hover:bg-transparent border-b border-slate-200">
+                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto">Employee Name</TableHead>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto">Employee No.</TableHead>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto">Date Started</TableHead>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto">Contact Info</TableHead>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto">Email</TableHead>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto">Status</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
