@@ -1,121 +1,208 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    Box,
-    Typography,
     Table,
     TableBody,
     TableCell,
-    TableContainer,
     TableHead,
+    TableHeader,
     TableRow,
-    Paper,
-    Avatar,
-    Chip,
-    CircularProgress
-} from '@mui/material';
-import { useContracts } from '../features/contracts/hooks/useContracts';
+} from "@/components/ui/table"
+import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Plus, RefreshCw, Loader2, AlertCircle, FileText } from "lucide-react"
+import PersonnelDataSheetModal from '../components/PersonnelDataSheetModal';
+import { ContractPagination } from '../features/contracts/components/ContractPagination';
+import { fetchPersonnelRecords, submitPersonnelRecord } from '../services/api';
 import { formatDate } from '../utils/format';
 
+const ITEMS_PER_PAGE = 10;
+
 const Information = () => {
-    const { contracts, loading, error } = useContracts();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [records, setRecords] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
 
-    if (loading) {
-        return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', py: 10 }}>
-                <CircularProgress />
-            </Box>
-        );
-    }
+    const loadRecords = async () => {
+        setLoading(true);
+        try {
+            const data = await fetchPersonnelRecords();
+            setRecords(Array.isArray(data) ? data : []);
+            setError(null);
+            setCurrentPage(1); // Reset to first page on refresh
+        } catch (err) {
+            console.error('Error loading personnel records:', err);
+            setError('Failed to load records');
+        } finally {
+            setLoading(false);
+        }
+    };
 
-    if (error) {
-        return (
-            <Box sx={{ p: 4, textAlign: 'center' }}>
-                <Typography color="error">{error}</Typography>
-            </Box>
-        );
-    }
+    useEffect(() => {
+        loadRecords();
+    }, []);
+
+    const handleOpenModal = () => setIsModalOpen(true);
+    const handleCloseModal = () => setIsModalOpen(false);
+
+    const handleSavePersonnelData = async (data) => {
+        try {
+            await submitPersonnelRecord(data);
+            handleCloseModal();
+            loadRecords(); // Refresh list
+        } catch (err) {
+            console.error('Error saving personnel data:', err);
+            alert('Failed to save data: ' + err.message);
+        }
+    };
+
+    // Pagination logic
+    const totalPages = Math.ceil(records.length / ITEMS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const paginatedRecords = records.slice(startIndex, endIndex);
 
     return (
-        <Box sx={{ width: '100%', minHeight: '100%', bgcolor: 'white' }}>
+        <div className="w-full min-h-full bg-white flex flex-col">
             {/* Page Header */}
-            <Box sx={{
-                p: 3,
-                borderBottom: '1px solid #eee',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-            }}>
-                <Box>
-                    <Typography variant="h6" sx={{ color: '#333', fontWeight: 500 }}>
-                        Employee Information
-                    </Typography>
-                </Box>
-            </Box>
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+                <div>
+                    <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                        Personnel Data Sheets
+                    </h1>
+                    <p className="text-sm text-slate-500 mt-1">
+                        Manage and view employee personnel records
+                    </p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="outline"
+                        onClick={loadRecords}
+                        disabled={loading}
+                        className="font-medium text-slate-600 border-slate-200"
+                    >
+                        <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                        Refresh
+                    </Button>
+                    <Button
+                        onClick={handleOpenModal}
+                        className="bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold shadow-sm"
+                    >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add New Record
+                    </Button>
+                </div>
+            </div>
 
-            {/* Table Content */}
-            <Box sx={{ p: 4 }}>
-                <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #eee', borderRadius: 2 }}>
-                    <Table sx={{ minWidth: 650 }} aria-label="employee information table">
-                        <TableHead sx={{ bgcolor: '#f8f9fa' }}>
-                            <TableRow>
-                                <TableCell sx={{ fontWeight: 600, color: '#5f6368' }}>Employee</TableCell>
-                                <TableCell sx={{ fontWeight: 600, color: '#5f6368' }}>Position</TableCell>
-                                <TableCell sx={{ fontWeight: 600, color: '#5f6368' }}>Department</TableCell>
-                                <TableCell sx={{ fontWeight: 600, color: '#5f6368' }}>Hire Date</TableCell>
-                                <TableCell sx={{ fontWeight: 600, color: '#5f6368' }}>Status</TableCell>
-                                <TableCell sx={{ fontWeight: 600, color: '#5f6368' }}>Contact</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {contracts.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
-                                        <Typography color="text.secondary">No employee information found</Typography>
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                contracts.map((employee) => (
-                                    <TableRow
-                                        key={employee.id}
-                                        hover
-                                        sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                                    >
-                                        <TableCell component="th" scope="row">
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                                <Avatar sx={{ bgcolor: '#1976d2', width: 32, height: 32, fontSize: '0.875rem' }}>
-                                                    {employee.name.charAt(0)}
-                                                </Avatar>
-                                                <Typography sx={{ fontWeight: 500 }}>{employee.name}</Typography>
-                                            </Box>
-                                        </TableCell>
-                                        <TableCell>{employee.position}</TableCell>
-                                        <TableCell>{employee.department || 'Operations'}</TableCell>
-                                        <TableCell>{formatDate(employee.startDate) || 'N/A'}</TableCell>
-                                        <TableCell>
-                                            <Chip
-                                                label="Active"
-                                                size="small"
-                                                sx={{
-                                                    bgcolor: 'rgba(76, 175, 80, 0.1)',
-                                                    color: '#2e7d32',
-                                                    fontWeight: 500,
-                                                    fontSize: '0.75rem'
-                                                }}
-                                            />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Typography variant="body2" color="text.secondary">
-                                                {employee.phone || 'N/A'}
-                                            </Typography>
-                                        </TableCell>
+            {/* Main Content Area */}
+            <div className="p-8 flex-1 flex flex-col overflow-hidden">
+                {loading ? (
+                    <div className="flex-1 flex flex-col items-center justify-center py-20">
+                        <Loader2 className="h-10 w-10 animate-spin text-[#1a3e62] mb-4" />
+                        <p className="text-slate-500 font-medium">Loading records...</p>
+                    </div>
+                ) : error ? (
+                    <div className="flex-1 flex flex-col items-center justify-center py-20 text-center">
+                        <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+                        <h3 className="text-lg font-semibold text-slate-900">{error}</h3>
+                        <p className="text-slate-500 mb-6 max-w-xs">There was an issue retrieving the personnel records.</p>
+                        <Button onClick={loadRecords} variant="default">Try Again</Button>
+                    </div>
+                ) : records.length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                        <div className="bg-white p-4 rounded-full shadow-sm mb-4">
+                            <FileText className="h-10 w-10 text-slate-400" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-slate-900 mb-2">No Personnel Data Records Yet</h3>
+                        <p className="text-slate-500 mb-8 max-w-sm">
+                            Click the "Add New Record" button to create your first Personnel Data Sheet.
+                        </p>
+                        <Button
+                            onClick={handleOpenModal}
+                            className="bg-[#1a3e62] hover:bg-[#122c46] shadow-md"
+                        >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Create PDS Record
+                        </Button>
+                    </div>
+                ) : (
+                    <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white flex flex-col flex-1">
+                        <div className="flex-1 overflow-auto">
+                            <Table>
+                                <TableHeader className="bg-slate-50/80 sticky top-0">
+                                    <TableRow>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4">Employee Name</TableHead>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4">Employee No.</TableHead>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4">Date Started</TableHead>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4">Contact Info</TableHead>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4">Email</TableHead>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4">Status</TableHead>
                                     </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </Box>
-        </Box>
+                                </TableHeader>
+                                <TableBody>
+                                    {paginatedRecords.map((record) => (
+                                        <TableRow key={record.id} className="hover:bg-slate-50/50 transition-colors">
+                                            <TableCell className="py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <Avatar className="h-9 w-9 border border-slate-100 shadow-sm">
+                                                        <AvatarFallback className="bg-[#1a3e62] text-white font-semibold text-xs">
+                                                            {record.firstName.charAt(0)}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <span className="font-semibold text-slate-900">
+                                                        {`${record.surname}, ${record.firstName}`}
+                                                    </span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="py-4 font-medium text-slate-600">
+                                                {record.employeeNumber || 'N/A'}
+                                            </TableCell>
+                                            <TableCell className="py-4 text-slate-600">
+                                                {formatDate(record.dateStarted)}
+                                            </TableCell>
+                                            <TableCell className="py-4 text-slate-600">
+                                                {record.cellphoneNumber}
+                                            </TableCell>
+                                            <TableCell className="py-4 text-slate-600">
+                                                {record.emailAddress}
+                                            </TableCell>
+                                            <TableCell className="py-4 text-slate-600">
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-none font-semibold px-2.5 py-0.5 rounded-full capitalize"
+                                                >
+                                                    Active
+                                                </Badge>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+
+                        <div className="border-t border-slate-100">
+                            <ContractPagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                startIndex={startIndex}
+                                endIndex={endIndex}
+                                totalItems={records.length}
+                                onPageChange={setCurrentPage}
+                            />
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Personnel Data Sheet Modal */}
+            <PersonnelDataSheetModal
+                open={isModalOpen}
+                onClose={handleCloseModal}
+                onSave={handleSavePersonnelData}
+            />
+        </div>
     );
 };
 

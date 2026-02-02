@@ -1,31 +1,51 @@
-import Modal from '../../../components/Modal';
+import React from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
+  Typography,
+  Box
+} from '@mui/material';
 
 /**
  * Delete confirmation dialog component
  */
 export function DeleteConfirmDialog({ open, contractName, onConfirm, onCancel }) {
   return (
-    <Modal open={open} onClose={onCancel} title="Delete Contract">
-      <div className="p-6">
-        <p className="text-[#202124] mb-6">
+    <Dialog
+      open={open}
+      onClose={onCancel}
+      PaperProps={{
+        sx: { borderRadius: 2 }
+      }}
+    >
+      <DialogTitle sx={{ fontWeight: 600 }}>DELETE CONTRACT</DialogTitle>
+      <DialogContent>
+        <DialogContentText sx={{ color: '#202124' }}>
           Are you sure you want to delete the contract for <strong>{contractName}</strong>?
           This action cannot be undone.
-        </p>
-        <div className="flex items-center justify-end gap-3">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 border border-[#dadce0] hover:bg-[#f8f9fa] text-[#5f6368] rounded font-medium transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="px-4 py-2 bg-[#ea4335] hover:bg-[#d33b2c] text-white rounded font-medium transition-colors shadow-sm"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </Modal>
+        </DialogContentText>
+      </DialogContent>
+      <DialogActions sx={{ p: 3 }}>
+        <Button
+          onClick={onCancel}
+          variant="outlined"
+          sx={{ borderRadius: 1.5, textTransform: 'none' }}
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={onConfirm}
+          variant="contained"
+          color="error"
+          sx={{ borderRadius: 1.5, textTransform: 'none' }}
+        >
+          Delete
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }

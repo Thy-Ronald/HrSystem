@@ -11,11 +11,11 @@ export function ContractToolbar({
   currentTime
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 p-2 border-b border-[#f1f3f4]">
+    <div className="flex items-center justify-between gap-2 p-3 border-b border-gray-100">
       <div className="flex items-center gap-2">
         <button
           onClick={onNewContract}
-          className="flex items-center gap-2 px-4 py-2 bg-[#c2e7ff] hover:bg-[#a8d8f0] text-[#001d35] rounded font-medium transition-colors shadow-sm"
+          className="flex items-center gap-2 px-6 py-2 bg-[#1a3e62] hover:bg-[#122c46] text-white rounded-xl font-medium transition-all shadow-sm"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 5v14M5 12h14" />

@@ -143,7 +143,8 @@ function ContractForm({ searchQuery = '' }) {
         borderBottom: '1px solid #eee',
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
+        bgcolor: 'white'
       }}>
         <Box>
           <Typography variant="h6" sx={{ color: '#333', fontWeight: 500 }}>

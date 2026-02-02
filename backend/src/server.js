@@ -9,6 +9,7 @@ const issuesRouter = require('./routes/issues');
 const analyticsRouter = require('./routes/analytics');
 const monitoringRouter = require('./routes/monitoring');
 const authRouter = require('./routes/auth');
+const personnelRouter = require('./routes/personnelRoutes');
 const { errorHandler } = require('./middlewares/errorHandler');
 const { socketAuth } = require('./middlewares/monitoringAuth');
 const { validateAuthPayload, validateSessionId, validateSDP, validateICECandidate } = require('./middlewares/monitoringValidation');
@@ -52,6 +53,7 @@ app.use('/api/issues', issuesRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/monitoring', monitoringRouter);
+app.use('/api/personnel', personnelRouter);
 
 app.use(errorHandler);
 

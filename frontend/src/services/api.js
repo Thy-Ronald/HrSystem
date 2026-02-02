@@ -445,6 +445,32 @@ export async function refreshCachedIssues(repo, fullRefresh = false) {
 }
 
 /**
+ * Submit a new personnel record (PDS)
+ * @param {Object} payload - Personnel data
+ * @returns {Promise<Object>} - Created record
+ */
+export async function submitPersonnelRecord(payload) {
+  const res = await fetch(`${API_BASE}/api/personnel`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res);
+}
+
+/**
+ * Fetch all personnel records
+ * @returns {Promise<Array>} - Array of personnel records
+ */
+export async function fetchPersonnelRecords() {
+  const res = await fetch(`${API_BASE}/api/personnel`, {
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(res);
+}
+
+/**
  * Get background job status and tracked repositories
  * 
  * Useful for admin/debugging UI to see:

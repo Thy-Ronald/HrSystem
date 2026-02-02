@@ -142,8 +142,8 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
 
   return (
     <div ref={containerRef} style={{ height: '100%' }}>
-      <Card variant="outlined" sx={{ height: '100%', borderRadius: 3, overflow: 'hidden', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', borderColor: session.streamActive ? '#1976d2' : '#e0e0e0', borderWidth: session.streamActive ? 2 : 1, display: 'flex', flexDirection: 'column', bgcolor: 'white', '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 8px 30px rgba(0,0,0,0.12)' } }}>
-        <Box sx={{ p: 2, borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#fcfcfc' }}>
+      <Card variant="outlined" sx={{ height: '100%', borderRadius: 2, overflow: 'hidden', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', borderColor: session.streamActive ? '#1a3e62' : '#eee', borderWidth: session.streamActive ? 2 : 1, display: 'flex', flexDirection: 'column', bgcolor: 'white', '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 8px 30px rgba(0,0,0,0.1)' } }}>
+        <Box sx={{ p: 2, borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#fcfcfc' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{session.employeeName}</Typography>
             {session.streamActive && (
@@ -168,8 +168,8 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
           </Box>
         </Box>
         <Box sx={{ p: 1.5, display: 'flex', gap: 1, bgcolor: '#f8f9fa' }}>
-          <Button fullWidth variant="contained" disableElevation startIcon={<VisibilityIcon />} disabled={!session.streamActive} onClick={() => setShowFullView(true)} sx={{ textTransform: 'none', fontWeight: 600 }}>View</Button>
-          <Button fullWidth variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={handleRemoveClick} sx={{ textTransform: 'none', fontWeight: 600 }}>Remove</Button>
+          <Button fullWidth variant="contained" disableElevation startIcon={<VisibilityIcon />} disabled={!session.streamActive} onClick={() => setShowFullView(true)} sx={{ textTransform: 'none', fontWeight: 600, bgcolor: '#1a3e62', borderRadius: 1.5, '&:hover': { bgcolor: '#122c46' } }}>View</Button>
+          <Button fullWidth variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={handleRemoveClick} sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 1.5 }}>Remove</Button>
         </Box>
       </Card>
 
@@ -191,8 +191,8 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
           <DialogContentText>Are you sure you want to disconnect from <strong>{session.employeeName}</strong>?</DialogContentText>
         </DialogContent>
         <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setShowConfirm(false)}>Cancel</Button>
-          <Button onClick={handleConfirmRemove} variant="contained" color="error">Disconnect</Button>
+          <Button onClick={() => setShowConfirm(false)} sx={{ textTransform: 'none', borderRadius: 1.5 }}>Cancel</Button>
+          <Button onClick={handleConfirmRemove} variant="contained" color="error" sx={{ textTransform: 'none', borderRadius: 1.5 }}>Disconnect</Button>
         </DialogActions>
       </Dialog>
     </div>
@@ -302,7 +302,7 @@ const Monitoring = () => {
               <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Setup Connection</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>Enter a code for admins to connect to your screen.</Typography>
               <input type="text" value={connectionCode} onChange={(e) => setConnectionCode(e.target.value)} placeholder="Enter code (min 4 chars)" style={{ width: '100%', padding: '16px', borderRadius: '12px', border: '2px solid #e0e6ed', textAlign: 'center', fontSize: '1.2rem', fontWeight: 700, marginBottom: '24px' }} />
-              <Button fullWidth variant="contained" size="large" onClick={handleSubmitConnectionCode} disabled={loading || connectionCode.trim().length < 4} sx={{ py: 2, borderRadius: 3, fontWeight: 700 }}>
+              <Button fullWidth variant="contained" size="large" onClick={handleSubmitConnectionCode} disabled={loading || connectionCode.trim().length < 4} sx={{ py: 2, borderRadius: 1.5, fontWeight: 700, bgcolor: '#1a3e62', textTransform: 'none', '&:hover': { bgcolor: '#122c46' } }}>
                 {loading ? <CircularProgress size={24} color="inherit" /> : 'Set Code & Continue'}
               </Button>
             </Card>
@@ -342,7 +342,7 @@ const Monitoring = () => {
                         startSharing();
                         setJustReconnected(false);
                       }}
-                      sx={{ py: 2, borderRadius: 2, fontWeight: 700 }}
+                      sx={{ py: 2, borderRadius: 1.5, fontWeight: 700, bgcolor: '#1a3e62', textTransform: 'none', '&:hover': { bgcolor: '#122c46' } }}
                     >
                       {justReconnected ? 'Resume Sharing Screen' : 'Start Sharing Screen'}
                     </Button>
@@ -365,7 +365,7 @@ const Monitoring = () => {
                         </Typography>
                       </Box>
                     </Box>
-                    <Button fullWidth variant="outlined" color="error" size="large" onClick={stopSharing} sx={{ py: 1.5, borderRadius: 2, fontWeight: 700, borderWidth: 2 }}>Stop Sharing</Button>
+                    <Button fullWidth variant="outlined" color="error" size="large" onClick={stopSharing} sx={{ py: 1.5, borderRadius: 1.5, fontWeight: 700, borderWidth: 1, textTransform: 'none' }}>Stop Sharing</Button>
                   </>
                 )}
                 {shareError && <Typography variant="caption" color="error" sx={{ mt: 2, display: 'block' }}>{shareError}</Typography>}
@@ -381,7 +381,7 @@ const Monitoring = () => {
             </DialogContentText>
           </DialogContent>
           <DialogActions sx={{ p: 3 }}>
-            <Button onClick={() => setShowResetConfirm(false)}>Cancel</Button>
+            <Button onClick={() => setShowResetConfirm(false)} sx={{ textTransform: 'none', borderRadius: 1.5 }}>Cancel</Button>
             <Button
               variant="contained"
               color="error"
@@ -389,6 +389,7 @@ const Monitoring = () => {
                 resetSession();
                 setShowResetConfirm(false);
               }}
+              sx={{ textTransform: 'none', borderRadius: 1.5 }}
             >
               Change Code
             </Button>
@@ -399,13 +400,25 @@ const Monitoring = () => {
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#f8f9fa' }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'white' }}>
       <style>{GLOBAL_STYLES}</style>
-      <Box sx={{ borderBottom: '1px solid #eee', p: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: 'white' }}>
+      <Box sx={{ borderBottom: '1px solid #eee', p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: 'white' }}>
         <Box>
           <Typography variant="h6" sx={{ color: '#333', fontWeight: 500 }}>Monitoring</Typography>
         </Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setShowAddModal(true)} sx={{ borderRadius: 1 }}>Add New</Button>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => setShowAddModal(true)}
+          sx={{
+            borderRadius: 1.5,
+            textTransform: 'none',
+            bgcolor: '#1a3e62',
+            '&:hover': { bgcolor: '#122c46' }
+          }}
+        >
+          Add New
+        </Button>
       </Box>
       <Box sx={{ p: 5 }}>
         {sessions.length === 0 ? (
@@ -438,8 +451,8 @@ const Monitoring = () => {
           {addFormError && <Typography color="error" variant="caption">{addFormError}</Typography>}
         </DialogContent>
         <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setShowAddModal(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleAddConnection} disabled={addFormLoading}>Connect</Button>
+          <Button onClick={() => setShowAddModal(false)} sx={{ textTransform: 'none', borderRadius: 1.5 }}>Cancel</Button>
+          <Button variant="contained" onClick={handleAddConnection} disabled={addFormLoading} sx={{ textTransform: 'none', borderRadius: 1.5, bgcolor: '#1a3e62', '&:hover': { bgcolor: '#122c46' } }}>Connect</Button>
         </DialogActions>
       </Dialog>
     </Box>

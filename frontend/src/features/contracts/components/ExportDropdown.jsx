@@ -43,7 +43,7 @@ export function ExportDropdown({ contracts, currentTime, disabled }) {
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={disabled}
-        className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#f8f9fa] text-[#5f6368] border border-[#dadce0] rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
         title="Export contracts"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -66,7 +66,7 @@ export function ExportDropdown({ contracts, currentTime, disabled }) {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white border border-[#dadce0] rounded shadow-lg z-50">
+        <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden">
           <div className="py-1">
             <button
               onClick={handleExportPDF}
