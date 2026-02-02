@@ -35,8 +35,6 @@ async function updatePersonnelRecord(req, res) {
     }
 }
 
-}
-
 async function deletePersonnelRecord(req, res) {
     try {
         const id = req.params.id;

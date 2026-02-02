@@ -1,7 +1,16 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   Card,
   CardContent,
@@ -10,7 +19,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Loader2, Mail, Lock, User, ArrowRight } from "lucide-react"
+import { Loader2, Mail, Lock, User, ArrowRight, Eye, EyeOff } from "lucide-react"
 import { StarsBackground } from "@/components/animate-ui/components/backgrounds/stars"
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
@@ -20,7 +29,12 @@ const Auth = ({ onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showTermsDialog, setShowTermsDialog] = useState(false);
   const [loading, setLoading] = useState(false);
   const toast = useToast();
   const { login, signup } = useAuth();
@@ -52,8 +66,18 @@ const Auth = ({ onLogin }) => {
       }
     } else {
       // Signup
-      if (!email.trim() || !password || !name.trim()) {
+      if (!email.trim() || !password || !name.trim() || !confirmPassword) {
         toast.error('Please fill in all fields');
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        toast.error('Passwords do not match');
+        return;
+      }
+
+      if (!termsAccepted) {
+        toast.error('You must agree to the Terms & Conditions');
         return;
       }
 
@@ -137,24 +161,76 @@ const Auth = ({ onLogin }) => {
                 </div>
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="password" className="text-slate-600 font-semibold uppercase tracking-wider text-[10px]">Password</Label>
+                <label htmlFor="password" className="text-slate-600 font-semibold uppercase tracking-wider text-[10px]">Password</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-9 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 h-10 rounded-lg focus:ring-blue-500/10 text-sm"
+                    className="pl-9 pr-9 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 h-10 rounded-lg focus:ring-blue-500/10 text-sm"
                     disabled={loading}
                     required
                   />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-10 w-10 text-slate-400 hover:text-slate-600"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
                 </div>
               </div>
+              {!isLogin && (
+                <>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="confirmPassword" className="text-slate-600 font-semibold uppercase tracking-wider text-[10px]">Confirm Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <Input
+                        id="confirmPassword"
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="pl-9 pr-9 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 h-10 rounded-lg focus:ring-blue-500/10 text-sm"
+                        disabled={loading}
+                        required
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-10 w-10 text-slate-400 hover:text-slate-600"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="terms"
+                      checked={termsAccepted}
+                      onCheckedChange={setTermsAccepted}
+                      className="border-slate-300 data-[state=checked]:bg-[#1a3e62] data-[state=checked]:border-[#1a3e62]"
+                    />
+                    <label
+                      htmlFor="terms"
+                      className="text-xs text-slate-500 font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      I agree to the <span onClick={() => setShowTermsDialog(true)} className="text-[#1a3e62] underline cursor-pointer hover:text-[#122c46]">Terms & Conditions</span>
+                    </label>
+                  </div>
+                </>
+              )}
               <Button
                 type="submit"
-                disabled={loading || (isLogin ? !email.trim() || !password : !email.trim() || !password || !name.trim())}
+                disabled={loading || (isLogin ? !email.trim() || !password : !email.trim() || !password || !name.trim() || !termsAccepted || password !== confirmPassword)}
                 className="w-full bg-[#1a3e62] hover:bg-[#122c46] text-white h-11 rounded-xl font-bold text-base transition-all shadow-md active:scale-95 group mt-2"
               >
                 {loading ? (
@@ -184,6 +260,8 @@ const Auth = ({ onLogin }) => {
                 setEmail('');
                 setPassword('');
                 setName('');
+                setConfirmPassword('');
+                setTermsAccepted(false);
               }}
               disabled={loading}
               className="w-full text-[#1a3e62] hover:text-[#122c46] hover:bg-slate-50 rounded-lg h-10 font-semibold text-sm"
@@ -197,6 +275,27 @@ const Auth = ({ onLogin }) => {
           </CardFooter>
         </Card>
       </div>
+
+      <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Terms & Conditions</DialogTitle>
+            <DialogDescription>
+              Please read our terms and conditions carefully.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-sm text-slate-600 space-y-4">
+            <p>1. <strong>Introduction</strong>: Welcome to our HR System. By creating an account, you agree to these terms.</p>
+            <p>2. <strong>User Responsibilities</strong>: You are responsible for maintaining the confidentiality of your account credentials.</p>
+            <p>3. <strong>Privacy</strong>: Your data is handled according to our Privacy Policy.</p>
+            <p>4. <strong>Usage</strong>: This system is for authorized personnel management only.</p>
+            {/* Add more filler text or real terms here */}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowTermsDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </StarsBackground>
   );
 };
