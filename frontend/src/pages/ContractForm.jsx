@@ -138,29 +138,21 @@ function ContractForm({ searchQuery = '' }) {
   return (
     <Box sx={{ width: '100%', minHeight: '100%', bgcolor: 'white' }}>
       {/* Page Header */}
-      <Box sx={{
-        p: 3,
-        borderBottom: '1px solid #eee',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        bgcolor: 'white'
-      }}>
-        <Box>
-          <Typography variant="h6" sx={{ color: '#333', fontWeight: 500 }}>
-            Employees
-          </Typography>
-        </Box>
-      </Box>
+      <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+        <div>
+          <h1 className="text-xl font-normal text-[#202124] tracking-tight">
+            Contracts
+          </h1>
+        </div>
 
-      {/* Toolbar */}
-      <ContractToolbar
-        onNewContract={handleNewContract}
-        onRefresh={refresh}
-        loading={loading}
-        contracts={contracts}
-        currentTime={currentTime}
-      />
+        <ContractToolbar
+          onNewContract={handleNewContract}
+          onRefresh={refresh}
+          loading={loading}
+          contracts={contracts}
+          currentTime={currentTime}
+        />
+      </div>
 
       {/* Page Content */}
       <Box sx={{ p: 4, flex: 1, display: 'flex', flexDirection: 'column' }}>

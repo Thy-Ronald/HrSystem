@@ -13,7 +13,7 @@ export function ContractToolbar({
   currentTime
 }) {
   return (
-    <div className="flex items-center justify-end gap-2 p-3 border-b border-slate-100">
+    <div className="flex items-center justify-end gap-2">
       <Button
         variant="ghost"
         size="icon"

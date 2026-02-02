@@ -96,12 +96,9 @@ const Information = () => {
             {/* Page Header */}
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
                 <div>
-                    <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                    <h1 className="text-xl font-normal text-[#202124] tracking-tight">
                         Personnel Data Sheets
                     </h1>
-                    <p className="text-sm text-slate-500 mt-1">
-                        Manage and view employee personnel records
-                    </p>
                 </div>
                 <div className="flex items-center gap-3">
                     <Button
