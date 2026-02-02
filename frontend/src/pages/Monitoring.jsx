@@ -198,24 +198,26 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
       </Card>
 
       <Dialog open={showFullView} onOpenChange={setShowFullView}>
-        <DialogContent className="max-w-screen-xl w-[95vw] h-[90vh] p-0 bg-black border-slate-800 overflow-hidden [&>button]:text-white">
-          <div className="relative w-full h-full flex flex-col">
-            <div className="p-4 flex justify-between items-center bg-black/80 backdrop-blur-sm absolute top-0 left-0 right-0 z-10 border-b border-white/5">
-              <h3 className="text-xl font-bold text-white tracking-tight">{session.employeeName}</h3>
+        <DialogContent className="max-w-4xl w-[95vw] h-[90vh] p-0 bg-black border-slate-800 overflow-hidden [&>button]:text-white shadow-2xl rounded-2xl flex flex-col">
+          <div className="w-full h-full flex flex-col">
+            {/* Header - Relative positioning ensures it doesn't overlap the video content */}
+            <div className="px-5 py-3 flex justify-between items-center bg-slate-900 border-b border-white/10 shrink-0">
+              <h3 className="text-lg font-bold text-white tracking-tight">{session.employeeName}</h3>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">
+                <div className="flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Active Stream</span>
+                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Live Stream</span>
                 </div>
               </div>
             </div>
-            <div className="flex-1 flex items-center justify-center bg-slate-950">
+            {/* Content Area / Video Frame */}
+            <div className="flex-1 w-full flex items-center justify-center bg-slate-950 overflow-hidden min-h-0">
               <video
                 ref={fullVideoRef}
                 autoPlay
                 playsInline
                 muted
-                className="w-full h-full object-contain"
+                className="max-w-full max-h-full object-contain shadow-2xl"
               />
             </div>
           </div>
