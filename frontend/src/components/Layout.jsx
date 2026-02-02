@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
+import { ConfirmDialog } from './ConfirmDialog';
 import { NotificationDropdown } from './NotificationDropdown';
 import { useNotifications } from '../hooks/useNotifications';
 import { useAuth } from '../contexts/AuthContext';
@@ -28,6 +29,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 const Layout = ({ children, currentPath, onNavigate }) => {
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const { notifications, loading, count, markAsRead, isRead } = useNotifications();
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -208,7 +210,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="text-rose-600 focus:bg-rose-50 cursor-pointer py-2 px-3 rounded-md text-sm transition-colors"
-                  onClick={() => logout()}
+                  onClick={() => setLogoutConfirmOpen(true)}
                 >
                   Logout
                 </DropdownMenuItem>
@@ -232,6 +234,19 @@ const Layout = ({ children, currentPath, onNavigate }) => {
           </Box>
         </Container>
       </Box>
+
+      <ConfirmDialog
+        open={logoutConfirmOpen}
+        title="Confirm Logout"
+        description="Are you sure you want to end your session?"
+        confirmText="Logout"
+        confirmVariant="destructive"
+        onConfirm={() => {
+          setLogoutConfirmOpen(false);
+          logout();
+        }}
+        onCancel={() => setLogoutConfirmOpen(false)}
+      />
 
     </Box>
   );

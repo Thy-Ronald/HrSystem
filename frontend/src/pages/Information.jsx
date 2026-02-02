@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { Plus, RefreshCw, Loader2, AlertCircle, FileText, Eye, Pencil, Trash2 } from "lucide-react"
 import PersonnelDataSheetModal from '../components/PersonnelDataSheetModal';
 import { ContractPagination } from '../features/contracts/components/ContractPagination';
-import { DeleteConfirmDialog } from '../features/contracts/components/DeleteConfirmDialog';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { fetchPersonnelRecords, submitPersonnelRecord, updatePersonnelRecord, deletePersonnelRecord } from '../services/api';
 import { formatDate } from '../utils/format';
 
@@ -281,10 +281,12 @@ const Information = () => {
             />
 
             {/* Delete Confirmation Dialog */}
-            <DeleteConfirmDialog
+            <ConfirmDialog
                 open={deleteDialogOpen}
-                itemName={recordToDelete ? `${recordToDelete.surname}, ${recordToDelete.firstName}` : ''}
                 title="DELETE PERSONNEL RECORD"
+                description={<>Are you sure you want to delete the record for <strong>{recordToDelete?.surname}, {recordToDelete?.firstName}</strong>?<br />This action cannot be undone.</>}
+                confirmText="Delete"
+                confirmVariant="destructive"
                 onConfirm={handleDeleteConfirm}
                 onCancel={() => setDeleteDialogOpen(false)}
             />

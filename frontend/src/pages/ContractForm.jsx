@@ -6,7 +6,7 @@ import { useContractStatus } from '../features/contracts/hooks/useContractStatus
 import { ContractToolbar } from '../features/contracts/components/ContractToolbar';
 import { ContractList } from '../features/contracts/components/ContractList';
 import { ContractModal } from '../features/contracts/components/ContractModal';
-import { DeleteConfirmDialog } from '../features/contracts/components/DeleteConfirmDialog';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -196,11 +196,12 @@ function ContractForm({ searchQuery = '' }) {
         onSubmit={handleSubmit}
         onCancel={handleModalClose}
       />
-
-      <DeleteConfirmDialog
+      <ConfirmDialog
         open={deleteConfirm.open}
-        itemName={deleteConfirm.contractName}
         title="DELETE CONTRACT"
+        description={<>Are you sure you want to delete the contract for <strong className="text-slate-900">{deleteConfirm.contractName}</strong>?<br />This action cannot be undone.</>}
+        confirmText="Delete"
+        confirmVariant="destructive"
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeleteConfirm({ open: false, contractId: null, contractName: '' })}
       />
