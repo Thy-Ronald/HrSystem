@@ -27,6 +27,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 const Layout = ({ children, currentPath, onNavigate }) => {
   const [anchorEl, setAnchorEl] = useState(null);
+  const [employeeAnchorEl, setEmployeeAnchorEl] = useState(null);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const { notifications, loading, count, markAsRead, isRead } = useNotifications();
   const { user, logout } = useAuth();
@@ -36,27 +37,41 @@ const Layout = ({ children, currentPath, onNavigate }) => {
     setAnchorEl(event.currentTarget);
   };
 
+  const handleEmployeeMenu = (event) => {
+    setEmployeeAnchorEl(event.currentTarget);
+  };
+
   const handleClose = () => {
     setAnchorEl(null);
   };
 
+  const handleEmployeeMenuClose = () => {
+    setEmployeeAnchorEl(null);
+  };
+
   const navItems = [
     { label: 'Dashboard', path: 'dashboard' },
-    { label: 'Employees', path: 'contract-form', adminOnly: true },
+    { label: 'Employees', path: 'employee-dropdown', adminOnly: true },
     { label: 'Github Analytics', path: 'github-analytics' },
     { label: 'Ranking', path: 'staff-ranking' },
     { label: 'Monitoring', path: 'monitoring' },
   ].filter(item => !item.adminOnly || isAdmin);
 
   // Map our currentPath to the tab index
-  const tabValue = navItems.findIndex(item => item.path === currentPath);
+  const tabValue = navItems.findIndex(item => {
+    if (item.path === 'employee-dropdown') {
+      return currentPath === 'contract-form' || currentPath === 'information';
+    }
+    return item.path === currentPath;
+  });
   const effectiveTabValue = tabValue === -1 ? 0 : tabValue;
 
   const handleTabChange = (event, newValue) => {
-    const targetPath = navItems[newValue].path;
+    const item = navItems[newValue];
+
     // Only navigate to implemented pages
-    if (['dashboard', 'contract-form', 'staff-ranking', 'monitoring'].includes(targetPath)) {
-      onNavigate(targetPath);
+    if (['dashboard', 'staff-ranking', 'monitoring'].includes(item.path)) {
+      onNavigate(item.path);
     }
   };
 
@@ -120,9 +135,65 @@ const Layout = ({ children, currentPath, onNavigate }) => {
               }}
             >
               {navItems.map((item, index) => (
-                <Tab key={index} label={item.label} />
+                <Tab
+                  key={index}
+                  onClick={(e) => {
+                    if (item.path === 'employee-dropdown') {
+                      handleEmployeeMenu(e);
+                    }
+                  }}
+                  label={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      {item.label}
+                      {item.path === 'employee-dropdown' && (
+                        <ArrowDropDownIcon sx={{ fontSize: '1.2rem', mt: 0.2 }} />
+                      )}
+                    </Box>
+                  }
+                />
               ))}
             </Tabs>
+
+            {/* Employee Dropdown Menu */}
+            <Menu
+              anchorEl={employeeAnchorEl}
+              open={Boolean(employeeAnchorEl)}
+              onClose={handleEmployeeMenuClose}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'left',
+              }}
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'left',
+              }}
+              sx={{
+                '& .MuiPaper-root': {
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                  border: '1px solid #eee',
+                  mt: 0.5
+                }
+              }}
+            >
+              <MenuItem
+                onClick={() => {
+                  onNavigate('contract-form');
+                  handleEmployeeMenuClose();
+                }}
+                sx={{ fontSize: '0.85rem', py: 1, px: 2, minWidth: 160 }}
+              >
+                Contract
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  onNavigate('information');
+                  handleEmployeeMenuClose();
+                }}
+                sx={{ fontSize: '0.85rem', py: 1, px: 2, minWidth: 160 }}
+              >
+                Information
+              </MenuItem>
+            </Menu>
           </Box>
 
           {/* User Section */}

@@ -9,6 +9,7 @@ import {
 import { Warning as WarningIcon } from '@mui/icons-material';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ContractForm from './pages/ContractForm';
+import Information from './pages/Information';
 import Dashboard from './pages/Dashboard';
 import RankingPage from './pages/StaffRanking';
 import Monitoring from './pages/Monitoring';
@@ -17,8 +18,9 @@ import Layout from './components/Layout';
 
 // Map URL paths to page keys
 const routeMap = {
-  '/': 'contract-form',
+  '/': 'dashboard',
   '/contract-form': 'contract-form',
+  '/information': 'information',
   '/dashboard': 'dashboard',
   '/staff-ranking': 'staff-ranking',
   '/ranking': 'staff-ranking', // Alias
@@ -28,14 +30,15 @@ const routeMap = {
 // Get page from URL
 function getPageFromPath() {
   const path = window.location.pathname;
-  return routeMap[path] || 'contract-form';
+  return routeMap[path] || 'dashboard';
 }
 
 // Set URL from page
 function setPathFromPage(page, replace = false) {
   const pathMap = {
-    'contract-form': '/contract-form',
     'dashboard': '/dashboard',
+    'contract-form': '/contract-form',
+    'information': '/information',
     'staff-ranking': '/staff-ranking',
     'monitoring': '/monitoring',
   };
@@ -91,8 +94,9 @@ function AppContent() {
     return <Auth onLogin={() => setCurrentPage('dashboard')} />;
   }
 
-  // Check if user is trying to access contract-form but is not admin
-  if (currentPage === 'contract-form' && user?.role !== 'admin') {
+  // Check if user is trying to access admin pages but is not admin
+  const adminOnlyPages = ['contract-form', 'information'];
+  if (adminOnlyPages.includes(currentPage) && user?.role !== 'admin') {
     return (
       <Layout currentPath={currentPage} onNavigate={handleNavigate}>
         <Container maxWidth="sm" sx={{ py: 10 }}>
@@ -100,7 +104,7 @@ function AppContent() {
             <WarningIcon sx={{ fontSize: 64, color: 'error.main', mb: 2, opacity: 0.8 }} />
             <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>Access Denied</Typography>
             <Typography color="text.secondary" sx={{ mb: 4 }}>
-              Only administrators can access the employee contract management screen.
+              Only administrators can access this screen.
             </Typography>
             <Button
               variant="contained"
@@ -118,6 +122,7 @@ function AppContent() {
   return (
     <Layout currentPath={currentPage} onNavigate={handleNavigate}>
       {currentPage === 'contract-form' && <ContractForm />}
+      {currentPage === 'information' && <Information />}
       {currentPage === 'dashboard' && <Dashboard />}
       {currentPage === 'staff-ranking' && <RankingPage />}
       {currentPage === 'monitoring' && <Monitoring />}
