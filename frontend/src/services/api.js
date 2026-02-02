@@ -460,6 +460,22 @@ export async function submitPersonnelRecord(payload) {
 }
 
 /**
+ * Update a personnel record (PDS)
+ * @param {number} id - Record ID
+ * @param {Object} payload - Personnel data
+ * @returns {Promise<Object>} - Updated record
+ */
+export async function updatePersonnelRecord(id, payload) {
+  const res = await fetch(`${API_BASE}/api/personnel/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(res);
+}
+
+/**
  * Fetch all personnel records
  * @returns {Promise<Array>} - Array of personnel records
  */

@@ -8,4 +8,7 @@ router.post('/', personnelController.createPersonnelRecord);
 // GET /api/personnel - Get all personnel records
 router.get('/', personnelController.getAllPersonnelRecords);
 
+// PUT /api/personnel/:id - Update a personnel record
+router.put('/:id', personnelController.updatePersonnelRecord);
+
 module.exports = router;

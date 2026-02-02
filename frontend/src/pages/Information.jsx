@@ -10,10 +10,10 @@ import {
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Plus, RefreshCw, Loader2, AlertCircle, FileText } from "lucide-react"
+import { Plus, RefreshCw, Loader2, AlertCircle, FileText, Eye, Pencil } from "lucide-react"
 import PersonnelDataSheetModal from '../components/PersonnelDataSheetModal';
 import { ContractPagination } from '../features/contracts/components/ContractPagination';
-import { fetchPersonnelRecords, submitPersonnelRecord } from '../services/api';
+import { fetchPersonnelRecords, submitPersonnelRecord, updatePersonnelRecord } from '../services/api';
 import { formatDate } from '../utils/format';
 
 const ITEMS_PER_PAGE = 10;
@@ -24,6 +24,8 @@ const Information = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
+    const [selectedRecord, setSelectedRecord] = useState(null);
+    const [modalMode, setModalMode] = useState('add'); // 'add', 'edit', 'view'
 
     const loadRecords = async () => {
         setLoading(true);
@@ -44,12 +46,37 @@ const Information = () => {
         loadRecords();
     }, []);
 
-    const handleOpenModal = () => setIsModalOpen(true);
-    const handleCloseModal = () => setIsModalOpen(false);
+    const handleAddNew = () => {
+        setSelectedRecord(null);
+        setModalMode('add');
+        setIsModalOpen(true);
+    };
+
+    const handleView = (record) => {
+        setSelectedRecord(record);
+        setModalMode('view');
+        setIsModalOpen(true);
+    };
+
+    const handleEdit = (record) => {
+        setSelectedRecord(record);
+        setModalMode('edit');
+        setIsModalOpen(true);
+    };
+
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setSelectedRecord(null);
+        setModalMode('add');
+    };
 
     const handleSavePersonnelData = async (data) => {
         try {
-            await submitPersonnelRecord(data);
+            if (modalMode === 'add') {
+                await submitPersonnelRecord(data);
+            } else if (modalMode === 'edit' && selectedRecord) {
+                await updatePersonnelRecord(selectedRecord.id, data);
+            }
             handleCloseModal();
             loadRecords(); // Refresh list
         } catch (err) {
@@ -87,7 +114,7 @@ const Information = () => {
                         Refresh
                     </Button>
                     <Button
-                        onClick={handleOpenModal}
+                        onClick={handleAddNew}
                         className="bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold shadow-sm"
                     >
                         <Plus className="mr-2 h-4 w-4" />
@@ -120,7 +147,7 @@ const Information = () => {
                             Click the "Add New Record" button to create your first Personnel Data Sheet.
                         </p>
                         <Button
-                            onClick={handleOpenModal}
+                            onClick={handleAddNew}
                             className="bg-[#1a3e62] hover:bg-[#122c46] shadow-md"
                         >
                             <Plus className="mr-2 h-4 w-4" />
@@ -138,7 +165,7 @@ const Information = () => {
                                         <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Date Started</TableHead>
                                         <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Contact Info</TableHead>
                                         <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Email</TableHead>
-                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Status</TableHead>
+                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap text-right pr-6">Action</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -168,13 +195,24 @@ const Information = () => {
                                             <TableCell className="py-4 text-slate-600">
                                                 {record.emailAddress}
                                             </TableCell>
-                                            <TableCell className="py-4 text-slate-600">
-                                                <Badge
-                                                    variant="secondary"
-                                                    className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-none font-semibold px-2.5 py-0.5 rounded-full capitalize"
-                                                >
-                                                    Active
-                                                </Badge>
+                                            <TableCell className="py-4 text-slate-600 text-right pr-6">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleView(record)}
+                                                        className="h-8 border-slate-200 text-slate-600 hover:bg-slate-50 font-medium px-4"
+                                                    >
+                                                        View
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() => handleEdit(record)}
+                                                        className="h-8 bg-[#1a3e62] hover:bg-[#122c46] text-white font-medium px-4 shadow-sm"
+                                                    >
+                                                        Edit
+                                                    </Button>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -201,6 +239,8 @@ const Information = () => {
                 open={isModalOpen}
                 onClose={handleCloseModal}
                 onSave={handleSavePersonnelData}
+                initialData={selectedRecord}
+                mode={modalMode}
             />
         </div>
     );

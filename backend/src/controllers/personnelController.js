@@ -24,7 +24,19 @@ async function getAllPersonnelRecords(req, res) {
     }
 }
 
+async function updatePersonnelRecord(req, res) {
+    try {
+        const id = req.params.id;
+        const record = await personnelModel.updatePersonnelRecord(id, req.body);
+        res.json(record);
+    } catch (error) {
+        console.error('Controller error updating personnel record:', error);
+        res.status(500).json({ error: 'Failed to update personnel record' });
+    }
+}
+
 module.exports = {
     createPersonnelRecord,
-    getAllPersonnelRecords
+    getAllPersonnelRecords,
+    updatePersonnelRecord
 };
