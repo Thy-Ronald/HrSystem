@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card"
 import { Loader2, User, ShieldCheck, ArrowRight, Monitor } from "lucide-react"
 import { StarsBackground } from "@/components/animate-ui/components/backgrounds/stars"
+import logo from '../assets/logo.png';
 
 const Login = ({ onLogin }) => {
   const [role, setRole] = useState('');
@@ -59,39 +60,42 @@ const Login = ({ onLogin }) => {
     <StarsBackground className="flex items-center justify-center p-4">
       <div className="w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500">
         <Card className="border-slate-200 bg-white/90 backdrop-blur-xl shadow-2xl rounded-3xl overflow-hidden border">
-          <CardHeader className="space-y-1 pb-6 text-center bg-gradient-to-b from-slate-50 to-transparent">
-            <div className="flex justify-center mb-4">
-              <div className="p-3 bg-blue-50 rounded-2xl border border-blue-100">
-                <Monitor className="h-8 w-8 text-[#1a3e62]" />
+          <CardHeader className="space-y-1 pb-4 text-center bg-gradient-to-b from-slate-50 to-transparent pt-6">
+            <div className="flex justify-center mb-1 relative">
+              <div className="absolute -left-14 top-1/2 -translate-y-1/2">
+                <img src={logo} alt="Logo" className="h-10 w-auto" />
+              </div>
+              <div className="p-2 bg-blue-50 rounded-xl border border-blue-100">
+                <Monitor className="h-6 w-6 text-[#1a3e62]" />
               </div>
             </div>
-            <CardTitle className="text-3xl font-bold tracking-tight text-slate-900">
+            <CardTitle className="text-2xl font-bold tracking-tight text-slate-900">
               Remote Support
             </CardTitle>
-            <CardDescription className="text-slate-500 font-medium">
+            <CardDescription className="text-slate-500 font-medium text-xs">
               Select your role and enter your name to continue
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-8">
-            <form onSubmit={handleSubmit} className="space-y-8">
-              <div className="space-y-4">
+          <CardContent className="p-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-3">
                 <Label className="text-slate-500 font-semibold uppercase tracking-wider text-[10px] block text-center">
                   Select Your Role
                 </Label>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setRole('employee')}
-                    className={`p-5 rounded-2xl border-2 transition-all duration-300 flex flex-col items-center gap-3 group relative overflow-hidden ${role === 'employee'
-                      ? 'border-[#1a3e62] bg-slate-50 text-[#1a3e62] shadow-md'
+                    className={`p-3 rounded-xl border-2 transition-all duration-300 flex flex-col items-center gap-2 group relative overflow-hidden ${role === 'employee'
+                      ? 'border-[#1a3e62] bg-slate-50 text-[#1a3e62] shadow-sm'
                       : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:text-slate-600'
                       }`}
                   >
-                    <div className={`p-3 rounded-xl transition-all duration-300 ${role === 'employee' ? 'bg-[#1a3e62] text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'
+                    <div className={`p-2 rounded-lg transition-all duration-300 ${role === 'employee' ? 'bg-[#1a3e62] text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'
                       }`}>
-                      <User className="w-6 h-6" />
+                      <User className="w-5 h-5" />
                     </div>
-                    <span className="font-bold tracking-tight">Employee</span>
+                    <span className="font-bold tracking-tight text-sm">Employee</span>
                     {role === 'employee' && (
                       <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-blue-500" />
                     )}
@@ -99,16 +103,16 @@ const Login = ({ onLogin }) => {
                   <button
                     type="button"
                     onClick={() => setRole('admin')}
-                    className={`p-5 rounded-2xl border-2 transition-all duration-300 flex flex-col items-center gap-3 group relative overflow-hidden ${role === 'admin'
-                      ? 'border-[#1a3e62] bg-slate-50 text-[#1a3e62] shadow-md'
+                    className={`p-3 rounded-xl border-2 transition-all duration-300 flex flex-col items-center gap-2 group relative overflow-hidden ${role === 'admin'
+                      ? 'border-[#1a3e62] bg-slate-50 text-[#1a3e62] shadow-sm'
                       : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:text-slate-600'
                       }`}
                   >
-                    <div className={`p-3 rounded-xl transition-all duration-300 ${role === 'admin' ? 'bg-[#1a3e62] text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'
+                    <div className={`p-2 rounded-lg transition-all duration-300 ${role === 'admin' ? 'bg-[#1a3e62] text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'
                       }`}>
-                      <ShieldCheck className="w-6 h-6" />
+                      <ShieldCheck className="w-5 h-5" />
                     </div>
-                    <span className="font-bold tracking-tight">Admin</span>
+                    <span className="font-bold tracking-tight text-sm">Admin</span>
                     {role === 'admin' && (
                       <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-indigo-500" />
                     )}
@@ -116,7 +120,7 @@ const Login = ({ onLogin }) => {
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <Label htmlFor="name" className="text-slate-500 font-semibold uppercase tracking-wider text-[10px] block text-center">
                   Your Full Name
                 </Label>
@@ -128,7 +132,7 @@ const Login = ({ onLogin }) => {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Enter your full name"
-                    className="pl-11 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 h-14 rounded-2xl focus:ring-blue-500/10 text-center font-medium"
+                    className="pl-11 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 h-11 rounded-xl focus:ring-blue-500/10 text-center font-medium text-sm"
                     required
                     disabled={loading}
                   />
@@ -138,26 +142,26 @@ const Login = ({ onLogin }) => {
               <Button
                 type="submit"
                 disabled={loading || !role || !name.trim()}
-                className="w-full bg-[#1a3e62] hover:bg-[#122c46] text-white h-16 rounded-2xl font-bold text-lg transition-all shadow-lg active:scale-95 group"
+                className="w-full bg-[#1a3e62] hover:bg-[#122c46] text-white h-12 rounded-xl font-bold text-base transition-all shadow-md active:scale-95 group mt-2"
               >
                 {loading ? (
                   <div className="flex items-center gap-3">
-                    <Loader2 className="h-6 w-6 animate-spin" />
+                    <Loader2 className="h-5 w-5 animate-spin" />
                     <span>Signing in...</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
                     <span>Sign In</span>
-                    <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </div>
                 )}
               </Button>
             </form>
 
-            <div className="mt-8 text-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <div className="mt-6 text-center bg-slate-50 p-3 rounded-xl border border-slate-100">
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] leading-relaxed">
                 Secure Monitoring System
-                <span className="block mt-1 font-medium lowercase text-slate-500 tracking-normal opacity-70 italic">All sessions are recorded for security.</span>
+                <span className="block mt-0.5 font-medium lowercase text-slate-500 tracking-normal opacity-70 italic">All sessions are recorded for security.</span>
               </p>
             </div>
           </CardContent>

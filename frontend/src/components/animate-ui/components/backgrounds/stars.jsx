@@ -59,7 +59,7 @@ function StarsBackground({
   factor = 0.05,
   speed = 50,
   transition = { stiffness: 50, damping: 20 },
-  starColor = '#cbd5e1',
+  starColor = '#000000',
   pointerEvents = true,
   ...props
 }) {
@@ -82,7 +82,7 @@ function StarsBackground({
     <div
       data-slot="stars-background"
       className={cn(
-        'relative size-full overflow-hidden bg-[radial-gradient(ellipse_at_bottom,_#f8fafc_0%,_#fff_100%)]',
+        'relative w-full min-h-screen overflow-hidden bg-slate-100',
         className
       )}
       onMouseMove={handleMouseMove}
