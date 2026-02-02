@@ -199,7 +199,8 @@ function ContractForm({ searchQuery = '' }) {
 
       <DeleteConfirmDialog
         open={deleteConfirm.open}
-        contractName={deleteConfirm.contractName}
+        itemName={deleteConfirm.contractName}
+        title="DELETE CONTRACT"
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeleteConfirm({ open: false, contractId: null, contractName: '' })}
       />

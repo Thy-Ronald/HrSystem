@@ -475,6 +475,21 @@ export async function updatePersonnelRecord(id, payload) {
   return handleResponse(res);
 }
 
+
+/**
+ * Delete a personnel record (PDS)
+ * @param {number} id - Record ID
+ * @returns {Promise<void>}
+ */
+export async function deletePersonnelRecord(id) {
+  const res = await fetch(`${API_BASE}/api/personnel/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse(res);
+}
+
 /**
  * Fetch all personnel records
  * @returns {Promise<Array>} - Array of personnel records

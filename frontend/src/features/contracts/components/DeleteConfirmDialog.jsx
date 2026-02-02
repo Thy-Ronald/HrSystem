@@ -11,14 +11,14 @@ import { Button } from "@/components/ui/button"
 /**
  * Delete confirmation dialog component
  */
-export function DeleteConfirmDialog({ open, contractName, onConfirm, onCancel }) {
+export function DeleteConfirmDialog({ open, itemName, onConfirm, onCancel, title = "DELETE ITEM" }) {
   return (
     <Dialog open={open} onOpenChange={(val) => !val && onCancel()}>
       <DialogContent className="sm:max-w-md bg-white">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-slate-900 leading-tight">DELETE CONTRACT</DialogTitle>
+          <DialogTitle className="text-xl font-bold text-slate-900 leading-tight">{title}</DialogTitle>
           <DialogDescription className="text-slate-500 pt-2 text-base">
-            Are you sure you want to delete the contract for <strong className="text-slate-900">{contractName}</strong>?
+            Are you sure you want to delete <strong className="text-slate-900">{itemName}</strong>?
             <br />
             This action cannot be undone.
           </DialogDescription>

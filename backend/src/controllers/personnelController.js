@@ -35,8 +35,26 @@ async function updatePersonnelRecord(req, res) {
     }
 }
 
+}
+
+async function deletePersonnelRecord(req, res) {
+    try {
+        const id = req.params.id;
+        const success = await personnelModel.deletePersonnelRecord(id);
+        if (success) {
+            res.status(204).send();
+        } else {
+            res.status(404).json({ error: 'Record not found' });
+        }
+    } catch (error) {
+        console.error('Controller error deleting personnel record:', error);
+        res.status(500).json({ error: 'Failed to delete personnel record' });
+    }
+}
+
 module.exports = {
     createPersonnelRecord,
     getAllPersonnelRecords,
-    updatePersonnelRecord
+    updatePersonnelRecord,
+    deletePersonnelRecord
 };

@@ -116,8 +116,21 @@ async function updatePersonnelRecord(id, data) {
     }
 }
 
+
+async function deletePersonnelRecord(id) {
+    const sql = 'DELETE FROM personnel_data_sheet WHERE id = ?';
+    try {
+        const result = await query(sql, [id]);
+        return result.affectedRows > 0;
+    } catch (error) {
+        console.error('Error deleting personnel record:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     createPersonnelRecord,
     getAllPersonnelRecords,
-    updatePersonnelRecord
+    updatePersonnelRecord,
+    deletePersonnelRecord
 };

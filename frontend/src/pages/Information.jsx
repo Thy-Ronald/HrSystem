@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Table,
     TableBody,
@@ -10,10 +10,11 @@ import {
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Plus, RefreshCw, Loader2, AlertCircle, FileText, Eye, Pencil } from "lucide-react"
+import { Plus, RefreshCw, Loader2, AlertCircle, FileText, Eye, Pencil, Trash2 } from "lucide-react"
 import PersonnelDataSheetModal from '../components/PersonnelDataSheetModal';
 import { ContractPagination } from '../features/contracts/components/ContractPagination';
-import { fetchPersonnelRecords, submitPersonnelRecord, updatePersonnelRecord } from '../services/api';
+import { DeleteConfirmDialog } from '../features/contracts/components/DeleteConfirmDialog';
+import { fetchPersonnelRecords, submitPersonnelRecord, updatePersonnelRecord, deletePersonnelRecord } from '../services/api';
 import { formatDate } from '../utils/format';
 
 const ITEMS_PER_PAGE = 10;
@@ -26,6 +27,10 @@ const Information = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedRecord, setSelectedRecord] = useState(null);
     const [modalMode, setModalMode] = useState('add'); // 'add', 'edit', 'view'
+
+    // Delete state
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [recordToDelete, setRecordToDelete] = useState(null);
 
     const loadRecords = async () => {
         setLoading(true);
@@ -62,6 +67,33 @@ const Information = () => {
         setSelectedRecord(record);
         setModalMode('edit');
         setIsModalOpen(true);
+    };
+
+    const handleDeleteClick = (record) => {
+        setRecordToDelete(record);
+        setDeleteDialogOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!recordToDelete) return;
+
+        try {
+            await deletePersonnelRecord(recordToDelete.id);
+            setDeleteDialogOpen(false);
+            setRecordToDelete(null);
+
+            // Adjust pagination if needed
+            const newTotalItems = records.length - 1;
+            const newTotalPages = Math.ceil(newTotalItems / ITEMS_PER_PAGE);
+            if (currentPage > newTotalPages && newTotalPages > 0) {
+                setCurrentPage(newTotalPages);
+            }
+
+            loadRecords(); // Refresh list
+        } catch (err) {
+            console.error('Error deleting personnel record:', err);
+            alert('Failed to delete record: ' + err.message);
+        }
     };
 
     const handleCloseModal = () => {
@@ -209,6 +241,14 @@ const Information = () => {
                                                     >
                                                         Edit
                                                     </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => handleDeleteClick(record)}
+                                                        className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-medium px-3"
+                                                    >
+                                                        Delete
+                                                    </Button>
                                                 </div>
                                             </TableCell>
                                         </TableRow>
@@ -238,6 +278,15 @@ const Information = () => {
                 onSave={handleSavePersonnelData}
                 initialData={selectedRecord}
                 mode={modalMode}
+            />
+
+            {/* Delete Confirmation Dialog */}
+            <DeleteConfirmDialog
+                open={deleteDialogOpen}
+                itemName={recordToDelete ? `${recordToDelete.surname}, ${recordToDelete.firstName}` : ''}
+                title="DELETE PERSONNEL RECORD"
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => setDeleteDialogOpen(false)}
             />
         </div>
     );

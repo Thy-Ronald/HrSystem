@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Pencil, Trash2 } from "lucide-react"
 import { ContractPagination } from './ContractPagination';
 import { filterContracts, getContractStatus, calculateTotalSalary, calculateExpirationDate } from '../utils/contractHelpers';
 import { formatDate } from '../../../utils/format';
@@ -113,30 +112,27 @@ export function ContractList({
                     {expirationDisplay}
                   </TableCell>
                   <TableCell className="py-4">
-                    <div className="flex items-center justify-center gap-1">
+                    <div className="flex items-center justify-center gap-2">
                       <Button
-                        variant="ghost"
-                        size="icon"
+                        size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
                           onEdit(contract.id);
                         }}
-                        className="h-8 w-8 text-slate-500 hover:text-[#1a3e62] hover:bg-slate-100 rounded-full"
-                        title="Edit Contract"
+                        className="h-8 bg-[#1a3e62] hover:bg-[#122c46] text-white font-medium px-4 shadow-sm"
                       >
-                        <Pencil className="h-4 w-4" />
+                        Edit
                       </Button>
                       <Button
                         variant="ghost"
-                        size="icon"
+                        size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
                           onDelete(contract.id, contract.name);
                         }}
-                        className="h-8 w-8 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-full"
-                        title="Delete Contract"
+                        className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-medium px-3"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        Delete
                       </Button>
                     </div>
                   </TableCell>

@@ -11,4 +11,7 @@ router.get('/', personnelController.getAllPersonnelRecords);
 // PUT /api/personnel/:id - Update a personnel record
 router.put('/:id', personnelController.updatePersonnelRecord);
 
+// DELETE /api/personnel/:id - Delete a personnel record
+router.delete('/:id', personnelController.deletePersonnelRecord);
+
 module.exports = router;
