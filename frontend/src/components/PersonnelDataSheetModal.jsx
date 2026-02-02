@@ -120,27 +120,19 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave }) => {
 
     return (
         <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
-            <DialogContent className="max-w-5xl p-0 overflow-hidden border-none shadow-2xl">
+            <DialogContent className="max-w-3xl p-0 overflow-hidden border-none shadow-2xl [&>button]:text-white">
                 <DialogHeader className="bg-[#1a3e62] text-white p-6 flex flex-row items-center justify-between space-y-0">
                     <DialogTitle className="text-xl font-bold tracking-tight uppercase">
                         Personnel Data Sheet
                     </DialogTitle>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onClose}
-                        className="text-white hover:bg-white/10 hover:text-white h-8 w-8"
-                    >
-                        <X className="h-5 w-5" />
-                    </Button>
                 </DialogHeader>
 
-                <ScrollArea className="max-h-[80vh]">
-                    <div className="p-8">
-                        <form id="pds-form" onSubmit={handleSubmit} className="space-y-6">
+                <ScrollArea className="max-h-[65vh]">
+                    <div className="p-6">
+                        <form id="pds-form" onSubmit={handleSubmit} className="space-y-4">
                             {/* SECTION 1: PERSONAL INFORMATION */}
                             <SectionTitle title="Section 1: Personal Information" />
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="dateStarted" className="font-semibold text-slate-700">Date Started <span className="text-destructive">*</span></Label>
                                     <Input
@@ -188,7 +180,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave }) => {
 
                             {/* SECTION 2: BASIC DETAILS */}
                             <SectionTitle title="Section 2: Basic Details" />
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="dateOfBirth" className="font-semibold text-slate-700">Date of Birth</Label>
                                     <Input
@@ -302,7 +294,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave }) => {
 
                             {/* SECTION 3: GOVERNMENT IDENTIFICATION */}
                             <SectionTitle title="Section 3: Government Identification" />
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="sssNumber" className="font-semibold text-slate-700">SSS Number</Label>
                                     <Input
@@ -357,7 +349,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave }) => {
 
                             {/* SECTION 4: CONTACT INFORMATION */}
                             <SectionTitle title="Section 4: Contact Information" />
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="residentialAddress" className="font-semibold text-slate-700">Residential Address</Label>
                                     <Input
@@ -425,7 +417,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave }) => {
 
                             {/* SECTION 5: IN CASE OF EMERGENCY */}
                             <SectionTitle title="Section 5: In Case of Emergency" />
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="emergencyName" className="font-semibold text-slate-700">Name <span className="text-destructive">*</span></Label>
                                     <Input
@@ -482,7 +474,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave }) => {
 
                             {/* SECTION 6: PARENT INFORMATION */}
                             <SectionTitle title="Section 6: Parent Information" />
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="fatherName" className="font-semibold text-slate-700">Name of Father</Label>
                                     <Input
@@ -572,7 +564,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave }) => {
                     </div>
                 </ScrollArea>
 
-                <DialogFooter className="bg-slate-50 p-6 border-t border-slate-100 flex items-center justify-end gap-3">
+                <DialogFooter className="bg-slate-50 p-4 border-t border-slate-100 flex items-center justify-end gap-3">
                     <Button
                         variant="outline"
                         onClick={onClose}

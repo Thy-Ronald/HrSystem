@@ -30,23 +30,15 @@ export function ContractModal({
 }) {
   return (
     <Dialog open={open} onOpenChange={(val) => !val && onCancel()}>
-      <DialogContent className="max-w-4xl p-0 overflow-hidden border-none shadow-2xl">
+      <DialogContent className="max-w-2xl p-0 overflow-hidden border-none shadow-2xl [&>button]:text-white">
         <DialogHeader className="bg-[#1a3e62] text-white p-6 flex flex-row items-center justify-between space-y-0">
           <DialogTitle className="text-xl font-bold tracking-tight">
             {editingContractId ? "EDIT CONTRACT" : "NEW CONTRACT"}
           </DialogTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onCancel}
-            className="text-white hover:bg-white/10 hover:text-white h-8 w-8"
-          >
-            <X className="h-5 w-5" />
-          </Button>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[75vh]">
-          <div className="p-8">
+        <ScrollArea className="max-h-[60vh]">
+          <div className="p-6">
             <form id="contract-form" onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
               <ContractFormFields
                 form={form}
@@ -60,7 +52,7 @@ export function ContractModal({
           </div>
         </ScrollArea>
 
-        <DialogFooter className="bg-slate-50 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100">
+        <DialogFooter className="bg-slate-50 p-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100">
           <div className="flex-1 text-left w-full sm:w-auto">
             {status.state !== 'idle' && (
               <p className={`text-sm font-semibold ${status.state === 'error' ? 'text-destructive' : 'text-[#1a3e62]'}`}>

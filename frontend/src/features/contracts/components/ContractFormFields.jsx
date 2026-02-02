@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
  * Section title component matching shadcn style
  */
 const SectionTitle = ({ title }) => (
-  <div className="mt-8 mb-4">
+  <div className="mt-6 mb-3">
     <h3 className="text-sm font-bold text-[#1a3e62] uppercase tracking-wider bg-slate-50 p-2 rounded-md">
       {title}
     </h3>
@@ -27,10 +27,10 @@ export function ContractFormFields({
   totalSalary
 }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Basic Information Section */}
       <SectionTitle title="Basic Information" />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="employeeName" className="font-semibold text-slate-700">
             Employee Name <span className="text-destructive">*</span>
@@ -96,7 +96,7 @@ export function ContractFormFields({
 
       {/* Financial Information Section */}
       <SectionTitle title="Financial Information" />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="basicSalary" className="font-semibold text-slate-700">Basic Salary</Label>
           <div className="relative">
@@ -148,7 +148,7 @@ export function ContractFormFields({
 
       {/* Bonus Information Section */}
       <SectionTitle title="Bonus Information" />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="attendanceBonusPercent" className="font-semibold text-slate-700">Attendance Bonus (%)</Label>
           <div className="relative">
@@ -201,11 +201,11 @@ export function ContractFormFields({
       </div>
 
       {/* Total Salary Summary */}
-      <div className="mt-10 pt-6">
-        <Separator className="mb-6" />
+      <div className="mt-6 pt-4">
+        <Separator className="mb-4" />
         <Card className="bg-[#1a3e62] text-white border-none shadow-lg overflow-hidden relative">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl" />
-          <CardContent className="p-8 flex flex-col md:flex-row justify-between items-center gap-4">
+          <CardContent className="p-6 flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-center md:text-left">
               <p className="text-sm font-bold text-slate-300 uppercase tracking-widest mb-1">Monthly Total Salary</p>
               <h2 className="text-4xl font-extrabold tracking-tight">₱{totalSalary.toFixed(2)}</h2>
