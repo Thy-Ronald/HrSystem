@@ -2,21 +2,22 @@
  * QuickFilterButton Component
  * Reusable button for filter selection
  */
+import { Button } from "@/components/ui/button"
 
 export function QuickFilterButton({ label, active, onClick }) {
   return (
-    <button
+    <Button
       onClick={onClick}
-      type="button"
+      variant={active ? "default" : "outline"}
       className={`
-        px-4 py-1.5 text-sm font-medium rounded border transition-colors
+        px-4 h-8 text-xs font-semibold rounded-lg transition-all
         ${active
-          ? 'bg-[#007bff] border-transparent text-white shadow-sm'
-          : 'bg-white border-[#dadce0] text-[#5f6368] hover:bg-[#f8f9fa]'
+          ? 'bg-[#1a3e62] hover:bg-[#122c46] shadow-sm text-white border-transparent'
+          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
         }
       `}
     >
       {label}
-    </button>
+    </Button>
   );
 }

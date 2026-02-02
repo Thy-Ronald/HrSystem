@@ -5,18 +5,20 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useDebounce } from '../hooks/useDebounce';
+import { Button } from "@/components/ui/button"
+import { ChevronDown, ChevronUp, Loader2 } from "lucide-react"
 
-export function RepositoryMultiSelect({ 
-  repositories, 
-  selectedRepos, 
+export function RepositoryMultiSelect({
+  repositories,
+  selectedRepos,
   onSelectionChange,
-  loading 
+  loading
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const dropdownRef = useRef(null);
   const inputRef = useRef(null);
-  
+
   // Debounce search input (300ms delay)
   const debouncedSearch = useDebounce(search, 300);
 
@@ -57,11 +59,11 @@ export function RepositoryMultiSelect({
   };
 
   // Get display value
-  const displayValue = selectedRepos.length === 0 
-    ? 'Select repositories...' 
-    : selectedRepos.length === 1 
-    ? selectedRepos[0]
-    : `${selectedRepos.length} repositories selected`;
+  const displayValue = selectedRepos.length === 0
+    ? 'Select repositories...'
+    : selectedRepos.length === 1
+      ? selectedRepos[0]
+      : `${selectedRepos.length} repositories selected`;
 
   return (
     <div className="flex flex-col gap-1 relative w-full" ref={dropdownRef}>
@@ -81,25 +83,22 @@ export function RepositoryMultiSelect({
           readOnly={!isOpen}
           className="w-full px-3 py-1.5 pr-8 text-sm border border-[#dadce0] rounded-lg bg-white text-[#202124] focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:border-[#1a73e8] disabled:opacity-50 cursor-pointer"
         />
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           disabled={loading}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5f6368] hover:text-[#202124] transition-colors disabled:opacity-50"
+          className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded transition-colors"
         >
           {loading ? (
-            <svg className="animate-spin h-4 w-4 text-[#5f6368]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
+            <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d={isOpen ? 'M18 15l-6-6-6 6' : 'M6 9l6 6 6-6'} />
-            </svg>
+            isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
           )}
-        </button>
+        </Button>
       </div>
-      
+
       {isOpen && !loading && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#dadce0] rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
           {filteredRepos.length === 0 ? (

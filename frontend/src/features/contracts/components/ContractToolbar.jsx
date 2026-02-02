@@ -1,4 +1,6 @@
 import { ExportDropdown } from './ExportDropdown';
+import { Button } from "@/components/ui/button"
+import { Plus, RefreshCw } from "lucide-react"
 
 /**
  * Toolbar component for contract list actions
@@ -11,36 +13,25 @@ export function ContractToolbar({
   currentTime
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 p-3 border-b border-gray-100">
+    <div className="flex items-center justify-between gap-2 p-3 border-b border-slate-100">
       <div className="flex items-center gap-2">
-        <button
+        <Button
           onClick={onNewContract}
-          className="flex items-center gap-2 px-6 py-2 bg-[#1a3e62] hover:bg-[#122c46] text-white rounded-xl font-medium transition-all shadow-sm"
+          className="bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold px-6 h-10 rounded-xl shadow-sm"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
+          <Plus className="mr-2 h-4 w-4" />
           <span>New Contract</span>
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onRefresh}
           disabled={loading}
-          className="p-2 hover:bg-[#eaebef] rounded transition-colors text-[#5f6368] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="h-10 w-10 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
           title="Refresh contracts"
         >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            className={loading ? 'animate-spin' : ''}
-          >
-            <path d="M23 4v6h-6M1 20v-6h6" />
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-          </svg>
-        </button>
+          <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+        </Button>
       </div>
       <ExportDropdown
         contracts={contracts}

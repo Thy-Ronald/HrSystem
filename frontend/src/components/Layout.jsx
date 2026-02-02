@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
 import { NotificationDropdown } from './NotificationDropdown';
 import { useNotifications } from '../hooks/useNotifications';
 import { useAuth } from '../contexts/AuthContext';
@@ -167,16 +168,16 @@ const Layout = ({ children, currentPath, onNavigate }) => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, position: 'relative' }}>
             {isAdmin && (
               <>
-                <IconButton
-                  size="small"
-                  color="inherit"
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setNotificationOpen(!notificationOpen)}
-                  sx={{ color: '#5f6368' }}
+                  className="h-9 w-9 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full relative"
                 >
                   <Badge badgeContent={count} color="error" sx={{ '& .MuiBadge-badge': { fontSize: 10, height: 16, minWidth: 16 } }}>
                     <NotificationsIcon fontSize="small" />
                   </Badge>
-                </IconButton>
+                </Button>
 
                 {notificationOpen && (
                   <NotificationDropdown

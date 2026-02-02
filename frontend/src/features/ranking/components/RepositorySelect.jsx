@@ -5,6 +5,8 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useDebounce } from '../hooks/useDebounce';
+import { Button } from "@/components/ui/button"
+import { ChevronDown, ChevronUp } from "lucide-react"
 
 export function RepositorySelect({ repositories, selectedRepo, onRepoChange, loading }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -70,16 +72,16 @@ export function RepositorySelect({ repositories, selectedRepo, onRepoChange, loa
           disabled={loading}
           className="px-3 py-1.5 pr-8 text-sm border border-[#dadce0] rounded bg-white text-[#202124] focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:border-[#1a73e8] min-w-[280px] disabled:opacity-50"
         />
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           disabled={loading}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-[#5f6368] hover:text-[#202124] disabled:opacity-50"
+          className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d={isOpen ? 'M18 15l-6-6-6 6' : 'M6 9l6 6 6-6'} />
-          </svg>
-        </button>
+          {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </Button>
       </div>
 
       {isOpen && !loading && (
@@ -90,15 +92,16 @@ export function RepositorySelect({ repositories, selectedRepo, onRepoChange, loa
             </div>
           ) : (
             filteredRepos.map((repo) => (
-              <button
+              <Button
                 key={repo.fullName}
+                variant="ghost"
                 type="button"
                 onClick={() => handleSelect(repo.fullName)}
-                className={`w-full px-3 py-2 text-left text-sm hover:bg-[#f1f3f4] ${selectedRepo === repo.fullName ? 'bg-[#e8f0fe] text-[#1967d2]' : 'text-[#202124]'
+                className={`w-full justify-start px-3 py-2 text-left text-sm font-normal rounded-none ${selectedRepo === repo.fullName ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800' : 'text-slate-700 hover:bg-slate-50'
                   }`}
               >
                 {repo.fullName}
-              </button>
+              </Button>
             ))
           )}
         </div>

@@ -5,37 +5,35 @@ import { useScreenShare } from '../hooks/useScreenShare';
 import { useToast } from '../components/Toast';
 import { useMonitoring } from '../contexts/MonitoringContext';
 import {
-  Box,
-  Typography,
-  Button,
-  IconButton,
   Card,
-  CardContent,
-  CircularProgress,
-  Chip,
-  Grid,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions
-} from '@mui/material';
+} from "@/components/ui/card"
 import {
-  Add as AddIcon,
-  Visibility as VisibilityIcon,
-  VisibilityOff as VisibilityOffIcon,
-  SignalCellularAlt as SignalIcon,
-  People as PeopleIcon,
-  Close as CloseIcon,
-  Fullscreen as FullscreenIcon,
-  Delete as DeleteIcon,
-  ScreenShare as ScreenShareIcon,
-  StopScreenShare as StopScreenShareIcon,
-  VpnKey as VpnKeyIcon,
-  Monitor as MonitorIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon
-} from '@mui/icons-material';
+  Button,
+} from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Plus,
+  Eye,
+  EyeOff,
+  Signal,
+  Users,
+  X,
+  Maximize2,
+  Trash2,
+  Monitor,
+  CheckCircle2,
+  AlertCircle,
+  Key,
+  Loader2
+} from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────
 // Styles & Animations
@@ -142,58 +140,113 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
 
   return (
     <div ref={containerRef} style={{ height: '100%' }}>
-      <Card variant="outlined" sx={{ height: '100%', borderRadius: 2, overflow: 'hidden', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', borderColor: session.streamActive ? '#1a3e62' : '#eee', borderWidth: session.streamActive ? 2 : 1, display: 'flex', flexDirection: 'column', bgcolor: 'white', '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 8px 30px rgba(0,0,0,0.1)' } }}>
-        <Box sx={{ p: 2, borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#fcfcfc' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{session.employeeName}</Typography>
+      <Card className={`h-full overflow-hidden transition-all duration-300 border-2 ${session.streamActive ? 'border-[#1a3e62] shadow-md' : 'border-slate-100 shadow-sm'} flex flex-col bg-white hover:translate-y-[-4px] hover:shadow-xl`}>
+        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+          <div className="flex items-center gap-3 min-w-0">
+            <h3 className="font-bold text-slate-800 truncate">{session.employeeName}</h3>
             {session.streamActive && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#4caf50', animation: 'pulse 1.5s infinite' }} />
-                <Typography variant="caption" sx={{ color: '#4caf50', fontWeight: 700, fontSize: '0.7rem' }}>Live</Typography>
-              </Box>
+              <div className="flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Live</span>
+              </div>
             )}
-          </Box>
-        </Box>
-        <Box sx={{ width: '100%', pt: '56.25%', bgcolor: '#000', position: 'relative', overflow: 'hidden', cursor: session.streamActive ? 'pointer' : 'default' }} onClick={() => session.streamActive && setShowFullView(true)}>
-          <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          </div>
+        </div>
+        <div
+          className={`relative w-full aspect-video bg-slate-900 overflow-hidden ${session.streamActive ? 'cursor-pointer' : 'cursor-default'}`}
+          onClick={() => session.streamActive && setShowFullView(true)}
+        >
+          <div className="absolute inset-0 flex items-center justify-center">
             {session.streamActive ? (
-              <video ref={remoteVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'contain' }} onPlay={() => setLoading(false)} />
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-contain"
+                onPlay={() => setLoading(false)}
+              />
             ) : (
-              <Box sx={{ textAlign: 'center', opacity: 0.5 }}>
-                <VisibilityOffIcon sx={{ fontSize: 40, color: '#666', mb: 1 }} />
-                <Typography variant="body2" sx={{ color: '#999', fontWeight: 600 }}>Offline</Typography>
-              </Box>
+              <div className="text-center opacity-40">
+                <EyeOff className="h-10 w-10 text-slate-500 mx-auto mb-2" />
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Offline</p>
+              </div>
             )}
-            {loading && session.streamActive && <CircularProgress size={30} sx={{ position: 'absolute' }} />}
-          </Box>
-        </Box>
-        <Box sx={{ p: 1.5, display: 'flex', gap: 1, bgcolor: '#f8f9fa' }}>
-          <Button fullWidth variant="contained" disableElevation startIcon={<VisibilityIcon />} disabled={!session.streamActive} onClick={() => setShowFullView(true)} sx={{ textTransform: 'none', fontWeight: 600, bgcolor: '#1a3e62', borderRadius: 1.5, '&:hover': { bgcolor: '#122c46' } }}>View</Button>
-          <Button fullWidth variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={handleRemoveClick} sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 1.5 }}>Remove</Button>
-        </Box>
+            {loading && session.streamActive && (
+              <Loader2 className="absolute h-8 w-8 text-white animate-spin opacity-50" />
+            )}
+          </div>
+        </div>
+        <div className="p-3 flex gap-2 bg-slate-50/30">
+          <Button
+            className="flex-1 bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold h-9 rounded-lg"
+            disabled={!session.streamActive}
+            onClick={() => setShowFullView(true)}
+          >
+            <Eye className="mr-2 h-4 w-4" />
+            View
+          </Button>
+          <Button
+            variant="outline"
+            className="flex-1 text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 h-9 rounded-lg"
+            onClick={handleRemoveClick}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Remove
+          </Button>
+        </div>
       </Card>
 
-      <Dialog fullWidth maxWidth="md" open={showFullView} onClose={() => setShowFullView(false)} PaperProps={{ sx: { bgcolor: '#000', borderRadius: 2, overflow: 'hidden' } }}>
-        <Box sx={{ position: 'relative', width: '100%', height: '90vh', display: 'flex', flexDirection: 'column' }}>
-          <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: 'rgba(0,0,0,0.8)', position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1 }}>
-            <Typography variant="h6" sx={{ color: 'white', fontWeight: 700 }}>{session.employeeName}</Typography>
-            <IconButton onClick={() => setShowFullView(false)} sx={{ color: 'white' }}><CloseIcon /></IconButton>
-          </Box>
-          <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <video ref={fullVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-          </Box>
-        </Box>
+      <Dialog open={showFullView} onOpenChange={setShowFullView}>
+        <DialogContent className="max-w-screen-xl w-[95vw] h-[90vh] p-0 bg-black border-slate-800 overflow-hidden [&>button]:text-white">
+          <div className="relative w-full h-full flex flex-col">
+            <div className="p-4 flex justify-between items-center bg-black/80 backdrop-blur-sm absolute top-0 left-0 right-0 z-10 border-b border-white/5">
+              <h3 className="text-xl font-bold text-white tracking-tight">{session.employeeName}</h3>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Active Stream</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 flex items-center justify-center bg-slate-950">
+              <video
+                ref={fullVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-contain"
+              />
+            </div>
+          </div>
+        </DialogContent>
       </Dialog>
 
-      <Dialog open={showConfirm} onClose={() => setShowConfirm(false)}>
-        <DialogTitle sx={{ fontWeight: 800 }}>Stop Monitoring?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>Are you sure you want to disconnect from <strong>{session.employeeName}</strong>?</DialogContentText>
+      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <DialogContent className="sm:max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-900 leading-tight">Stop Monitoring?</DialogTitle>
+            <DialogDescription className="text-slate-500 pt-2">
+              Are you sure you want to disconnect from <strong className="text-slate-900">{session.employeeName}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 pt-4">
+            <Button
+              variant="ghost"
+              onClick={() => setShowConfirm(false)}
+              className="text-slate-600 hover:bg-slate-100 font-medium"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmRemove}
+              className="bg-rose-600 hover:bg-rose-700 font-semibold"
+            >
+              Disconnect
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setShowConfirm(false)} sx={{ textTransform: 'none', borderRadius: 1.5 }}>Cancel</Button>
-          <Button onClick={handleConfirmRemove} variant="contained" color="error" sx={{ textTransform: 'none', borderRadius: 1.5 }}>Disconnect</Button>
-        </DialogActions>
       </Dialog>
     </div>
   );
@@ -288,174 +341,227 @@ const Monitoring = () => {
     emit('monitoring:leave-session', { sessionId: id });
   };
 
-  if (!role) return <Box sx={{ p: 10, textAlign: 'center' }}><CircularProgress /></Box>;
+  if (!role) return <div className="p-20 flex justify-center items-center"><Loader2 className="h-10 w-10 text-blue-600 animate-spin" /></div>;
 
   if (role === 'employee') {
     return (
-      <Box sx={{ minHeight: 'calc(100vh - 64px)', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f5f7f9', p: 3 }}>
-        <Box sx={{ maxWidth: 500, width: '100%' }}>
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center bg-slate-50 p-6">
+        <style>{GLOBAL_STYLES}</style>
+        <div className="max-w-md w-full">
           {!sessionId ? (
-            <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid #e0e6ed', p: 4, textAlign: 'center' }}>
-              <Box sx={{ width: 64, height: 64, borderRadius: '50%', bgcolor: 'rgba(25, 118, 210, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 3 }}>
-                <VpnKeyIcon sx={{ fontSize: 32, color: '#1976d2' }} />
-              </Box>
-              <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Setup Connection</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>Enter a code for admins to connect to your screen.</Typography>
-              <input type="text" value={connectionCode} onChange={(e) => setConnectionCode(e.target.value)} placeholder="Enter code (min 4 chars)" style={{ width: '100%', padding: '16px', borderRadius: '12px', border: '2px solid #e0e6ed', textAlign: 'center', fontSize: '1.2rem', fontWeight: 700, marginBottom: '24px' }} />
-              <Button fullWidth variant="contained" size="large" onClick={handleSubmitConnectionCode} disabled={loading || connectionCode.trim().length < 4} sx={{ py: 2, borderRadius: 1.5, fontWeight: 700, bgcolor: '#1a3e62', textTransform: 'none', '&:hover': { bgcolor: '#122c46' } }}>
-                {loading ? <CircularProgress size={24} color="inherit" /> : 'Set Code & Continue'}
+            <Card className="rounded-3xl border-slate-200 p-8 text-center shadow-xl bg-white">
+              <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-6">
+                <Key className="h-8 w-8 text-blue-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Setup Connection</h2>
+              <p className="text-slate-500 mb-8 font-medium">Enter a code for admins to connect to your screen.</p>
+              <div className="relative mb-8">
+                <input
+                  type="text"
+                  value={connectionCode}
+                  onChange={(e) => setConnectionCode(e.target.value)}
+                  placeholder="Enter code"
+                  className="w-full px-4 py-4 rounded-xl border-2 border-slate-100 text-center text-2xl font-bold text-slate-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-300"
+                />
+              </div>
+              <Button
+                className="w-full bg-[#1a3e62] hover:bg-[#122c46] text-white font-bold h-14 rounded-2xl transition-all shadow-lg active:scale-95 text-lg"
+                onClick={handleSubmitConnectionCode}
+                disabled={loading || connectionCode.trim().length < 4}
+              >
+                {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : 'Start Session'}
               </Button>
             </Card>
           ) : (
-            <Card elevation={0} sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid #e0e6ed', boxShadow: '0 10px 40px rgba(0,0,0,0.04)' }}>
-              <Box sx={{ p: 4, textAlign: 'center' }}>
+            <Card className="rounded-3xl border-slate-200 overflow-hidden shadow-2xl bg-white">
+              <div className="p-8 text-center">
                 {!isSharing ? (
                   <>
-                    <Box sx={{ width: 64, height: 64, borderRadius: '50%', bgcolor: 'rgba(25, 118, 210, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
-                      <MonitorIcon sx={{ fontSize: 32, color: '#1976d2' }} />
-                    </Box>
-                    <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
+                    <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
+                      <Monitor className="h-8 w-8 text-blue-600" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-900 mb-2">
                       {justReconnected ? 'Session Restored' : 'Ready to Share'}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+                    </h2>
+                    <p className="text-slate-500 mb-8 font-medium italic">
                       {justReconnected
                         ? 'Your connection was restored. Please resume sharing to allow admins to view your screen.'
                         : 'Admins can view your screen once you start sharing.'}
-                    </Typography>
-                    <Box sx={{ mb: 4, p: 3, bgcolor: '#f8fbff', borderRadius: 3, border: '1px dashed #c2d6ff', position: 'relative' }}>
-                      <Typography variant="caption" sx={{ color: '#1976d2', fontWeight: 700, display: 'block', mb: 1 }}>CONNECTION CODE</Typography>
-                      <Typography variant="h3" sx={{ fontWeight: 900, color: '#1976d2', letterSpacing: 4 }}>{connectionCode}</Typography>
-                      <IconButton
-                        size="small"
+                    </p>
+                    <div className="mb-8 p-6 bg-blue-50/50 rounded-2xl border-2 border-dashed border-blue-200 relative group">
+                      <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest block mb-2">Connection Code</span>
+                      <div className="text-4xl font-black text-blue-700 tracking-[0.2em] font-mono">{connectionCode}</div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => setShowResetConfirm(true)}
-                        sx={{ position: 'absolute', top: 8, right: 8, color: '#1976d2', opacity: 0.6, '&:hover': { opacity: 1 } }}
+                        className="absolute top-2 right-2 text-blue-400 hover:text-blue-600 hover:bg-white rounded-full h-8 w-8 shadow-sm transition-all"
                         title="Change Code"
                       >
-                        <CloseIcon sx={{ fontSize: 18 }} />
-                      </IconButton>
-                    </Box>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
                     <Button
-                      fullWidth
-                      variant="contained"
-                      size="large"
+                      className="w-full bg-[#1a3e62] hover:bg-[#122c46] text-white font-bold h-14 rounded-2xl transition-all shadow-lg active:scale-95 text-lg"
                       onClick={() => {
                         startSharing();
                         setJustReconnected(false);
                       }}
-                      sx={{ py: 2, borderRadius: 1.5, fontWeight: 700, bgcolor: '#1a3e62', textTransform: 'none', '&:hover': { bgcolor: '#122c46' } }}
                     >
-                      {justReconnected ? 'Resume Sharing Screen' : 'Start Sharing Screen'}
+                      {justReconnected ? 'Resume Sharing' : 'Start Sharing Screen'}
                     </Button>
                   </>
                 ) : (
                   <>
-                    <Box sx={{ width: 64, height: 64, borderRadius: '50%', bgcolor: 'rgba(76, 175, 80, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2, animation: 'pulse 2s infinite' }}>
-                      <CheckCircleIcon sx={{ fontSize: 32, color: '#4caf50' }} />
-                    </Box>
-                    <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Sharing Active</Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>Your screen is live for connected administrators.</Typography>
-                    <Box sx={{ mb: 4, display: 'flex', justifyContent: 'center', gap: 3 }}>
-                      <Box sx={{ textAlign: 'left', position: 'relative' }}>
-                        <Typography variant="caption" color="text.secondary">Code</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          {connectionCode}
-                          <IconButton size="small" onClick={() => setShowResetConfirm(true)} sx={{ p: 0.2 }}>
-                            <AddIcon sx={{ transform: 'rotate(45deg)', fontSize: 14 }} />
-                          </IconButton>
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <Button fullWidth variant="outlined" color="error" size="large" onClick={stopSharing} sx={{ py: 1.5, borderRadius: 1.5, fontWeight: 700, borderWidth: 1, textTransform: 'none' }}>Stop Sharing</Button>
+                    <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4 border-2 border-emerald-100 animate-pulse">
+                      <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-emerald-600 mb-1">Sharing Active</h2>
+                    <p className="text-slate-500 mb-8 font-medium">Your screen is live for connected administrators.</p>
+                    <div className="mb-8 flex justify-center">
+                      <div className="px-6 py-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                        <div className="text-left">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Session Code</span>
+                          <span className="text-xl font-bold text-slate-700 tracking-wider font-mono">{connectionCode}</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setShowResetConfirm(true)}
+                          className="h-8 w-8 p-0 hover:bg-slate-200 rounded-full text-slate-400"
+                        >
+                          <X className="h-4 w-4 rotate-45" />
+                        </Button>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 font-bold h-14 rounded-2xl transition-all shadow-sm active:scale-95 text-lg"
+                      onClick={stopSharing}
+                    >
+                      Stop Sharing
+                    </Button>
                   </>
                 )}
-                {shareError && <Typography variant="caption" color="error" sx={{ mt: 2, display: 'block' }}>{shareError}</Typography>}
-              </Box>
+                {shareError && <p className="text-rose-500 text-xs mt-4 font-bold uppercase tracking-wider">{shareError}</p>}
+              </div>
             </Card>
           )}
-        </Box>
-        <Dialog open={showResetConfirm} onClose={() => setShowResetConfirm(false)}>
-          <DialogTitle sx={{ fontWeight: 800 }}>Change Connection Code?</DialogTitle>
-          <DialogContent>
-            <DialogContentText>
-              Changing the code will disconnect any currently viewing administrators and stop your current screen share. You will need to set a new code and share it with admins.
-            </DialogContentText>
+        </div>
+        <Dialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+          <DialogContent className="sm:max-w-md bg-white">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-slate-900 leading-tight">Change Connection Code?</DialogTitle>
+              <DialogDescription className="text-slate-500 pt-2">
+                Changing the code will disconnect any currently viewing administrators and stop your current screen share.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0 pt-4">
+              <Button
+                variant="ghost"
+                onClick={() => setShowResetConfirm(false)}
+                className="text-slate-600 hover:bg-slate-100 font-medium"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                className="bg-rose-600 hover:bg-rose-700 font-semibold"
+                onClick={() => {
+                  resetSession();
+                  setShowResetConfirm(false);
+                }}
+              >
+                Change Code
+              </Button>
+            </DialogFooter>
           </DialogContent>
-          <DialogActions sx={{ p: 3 }}>
-            <Button onClick={() => setShowResetConfirm(false)} sx={{ textTransform: 'none', borderRadius: 1.5 }}>Cancel</Button>
-            <Button
-              variant="contained"
-              color="error"
-              onClick={() => {
-                resetSession();
-                setShowResetConfirm(false);
-              }}
-              sx={{ textTransform: 'none', borderRadius: 1.5 }}
-            >
-              Change Code
-            </Button>
-          </DialogActions>
         </Dialog>
-      </Box>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'white' }}>
+    <div className="min-h-screen bg-slate-50">
       <style>{GLOBAL_STYLES}</style>
-      <Box sx={{ borderBottom: '1px solid #eee', p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: 'white' }}>
-        <Box>
-          <Typography variant="h6" sx={{ color: '#333', fontWeight: 500 }}>Monitoring</Typography>
-        </Box>
+
+      {/* Header */}
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Monitoring Dashboard</h1>
+          <p className="text-sm text-slate-500 font-medium">Manage and view active employee streams</p>
+        </div>
         <Button
-          variant="contained"
-          startIcon={<AddIcon />}
           onClick={() => setShowAddModal(true)}
-          sx={{
-            borderRadius: 1.5,
-            textTransform: 'none',
-            bgcolor: '#1a3e62',
-            '&:hover': { bgcolor: '#122c46' }
-          }}
+          className="bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold h-11 px-6 rounded-xl shadow-md transition-all active:scale-95"
         >
-          Add New
+          <Plus className="mr-2 h-5 w-5" />
+          Connect New
         </Button>
-      </Box>
-      <Box sx={{ p: 5 }}>
+      </div>
+
+      {/* Content */}
+      <div className="p-6 lg:p-10">
         {sessions.length === 0 ? (
-          <Box sx={{ py: 15, textAlign: 'center', bgcolor: 'white', borderRadius: 4, border: '2px dashed #eceff1' }}>
-            <Typography variant="h6" color="text.secondary">No active sessions</Typography>
-          </Box>
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200">
+            <div className="bg-slate-50 p-6 rounded-full mb-4">
+              <Monitor className="h-12 w-12 text-slate-300" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">No active sessions</h3>
+            <p className="text-slate-500 max-w-xs text-center">
+              Click the button above to connect to an employee using their session code.
+            </p>
+          </div>
         ) : (
-          <Grid container spacing={4}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {sessions.map(s => (
-              <Grid item xs={12} sm={6} md={4} key={s.sessionId}>
-                <MonitoringSessionCard session={s} adminName={name} onRemove={handleRemoveSession} />
-              </Grid>
+              <MonitoringSessionCard
+                key={s.sessionId}
+                session={s}
+                adminName={name}
+                onRemove={handleRemoveSession}
+              />
             ))}
-          </Grid>
+          </div>
         )}
-      </Box>
-      <Dialog open={showAddModal} onClose={() => setShowAddModal(false)}>
-        <DialogTitle sx={{ fontWeight: 800 }}>Connect to Employee</DialogTitle>
-        <DialogContent>
-          <input
-            type="text"
-            value={addFormCode}
-            onChange={e => {
-              setAddFormCode(e.target.value);
-              if (addFormError) setAddFormError('');
-            }}
-            placeholder="Enter code"
-            style={{ width: '100%', padding: '12px', marginTop: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-          />
-          {addFormError && <Typography color="error" variant="caption">{addFormError}</Typography>}
+      </div>
+      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+        <DialogContent className="sm:max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-900 leading-tight">Connect to Employee</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <input
+              type="text"
+              value={addFormCode}
+              onChange={e => {
+                setAddFormCode(e.target.value);
+                if (addFormError) setAddFormError('');
+              }}
+              placeholder="Enter code"
+              className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
+            />
+            {addFormError && <p className="text-rose-500 text-xs mt-1 font-medium">{addFormError}</p>}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="ghost"
+              onClick={() => setShowAddModal(false)}
+              className="text-slate-600 hover:bg-slate-100 font-medium"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold px-6"
+              onClick={handleAddConnection}
+              disabled={addFormLoading}
+            >
+              Connect
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setShowAddModal(false)} sx={{ textTransform: 'none', borderRadius: 1.5 }}>Cancel</Button>
-          <Button variant="contained" onClick={handleAddConnection} disabled={addFormLoading} sx={{ textTransform: 'none', borderRadius: 1.5, bgcolor: '#1a3e62', '&:hover': { bgcolor: '#122c46' } }}>Connect</Button>
-        </DialogActions>
       </Dialog>
-    </Box>
+    </div>
   );
 };
 

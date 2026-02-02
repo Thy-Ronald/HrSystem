@@ -1,51 +1,45 @@
-import React from 'react';
 import {
   Dialog,
-  DialogTitle,
   DialogContent,
-  DialogContentText,
-  DialogActions,
-  Button,
-  Typography,
-  Box
-} from '@mui/material';
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 
 /**
  * Delete confirmation dialog component
  */
 export function DeleteConfirmDialog({ open, contractName, onConfirm, onCancel }) {
   return (
-    <Dialog
-      open={open}
-      onClose={onCancel}
-      PaperProps={{
-        sx: { borderRadius: 2 }
-      }}
-    >
-      <DialogTitle sx={{ fontWeight: 600 }}>DELETE CONTRACT</DialogTitle>
-      <DialogContent>
-        <DialogContentText sx={{ color: '#202124' }}>
-          Are you sure you want to delete the contract for <strong>{contractName}</strong>?
-          This action cannot be undone.
-        </DialogContentText>
+    <Dialog open={open} onOpenChange={(val) => !val && onCancel()}>
+      <DialogContent className="sm:max-w-md bg-white">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold text-slate-900 leading-tight">DELETE CONTRACT</DialogTitle>
+          <DialogDescription className="text-slate-500 pt-2 text-base">
+            Are you sure you want to delete the contract for <strong className="text-slate-900">{contractName}</strong>?
+            <br />
+            This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2 sm:gap-0 pt-4">
+          <Button
+            variant="ghost"
+            onClick={onCancel}
+            className="text-slate-600 hover:bg-slate-100 font-medium"
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={onConfirm}
+            className="bg-rose-600 hover:bg-rose-700 font-semibold"
+          >
+            Delete
+          </Button>
+        </DialogFooter>
       </DialogContent>
-      <DialogActions sx={{ p: 3 }}>
-        <Button
-          onClick={onCancel}
-          variant="outlined"
-          sx={{ borderRadius: 1.5, textTransform: 'none' }}
-        >
-          Cancel
-        </Button>
-        <Button
-          onClick={onConfirm}
-          variant="contained"
-          color="error"
-          sx={{ borderRadius: 1.5, textTransform: 'none' }}
-        >
-          Delete
-        </Button>
-      </DialogActions>
     </Dialog>
   );
 }

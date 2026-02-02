@@ -5,11 +5,10 @@ import {
   CardContent,
   Typography,
   TextField,
-  Button,
   CircularProgress,
-  Link,
   Container
 } from '@mui/material';
+import { Button } from "@/components/ui/button"
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
 
@@ -149,18 +148,8 @@ const Auth = ({ onLogin }) => {
 
                 <Button
                   type="submit"
-                  variant="contained"
-                  fullWidth
-                  size="large"
                   disabled={loading || (isLogin ? !email.trim() || !password : !email.trim() || !password || !name.trim())}
-                  sx={{
-                    py: 1.5,
-                    borderRadius: 1.5,
-                    textTransform: 'none',
-                    fontSize: '1rem',
-                    boxShadow: 'none',
-                    '&:hover': { boxShadow: 'none' }
-                  }}
+                  className="w-full bg-[#1a3e62] hover:bg-[#122c46] text-white py-6 rounded-xl font-semibold text-base transition-all shadow-md active:scale-[0.98]"
                 >
                   {loading ? (
                     <CircularProgress size={24} sx={{ color: 'white' }} />
@@ -172,9 +161,8 @@ const Auth = ({ onLogin }) => {
             </form>
 
             <Box sx={{ mt: 3, textAlign: 'center' }}>
-              <Link
-                component="button"
-                variant="body2"
+              <Button
+                variant="link"
                 onClick={() => {
                   setIsLogin(!isLogin);
                   setEmail('');
@@ -182,14 +170,14 @@ const Auth = ({ onLogin }) => {
                   setName('');
                 }}
                 disabled={loading}
-                sx={{ textDecoration: 'none', fontWeight: 500 }}
+                className="text-[#1a3e62] hover:text-[#122c46] font-semibold"
               >
                 {isLogin ? (
                   <>Don't have an account? Sign Up</>
                 ) : (
                   <>Already have an account? Sign In</>
                 )}
-              </Link>
+              </Button>
             </Box>
           </CardContent>
         </Card>

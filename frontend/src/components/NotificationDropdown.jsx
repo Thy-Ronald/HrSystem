@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { formatDate } from '../utils/format';
 import { calculateExpirationDate } from '../features/contracts/utils/contractHelpers';
+import { Button } from "@/components/ui/button"
+import { X, Bell, FileText } from "lucide-react"
 
 /**
  * Facebook-style notification dropdown component
@@ -69,14 +71,14 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
       {/* Header */}
       <div className="px-4 py-3 border-b border-[#dadce0] flex items-center justify-between bg-white sticky top-0">
         <h3 className="text-lg font-semibold text-[#202124]">Notifications</h3>
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onClose}
-          className="p-1 hover:bg-[#f0f2f5] rounded-full transition-colors"
+          className="h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </button>
+          <X className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* Content */}
@@ -88,10 +90,9 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
           </div>
         ) : notifications.length === 0 ? (
           <div className="p-8 text-center text-[#5f6368]">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="mx-auto mb-4 opacity-30">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
+            <div className="bg-slate-50 p-4 rounded-full mb-4 shadow-inner">
+              <Bell className="h-10 w-10 text-slate-300" />
+            </div>
             <p className="font-medium">No notifications</p>
             <p className="text-sm">All contracts are up to date</p>
           </div>
@@ -112,13 +113,8 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
                 >
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 mt-1">
-                      <div className="w-10 h-10 rounded-full bg-[#e4e6eb] flex items-center justify-center">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1877f2" strokeWidth="2">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                          <polyline points="14 2 14 8 20 8" />
-                          <line x1="16" y1="13" x2="8" y2="13" />
-                          <line x1="16" y1="17" x2="8" y2="17" />
-                        </svg>
+                      <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
+                        <FileText className="h-5 w-5 text-blue-600" />
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
@@ -157,9 +153,12 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
       {/* Footer */}
       {notifications.length > 0 && (
         <div className="px-4 py-3 border-t border-[#dadce0] bg-[#f0f2f5]">
-          <button className="w-full text-center text-sm font-semibold text-[#1877f2] hover:underline">
+          <Button
+            variant="link"
+            className="w-full text-center text-sm font-semibold text-blue-600 hover:text-blue-700 hover:no-underline"
+          >
             See All Notifications
-          </button>
+          </Button>
         </div>
       )}
     </div>

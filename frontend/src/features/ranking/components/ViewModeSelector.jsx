@@ -2,25 +2,26 @@
  * ViewModeSelector Component
  * Toggle between Rank and Graph Ranking views
  */
-
-import { VIEW_MODES } from '../constants';
+import { Button } from "@/components/ui/button"
 
 export function ViewModeSelector({ viewMode, onViewChange, onOpenModal }) {
+  const buttonStyle = "px-4 h-9 text-xs font-semibold rounded-lg bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all";
+
   return (
     <nav className="flex items-center gap-2" aria-label="View mode selection">
-      <button
+      <Button
         onClick={onOpenModal}
-        type="button"
-        className="px-4 py-2 text-sm font-medium rounded bg-white border border-[#dadce0] text-[#5f6368] hover:bg-[#f8f9fa] transition-colors"
+        variant="outline"
+        className={buttonStyle}
       >
         Rank
-      </button>
-      <button
-        type="button"
-        className="px-4 py-2 text-sm font-medium rounded bg-white border border-[#dadce0] text-[#5f6368] hover:bg-[#f8f9fa] transition-colors"
+      </Button>
+      <Button
+        variant="outline"
+        className={buttonStyle}
       >
         Graph Ranking
-      </button>
+      </Button>
     </nav>
   );
 }
