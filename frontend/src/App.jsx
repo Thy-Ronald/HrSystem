@@ -148,7 +148,6 @@ function AppContent() {
 }
 
 import { MonitoringProvider } from './contexts/MonitoringContext';
-import { GithubProvider } from './contexts/GithubContext';
 import { ToastProvider } from './components/Toast';
 
 function App() {
@@ -156,9 +155,7 @@ function App() {
     <AuthProvider>
       <ToastProvider>
         <MonitoringProvider>
-          <GithubProvider>
-            <AppContent />
-          </GithubProvider>
+          <AppContent />
         </MonitoringProvider>
       </ToastProvider>
     </AuthProvider>
@@ -166,3 +163,4 @@ function App() {
 }
 
 export default App;
+
