@@ -1,31 +1,9 @@
 
 import React, { useMemo } from 'react';
 import { Box, Typography, Tooltip } from '@mui/material';
+import { STATUS_COLORS, STATUS_ACRONYMS } from '../constants/github';
 
-// Status colors matching the image/requirements
-const STATUS_COLORS = {
-    'Assigned': '#81C784', // Light Green
-    'In Progress': '#FFD54F', // Yellow
-    'Review': '#2979FF', // Blue scale
-    'Local Done': '#CFD8DC', // Grey
-    'Dev Deployed': '#64B5F6', // Lighter Blue
-    'Dev Checked': '#4DB6AC', // Teal
-    'Time Up': '#FFE0B2', // Orange/Amber
-    // Fallbacks
-    'Done': '#CFD8DC',
-    'Unknown': '#E0E0E0'
-};
 
-const statusAcronyms = {
-    'Assigned': 'A',
-    'In Progress': 'IP',
-    'Review': 'R',
-    'Local Done': 'LD',
-    'Dev Deployed': 'DD',
-    'Dev Checked': 'DC',
-    'Time Up': 'TU',
-    'Done': 'D'
-};
 
 const TimelineChart = ({ issues, startDate, endDate }) => {
     const chartStart = startDate ? new Date(startDate).getTime() : new Date().setHours(0, 0, 0, 0);
@@ -147,7 +125,7 @@ const TimelineChart = ({ issues, startDate, endDate }) => {
                                                 zIndex: idx // Higher index for later statuses
                                             }}
                                         >
-                                            {status.status}
+                                            {STATUS_ACRONYMS[status.status] || status.status}
                                         </Box>
                                     </Tooltip>
                                 );
