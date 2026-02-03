@@ -12,31 +12,37 @@ import {
     FormControl,
     Tooltip
 } from '@mui/material';
-import { getGithubTimeline, fetchRepositories } from '../services/api';
+import { useGithub } from '../contexts/GithubContext';
 import TimelineChart from '../components/TimelineChart';
 import { AccessTime, Assignment } from '@mui/icons-material';
 import useSocket from '../hooks/useSocket';
 import { STATUS_COLORS } from '../constants/github';
 import TimerDisplay from '../components/TimerDisplay';
 
-
-
 const GithubAnalytics = () => {
-    const [loading, setLoading] = useState(false);
-    const [timelineData, setTimelineData] = useState([]);
-    const [selectedRepo, setSelectedRepo] = useState('');
-    const [repos, setRepos] = useState([]);
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
+    // Connect to context
+    const {
+        timelineData,
+        selectedRepo,
+        setSelectedRepo,
+        repos,
+        selectedDate,
+        setSelectedDate,
+        loading,
+        fetchData,
+        initialFetchDone
+    } = useGithub();
+
     const [currentTime, setCurrentTime] = useState(Date.now());
     const scrollRef = useRef(null);
 
-    // Default scroll to 10:00 AM
+    // Default scroll to 10:00 AM on load
     useEffect(() => {
         if (scrollRef.current && !loading && timelineData.length > 0) {
             // (10 hours / 24 hours) * 2400px = 1000px
             scrollRef.current.scrollLeft = 1000;
         }
-    }, [loading, timelineData]);
+    }, [loading, timelineData.length]); // Only reset on data structure change
 
     // Central ticker for all timers
     useEffect(() => {
@@ -46,40 +52,12 @@ const GithubAnalytics = () => {
         return () => clearInterval(interval);
     }, []);
 
-    // Fetch repositories on mount
+    // Initial fetch if needed
     useEffect(() => {
-        async function loadRepos() {
-            try {
-                const repoList = await fetchRepositories();
-                setRepos(repoList);
-                if (repoList.length > 0) {
-                    const defaultRepo = repoList.find(r => r.name === 'sacsys009') || repoList[0];
-                    setSelectedRepo(defaultRepo.fullName);
-                }
-            } catch (err) {
-                console.error("Failed to load repos", err);
-            }
+        if (!initialFetchDone && selectedRepo) {
+            fetchData();
         }
-        loadRepos();
-    }, []);
-
-    // Fetch timeline data when repo or date changes
-    const fetchData = React.useCallback(async () => {
-        if (!selectedRepo) return;
-        setLoading(true);
-        try {
-            const data = await getGithubTimeline(selectedRepo, null, { date: selectedDate });
-            setTimelineData(data || []);
-        } catch (err) {
-            console.error("Failed to fetch timeline", err);
-        } finally {
-            setLoading(false);
-        }
-    }, [selectedRepo, selectedDate]);
-
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+    }, [selectedRepo, selectedDate, fetchData, initialFetchDone]);
 
     // Setup Socket.IO for real-time updates
     const { subscribe, unsubscribe } = useSocket();
@@ -90,13 +68,14 @@ const GithubAnalytics = () => {
             // Refresh if the updated repo matches current selection
             if (payload.repo === selectedRepo) {
                 console.log("[Socket] Refreshing data for", selectedRepo);
-                fetchData();
+                fetchData(true); // Force refresh
             }
         };
 
         subscribe('github:repo-updated', handleGithubUpdate);
         return () => unsubscribe('github:repo-updated', handleGithubUpdate);
     }, [selectedRepo, subscribe, unsubscribe, fetchData]);
+
 
     const getChartRange = () => {
         const start = new Date(selectedDate);
