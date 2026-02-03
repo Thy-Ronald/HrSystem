@@ -26,17 +26,14 @@ const {
   getCachedGitHubResponse,
 } = require('../utils/githubCache');
 
+const cacheService = require('./cacheService');
+
 /**
  * Clear cache entries for a specific repository
  */
 async function clearCacheForRepo(repoFullName) {
   const filters = ['today', 'yesterday', 'this-week', 'last-week', 'this-month'];
   let clearedCount = 0;
-
-  // We use the centralized githubCache system now
-  // Since it's Redis-based, we'd ideally have a pattern-based delete, 
-  // but for now, we'll manually clear common keys if needed.
-  // In the new system, keys are 'github:issues:owner_repo:filter'
 
   console.log(`[Cache] Clearing entries for repo: ${repoFullName}`);
 }
@@ -59,13 +56,28 @@ async function checkCacheStatus(repoFullName, filter) {
 }
 
 /**
- * Check if repository issues have changed (minimal ETag check)
+ * Check if repository issues have changed (using pushed_at timestamp)
  */
 async function checkRepoChanges(repoFullName) {
-  // This is a specialized optimization. For now, we delegate to getting repo info
-  // or just assume it might have changed. 
-  // To keep API compatibility without the complex ETag logic here:
-  return { changed: true, etag: null };
+  try {
+    const repo = await getRepoInfo(repoFullName);
+    if (!repo) return { changed: false };
+
+    const currentPushedAt = repo.pushed_at;
+    const cacheKey = `github:repo_last_pushed:${repoFullName.replace('/', '_')}`;
+    const lastPushedAt = await cacheService.get(cacheKey);
+
+    if (lastPushedAt === currentPushedAt) {
+      return { changed: false, etag: null };
+    }
+
+    // Update cache
+    await cacheService.set(cacheKey, currentPushedAt, 86400 * 7); // Cache for 7 days
+    return { changed: true, etag: null };
+  } catch (error) {
+    console.error(`[checkRepoChanges] Error for ${repoFullName}:`, error.message);
+    return { changed: true, etag: null }; // Fallback to 'changed' to be safe
+  }
 }
 
 module.exports = {

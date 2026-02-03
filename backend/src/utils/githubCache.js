@@ -130,13 +130,22 @@ async function getCachedGitHubResponse(cacheKey) {
  * @param {string} cacheKey - Cache key
  * @param {any} data - Data to cache
  * @param {string|null} etag - ETag from GitHub response headers
+ * @param {number|null} customTtl - Optional TTL in seconds (overrides 6 PM logic)
  * @returns {Promise<void>}
  */
-async function setCachedGitHubResponse(cacheKey, data, etag = null) {
+async function setCachedGitHubResponse(cacheKey, data, etag = null, customTtl = 600) {
   try {
-    // Calculate TTL until 6 PM
-    const ttlSeconds = getTTLUntil6PM();
-    const expiresAt = getExpiresAt6PM();
+    // Determine TTL and expiration
+    let ttlSeconds, expiresAt;
+
+    if (customTtl) {
+      ttlSeconds = customTtl;
+      expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+    } else {
+      // Calculate TTL until 6 PM
+      ttlSeconds = getTTLUntil6PM();
+      expiresAt = getExpiresAt6PM();
+    }
 
     // Create cache entry with all required fields
     // cacheService.set wraps data in { data: <ourData>, timestamp, etag } format
@@ -171,10 +180,10 @@ async function setCachedGitHubResponse(cacheKey, data, etag = null) {
  * @param {string|null} etag - Existing ETag
  * @returns {Promise<void>}
  */
-async function refreshCacheTTL(cacheKey, data, etag = null) {
+async function refreshCacheTTL(cacheKey, data, etag = null, customTtl = 600) {
   try {
-    // Re-store with new 6 PM TTL
-    await setCachedGitHubResponse(cacheKey, data, etag);
+    // Re-store with new TTL
+    await setCachedGitHubResponse(cacheKey, data, etag, customTtl);
     console.log(`[GitHub Cache] 🔄 Refreshed TTL: ${cacheKey}`);
   } catch (error) {
     console.error(`[GitHub Cache] Error refreshing TTL for ${cacheKey}:`, error.message);

@@ -157,7 +157,7 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
             }))
             .sort((a, b) => b.total - a.total || a.username.localeCompare(b.username));
 
-        await setCachedGitHubResponse(cacheKey, result, null);
+        await setCachedGitHubResponse(cacheKey, result, null, 600);
         return result;
     } catch (error) {
         throw error;
@@ -301,7 +301,7 @@ async function getIssueTimeline(repoFullName, filter = 'this-month', date = null
         });
 
         const result = Object.values(issuesByUser);
-        await setCachedGitHubResponse(cacheKey, result, null);
+        await setCachedGitHubResponse(cacheKey, result, null, 600);
         return result;
     } catch (error) {
         throw error;
