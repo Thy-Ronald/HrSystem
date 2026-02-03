@@ -32,20 +32,29 @@ const STATUS_COLORS = {
 
 const TimerDisplay = ({ statusHistory, currentStatus, currentTime }) => {
     const calculateDuration = () => {
-        let total = statusHistory.reduce((acc, seg) => {
-            if (seg.status === 'In Progress') {
+        // Sum all completed "In Progress" segments from the history
+        let total = statusHistory.reduce((acc, seg, idx) => {
+            // Only add duration for 'In Progress' segments that are NOT the current/active one
+            if (seg.status === 'In Progress' && idx < statusHistory.length - 1) {
                 return acc + (seg.durationMs || 0);
             }
             return acc;
         }, 0);
 
-        // If currently in progress, add time since the last transition
+        // If CURRENT status is "In Progress", add the live ticking duration from the latest segment
         if (currentStatus === 'In Progress' && statusHistory.length > 0) {
             const lastSegment = statusHistory[statusHistory.length - 1];
             if (lastSegment.status === 'In Progress') {
                 const startTime = new Date(lastSegment.startDate).getTime();
                 const now = currentTime || Date.now();
                 total += Math.max(0, now - startTime);
+            }
+        } else {
+            // If NOT "In Progress" (e.g., Paused/Time Up or Stopped/Done), 
+            // check if the LAST segment was an "In Progress" segment and add its fixed duration
+            const lastSegment = statusHistory[statusHistory.length - 1];
+            if (lastSegment && lastSegment.status === 'In Progress') {
+                total += (lastSegment.durationMs || 0);
             }
         }
         return total;
