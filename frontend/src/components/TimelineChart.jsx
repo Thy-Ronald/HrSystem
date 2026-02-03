@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { Box, Typography, Tooltip } from '@mui/material';
-import { STATUS_COLORS, STATUS_ACRONYMS } from '../constants/github';
+import { STATUS_COLORS } from '../constants/github';
 
 
 
@@ -125,7 +125,7 @@ const TimelineChart = ({ issues, startDate, endDate }) => {
                                                 zIndex: idx // Higher index for later statuses
                                             }}
                                         >
-                                            {STATUS_ACRONYMS[status.status] || status.status}
+                                            {status.status}
                                         </Box>
                                     </Tooltip>
                                 );
