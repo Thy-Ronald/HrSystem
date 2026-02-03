@@ -36,13 +36,15 @@ const STATUS_LABELS = {
   'Review': 'Review',
   'Local Done': 'Local Done',
   'Dev Deployed': 'Dev Deployed',
-  'Dev Checked': 'Dev Checked'
+  'Dev Checked': 'Dev Checked',
+  'Time Up': 'Time Up'
 };
 
 const STATUS_PRIORITY_ORDER = [
   'Dev Checked',
   'Dev Deployed',
   'Local Done',
+  'Time Up',
   'Review',
   'In Progress'
 ];
@@ -57,6 +59,7 @@ const mapLabelToStatus = (name) => {
   if (n.includes('local done')) return 'Local Done';
   if (n.includes('dev deployed')) return 'Dev Deployed';
   if (n.includes('dev checked')) return 'Dev Checked';
+  if (n.includes('time up') || n.includes('time-up')) return 'Time Up';
   return null;
 };
 
@@ -135,7 +138,7 @@ const withAuth = () => {
 async function checkRepoChanges(repoFullName) {
   const [owner, repo] = repoFullName.split('/');
   const cacheKey = `etag_${repoFullName}`;
-  const storedEtag = getEtag(cacheKey);
+  const storedEtag = etagCache.get(cacheKey);
 
   try {
     const headers = {
@@ -473,6 +476,7 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
     reviewed: ['2.5 review'], // Only exact match for "2.5 Review" label
     done: ['3:local done'], // Only exact match for "3:Local Done" label
     inProgress: ['2:in progress'], // Only exact match for "2:In Progress" label
+    timeUp: ['time up'], // Add time up support
   };
 
   const getStatusFromLabels = (labels) => {
@@ -480,13 +484,14 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
 
     for (const name of labelNames) {
       // Check in priority order: devChecked > devDeployed > reviewed > done > inProgress
-      if (statusLabels.devChecked.includes(name)) return 'devChecked';
-      if (statusLabels.devDeployed.includes(name)) return 'devDeployed';
-      if (statusLabels.reviewed.includes(name)) return 'reviewed';
-      if (statusLabels.done.includes(name)) return 'done';
-      if (statusLabels.inProgress.includes(name)) return 'inProgress';
+      if (statusLabels.devChecked.includes(name)) return 'Dev Checked';
+      if (statusLabels.devDeployed.includes(name)) return 'Dev Deployed';
+      if (statusLabels.reviewed.includes(name)) return 'Review';
+      if (statusLabels.done.includes(name)) return 'Local Done';
+      if (statusLabels.timeUp.includes(name)) return 'Time Up';
+      if (statusLabels.inProgress.includes(name)) return 'In Progress';
     }
-    return 'assigned'; // Default to assigned if no status label
+    return 'Assigned'; // Default to assigned if no status label
   };
 
   try {
@@ -790,13 +795,13 @@ async function getIssueTimeline(repoFullName, filter = 'this-month', date = null
                     avatarUrl
                   }
                 }
-                labels(first: 10) {
+                labels(first: 20) {
                   nodes {
                     name
                     color
                   }
                 }
-                timelineItems(last: 100, itemTypes: [LABELED_EVENT, UNLABELED_EVENT, ASSIGNED_EVENT]) {
+                timelineItems(last: 200, itemTypes: [LABELED_EVENT, UNLABELED_EVENT, ASSIGNED_EVENT]) {
                   nodes {
                     __typename
                     ... on LabeledEvent {
@@ -942,12 +947,16 @@ async function getIssueTimeline(repoFullName, filter = 'this-month', date = null
               }
             }
 
-            const endTime = issue.state === 'CLOSED' ? new Date(issue.updatedAt) : new Date();
+            const isTerminal = ['Local Done', 'Dev Deployed', 'Dev Checked', 'Time Up'].includes(currentStatus);
+            // If terminal or closed, the segment should end at the start of that state (no duration for "Done")
+            // This prevents the grey bar from extending to "now"
+            const endTime = (issue.state === 'CLOSED' || isTerminal) ? statusStartTime : new Date();
+
             statusHistory.push({
               status: currentStatus,
               startDate: statusStartTime,
               endDate: endTime,
-              durationMs: endTime - statusStartTime
+              durationMs: Math.max(0, endTime - statusStartTime)
             });
 
             allIssues.push({
@@ -989,7 +998,12 @@ async function getIssueTimeline(repoFullName, filter = 'this-month', date = null
           };
         }
         issuesByUser[username].issues.push(issue);
-        issuesByUser[username].totalP += (issue.pValue || 0);
+
+        // Only count P for active tasks
+        const isTerminal = ['Local Done', 'Dev Deployed', 'Dev Checked', 'Time Up'].includes(issue.currentStatus);
+        if (issue.state === 'OPEN' && !isTerminal) {
+          issuesByUser[username].totalP += (issue.pValue || 0);
+        }
       }
     });
 

@@ -18,6 +18,7 @@ const { generateToken } = require('./utils/jwt');
 const { initializeEmailJS } = require('./services/emailService');
 const { startContractExpirationJob } = require('./jobs/contractExpirationJob');
 const { startCacheRefreshJob, stopCacheRefreshJob } = require('./jobs/cacheRefreshJob');
+const { startRealtimeRefreshJob, stopRealtimeRefreshJob } = require('./jobs/realtimeRefreshJob');
 const { testConnection } = require('./config/database');
 const cacheService = require('./services/cacheService');
 const monitoringService = require('./services/monitoringService');
@@ -543,6 +544,9 @@ async function startServer() {
     } else {
       console.log('Cache refresh job disabled - database not connected.');
     }
+
+    // Start Real-time GitHub monitoring (checks every 15s)
+    startRealtimeRefreshJob(io);
   });
 }
 
@@ -550,6 +554,7 @@ async function startServer() {
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully...');
   stopCacheRefreshJob();
+  stopRealtimeRefreshJob();
   await cacheService.disconnect();
   const { closePool } = require('./config/database');
   await closePool();
@@ -559,6 +564,7 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down gracefully...');
   stopCacheRefreshJob();
+  stopRealtimeRefreshJob();
   await cacheService.disconnect();
   const { closePool } = require('./config/database');
   await closePool();

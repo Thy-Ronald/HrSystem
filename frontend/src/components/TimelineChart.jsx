@@ -10,9 +10,21 @@ const STATUS_COLORS = {
     'Local Done': '#CFD8DC', // Grey
     'Dev Deployed': '#64B5F6', // Lighter Blue
     'Dev Checked': '#4DB6AC', // Teal
+    'Time Up': '#FFE0B2', // Orange/Amber
     // Fallbacks
     'Done': '#CFD8DC',
     'Unknown': '#E0E0E0'
+};
+
+const statusAcronyms = {
+    'Assigned': 'A',
+    'In Progress': 'IP',
+    'Review': 'R',
+    'Local Done': 'LD',
+    'Dev Deployed': 'DD',
+    'Dev Checked': 'DC',
+    'Time Up': 'TU',
+    'Done': 'D'
 };
 
 const TimelineChart = ({ issues, startDate, endDate }) => {
@@ -38,7 +50,7 @@ const TimelineChart = ({ issues, startDate, endDate }) => {
         const e = new Date(end).getTime();
         const duration = e - s;
         const percent = (duration / totalDuration) * 100;
-        return Math.max(0.5, percent); // Min width for visibility
+        return Math.max(5, percent); // Increased min width (5%) to fit two letters/initials comfortably
     };
 
     return (
@@ -55,7 +67,7 @@ const TimelineChart = ({ issues, startDate, endDate }) => {
                 zIndex: 0
             }}>
                 {/* Render grid lines approximately every 10% for now */}
-                {[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(p => (
+                {[0, 8.33, 16.66, 25, 33.33, 41.66, 50, 58.33, 66.66, 75, 83.33, 91.66, 100].map(p => (
                     <Box
                         key={p}
                         sx={{
@@ -85,49 +97,65 @@ const TimelineChart = ({ issues, startDate, endDate }) => {
                         }}
                     >
                         {/* Render Status Segments */}
-                        {issue.statusHistory.map((status, idx) => {
-                            // Only render if it overlaps with the chart range
-                            const segStart = new Date(status.startDate).getTime();
-                            const segEnd = new Date(status.endDate).getTime();
+                        {(() => {
+                            let lastEndPercent = -1;
+                            return issue.statusHistory.map((status, idx) => {
+                                // Only render if it overlaps with the chart range
+                                const segStart = new Date(status.startDate).getTime();
+                                const segEnd = new Date(status.endDate).getTime();
 
-                            if (segEnd < chartStart || segStart > chartEnd) return null;
+                                if (segEnd < chartStart || segStart > chartEnd) return null;
 
-                            const left = getLeft(Math.max(segStart, chartStart));
-                            const width = getWidth(Math.max(segStart, chartStart), Math.min(segEnd, chartEnd));
+                                let left = getLeft(Math.max(segStart, chartStart));
+                                const width = getWidth(Math.max(segStart, chartStart), Math.min(segEnd, chartEnd));
 
-                            const color = STATUS_COLORS[status.status] || STATUS_COLORS['Unknown'];
+                                // Collision Prevention: Ensure this segment starts at least where the previous one ended
+                                if (left < lastEndPercent) {
+                                    left = lastEndPercent;
+                                }
+                                lastEndPercent = left + width;
 
-                            return (
-                                <Tooltip
-                                    key={idx}
-                                    title={`${status.status}: ${new Date(status.startDate).toLocaleTimeString()} - ${new Date(status.endDate).toLocaleTimeString()}`}
-                                >
-                                    <Box
-                                        sx={{
-                                            position: 'absolute',
-                                            left: `${left}%`,
-                                            width: `${width}%`,
-                                            height: 24,
-                                            bgcolor: color,
-                                            borderRadius: 1,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            overflow: 'hidden',
-                                            px: 0.5,
-                                            boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                                            fontSize: '0.7rem',
-                                            color: '#424242',
-                                            fontWeight: 'bold',
-                                            whiteSpace: 'nowrap',
-                                            cursor: 'pointer'
-                                        }}
+                                // Prevent total width from exceeding 100%
+                                if (left >= 100) return null;
+                                const finalWidth = Math.min(width, 100 - left);
+
+                                const color = STATUS_COLORS[status.status] || STATUS_COLORS['Unknown'];
+
+                                return (
+                                    <Tooltip
+                                        key={idx}
+                                        title={['Local Done', 'Dev Deployed', 'Dev Checked', 'Done', 'Time Up', 'timeUp', 'Time up'].includes(status.status)
+                                            ? `${status.status}: ${new Date(status.startDate).toLocaleTimeString()}`
+                                            : `${status.status}: ${new Date(status.startDate).toLocaleTimeString()} - ${new Date(status.endDate).toLocaleTimeString()}`}
                                     >
-                                        {width > 5 && status.status} {/* Only show text if wide enough */}
-                                    </Box>
-                                </Tooltip>
-                            );
-                        })}
+                                        <Box
+                                            sx={{
+                                                position: 'absolute',
+                                                left: `${left}%`,
+                                                width: `${finalWidth}%`,
+                                                height: 24,
+                                                bgcolor: color,
+                                                borderRadius: 1,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                overflow: 'hidden',
+                                                px: 0.5,
+                                                boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                                fontSize: '0.7rem',
+                                                color: '#424242',
+                                                fontWeight: 'bold',
+                                                whiteSpace: 'nowrap',
+                                                cursor: 'pointer',
+                                                zIndex: idx // Higher index for later statuses
+                                            }}
+                                        >
+                                            {finalWidth < 10 ? (statusAcronyms[status.status] || status.status.charAt(0)) : status.status}
+                                        </Box>
+                                    </Tooltip>
+                                );
+                            });
+                        })()}
                     </Box>
                 ))}
             </Box>
