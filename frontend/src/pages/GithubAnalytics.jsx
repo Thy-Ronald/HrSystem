@@ -9,7 +9,8 @@ import {
     CircularProgress,
     Avatar,
     Divider,
-    FormControl
+    FormControl,
+    Tooltip
 } from '@mui/material';
 import { getGithubTimeline, fetchRepositories } from '../services/api';
 import TimelineChart from '../components/TimelineChart';
@@ -282,32 +283,34 @@ const GithubAnalytics = () => {
                                                 bgcolor: '#fff',
                                                 position: 'sticky', left: 0, zIndex: 5
                                             }}>
-                                                <Typography
-                                                    variant="caption"
-                                                    noWrap
-                                                    sx={{
-                                                        color: '#1a73e8',
-                                                        fontWeight: 600,
-                                                        fontSize: '0.75rem',
-                                                        cursor: 'pointer',
-                                                        '&:hover': { color: '#174ea6' },
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: 0.5,
-                                                        textTransform: 'none'
-                                                    }}
-                                                    onClick={() => window.open(issue.url, '_blank')}
-                                                >
-                                                    <Box component="span" sx={{ color: '#1a73e8', opacity: 0.7, mr: 0.5 }}>
-                                                        {issue.title.split(' ')[0]}
-                                                    </Box>
-                                                    <Box component="span" sx={{ color: '#1a73e8', opacity: 0.7, mr: 0.5 }}>
-                                                        #{issue.number}
-                                                    </Box>
-                                                    <Box component="span" sx={{ color: '#333', fontSize: '0.72rem' }}>
-                                                        {issue.title.split(' ').slice(1).join(' ')}
-                                                    </Box>
-                                                </Typography>
+                                                <Tooltip title={issue.title} arrow placement="top-start">
+                                                    <Typography
+                                                        variant="caption"
+                                                        noWrap
+                                                        sx={{
+                                                            color: '#1a73e8',
+                                                            fontWeight: 600,
+                                                            fontSize: '0.75rem',
+                                                            cursor: 'pointer',
+                                                            '&:hover': { color: '#174ea6' },
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 0.5,
+                                                            textTransform: 'none'
+                                                        }}
+                                                        onClick={() => window.open(issue.url, '_blank')}
+                                                    >
+                                                        <Box component="span" sx={{ color: '#1a73e8', opacity: 0.7, mr: 0.5 }}>
+                                                            {issue.title.split(' ')[0]}
+                                                        </Box>
+                                                        <Box component="span" sx={{ color: '#1a73e8', opacity: 0.7, mr: 0.5 }}>
+                                                            #{issue.number}
+                                                        </Box>
+                                                        <Box component="span" sx={{ color: '#333', fontSize: '0.72rem' }}>
+                                                            {issue.title.split(' ').slice(1).join(' ')}
+                                                        </Box>
+                                                    </Typography>
+                                                </Tooltip>
                                             </Box>
 
                                             <Box sx={{ width: 2400, minWidth: 2400, position: 'relative', borderRight: '1px solid #e0e0e0' }}>
