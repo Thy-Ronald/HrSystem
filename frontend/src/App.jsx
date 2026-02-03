@@ -27,6 +27,7 @@ const routeMap = {
   '/ranking': 'staff-ranking', // Alias
   '/monitoring': 'monitoring',
   '/github-analytics': 'github-analytics',
+  '/auth': 'auth',
 };
 
 // Get page from URL
@@ -44,13 +45,16 @@ function setPathFromPage(page, replace = false) {
     'staff-ranking': '/staff-ranking',
     'monitoring': '/monitoring',
     'github-analytics': '/github-analytics',
+    'auth': '/auth',
   };
   const path = pathMap[page] || '/';
+  const fullPath = path + window.location.search;
+
   if (window.location.pathname !== path) {
     if (replace) {
-      window.history.replaceState({}, '', path);
+      window.history.replaceState({}, '', fullPath);
     } else {
-      window.history.pushState({}, '', path);
+      window.history.pushState({}, '', fullPath);
     }
   }
 }
@@ -79,6 +83,15 @@ function AppContent() {
     setCurrentPage(page);
     setPathFromPage(page);
   };
+
+  // Redirect to dashboard if authenticated and on auth page
+  useEffect(() => {
+    console.log(`[App] Auth state change. Authenticated: ${isAuthenticated}, Current Page: ${currentPage}`);
+    if (isAuthenticated && currentPage === 'auth') {
+      console.log('[App] Redirecting authenticated user to dashboard');
+      handleNavigate('dashboard');
+    }
+  }, [isAuthenticated, currentPage]);
 
   // Show loading state while checking authentication
   if (loading) {

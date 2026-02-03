@@ -9,6 +9,7 @@ const { generateToken } = require('../utils/jwt');
 const { validateName, validateRole } = require('../middlewares/monitoringValidation');
 const { authLimiter } = require('../middlewares/rateLimiter');
 const userService = require('../services/userService');
+const axios = require('axios');
 
 /**
  * GET /api/auth/test
@@ -226,6 +227,120 @@ router.post('/verify', async (req, res) => {
       error: 'Invalid token',
       message: error.message || 'Token verification failed',
     });
+  }
+});
+
+/**
+ * GET /api/auth/github
+ * Redirect to GitHub for OAuth
+ */
+router.get('/github', (req, res) => {
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  if (!clientId) {
+    return res.status(500).json({ success: false, message: 'GitHub Client ID not configured' });
+  }
+  const redirectUri = `${process.env.BACKEND_URL || 'http://localhost:4000'}/api/auth/github/callback`;
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email&prompt=select_account`;
+  res.redirect(githubAuthUrl);
+});
+
+/**
+ * GET /api/auth/github/callback
+ * Handle GitHub OAuth callback
+ */
+router.get('/github/callback', async (req, res) => {
+  const { code } = req.query;
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+  console.log(`[GitHub OAuth] Callback received with code: ${code ? 'yes' : 'no'}`);
+
+  if (!code) {
+    console.error('[GitHub OAuth] Missing code in callback');
+    return res.redirect(`${frontendUrl}/auth?error=No+code+provided`);
+  }
+
+  try {
+    // 1. Exchange code for access token
+    console.log('[GitHub OAuth] Exchanging code for token...');
+    const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
+      client_id: process.env.GITHUB_CLIENT_ID,
+      client_secret: process.env.GITHUB_CLIENT_SECRET,
+      code,
+    }, {
+      headers: { Accept: 'application/json' }
+    });
+
+    const accessToken = tokenResponse.data.access_token;
+    if (!accessToken) {
+      console.error('[GitHub OAuth] Failed to get access token:', tokenResponse.data);
+      return res.redirect(`${frontendUrl}/auth?error=OAuth+failed`);
+    }
+
+    console.log('[GitHub OAuth] Access token obtained, fetching user info...');
+
+    // 2. Get user info from GitHub
+    const userResponse = await axios.get('https://api.github.com/user', {
+      headers: { Authorization: `token ${accessToken}` }
+    });
+
+    const githubUser = userResponse.data;
+    console.log(`[GitHub OAuth] GitHub user: ${githubUser.login} (ID: ${githubUser.id})`);
+
+    // 3. Get user email (might need extra call if not public)
+    let email = githubUser.email;
+    if (!email) {
+      console.log('[GitHub OAuth] Email not public, fetching shared/private emails...');
+      const emailsResponse = await axios.get('https://api.github.com/user/emails', {
+        headers: { Authorization: `token ${accessToken}` }
+      });
+      const primaryEmail = emailsResponse.data.find(e => e.primary) || emailsResponse.data[0];
+      email = primaryEmail ? primaryEmail.email : null;
+    }
+
+    if (!email) {
+      console.error('[GitHub OAuth] No email found for user');
+      return res.redirect(`${frontendUrl}/auth?error=No+email+found`);
+    }
+
+    console.log(`[GitHub OAuth] User email: ${email}`);
+
+    // 4. Check if user exists by GitHub ID or email
+    let user = await userService.findUserByGithubId(githubUser.id.toString());
+
+    if (!user) {
+      console.log('[GitHub OAuth] User not found by GitHub ID, checking email...');
+      user = await userService.findUserByEmail(email);
+      if (user) {
+        console.log('[GitHub OAuth] Linking existing user to GitHub account (implicit)');
+      } else {
+        console.log('[GitHub OAuth] Creating new user profile...');
+        // Create new user
+        user = await userService.createUser(
+          email,
+          null, // No password
+          githubUser.name || githubUser.login,
+          'employee',
+          { github_id: githubUser.id.toString(), avatar_url: githubUser.avatar_url }
+        );
+      }
+    }
+
+    // 5. Generate JWT
+    console.log(`[GitHub OAuth] Generating JWT for user ID: ${user.id}`);
+    const token = generateToken({
+      userId: user.id,
+      role: user.role,
+      name: user.name,
+      email: user.email,
+    });
+
+    // 6. Redirect back to frontend with token
+    const finalRedirectUrl = `${frontendUrl}/auth?token=${token}&github_success=true`;
+    console.log(`[GitHub OAuth] SUCCESS: Redirecting to frontend...`);
+    res.redirect(finalRedirectUrl);
+  } catch (error) {
+    console.error('[GitHub OAuth] EXCEPTION:', error.response?.data || error.message);
+    res.redirect(`${frontendUrl}/auth?error=GitHub+authentication+failed`);
   }
 });
 

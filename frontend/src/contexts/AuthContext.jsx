@@ -10,17 +10,29 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(null);
 
-  // Check for existing token on mount
+  // Check for existing token or URL token on mount
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get('token');
+    if (urlToken) console.log('[AuthContext] Token found in URL');
     const storedToken = getToken();
-    if (storedToken) {
-      verifyToken(storedToken);
+
+    const tokenToVerify = urlToken || storedToken;
+
+    if (tokenToVerify) {
+      verifyToken(tokenToVerify);
+      // If it was a URL token, clean the URL
+      if (urlToken) {
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
     } else {
       setLoading(false);
     }
   }, []);
 
   const verifyToken = async (tokenToVerify) => {
+    console.log('[AuthContext] Verifying token...');
     try {
       const response = await fetch(`${API_BASE}/api/auth/verify`, {
         method: 'POST',
@@ -104,11 +116,11 @@ export function AuthProvider({ children }) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          email: email.trim(), 
-          password, 
-          name: name.trim(), 
-          role: role || 'employee' 
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          name: name.trim(),
+          role: role || 'employee'
         }),
       });
 
@@ -140,6 +152,13 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const loginWithToken = async (tokenToUse, userData) => {
+    setUser(userData);
+    setToken(tokenToUse);
+    saveToken(tokenToUse);
+    return { success: true, user: userData, token: tokenToUse };
+  };
+
   const logout = () => {
     removeToken();
     setUser(null);
@@ -152,6 +171,7 @@ export function AuthProvider({ children }) {
     loading,
     login,
     signup,
+    loginWithToken,
     logout,
     isAuthenticated: !!user && !!token,
   };
