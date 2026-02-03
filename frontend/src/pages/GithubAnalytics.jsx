@@ -30,7 +30,7 @@ const STATUS_COLORS = {
     'Unknown': '#E0E0E0'
 };
 
-const TimerDisplay = ({ statusHistory, currentStatus, currentTime }) => {
+const TimerDisplay = ({ statusHistory, currentStatus, currentTime, pValue }) => {
     const calculateDuration = () => {
         // Sum all completed "In Progress" segments from the history
         let total = statusHistory.reduce((acc, seg, idx) => {
@@ -65,6 +65,10 @@ const TimerDisplay = ({ statusHistory, currentStatus, currentTime }) => {
     const isPaused = currentStatus === 'Time Up';
     const isActive = currentStatus === 'In Progress';
 
+    // 1 P = 1 minute
+    const estimateMs = (pValue || 0) * 60 * 1000;
+    const isExceeded = estimateMs > 0 && duration > estimateMs;
+
     const formatDuration = (ms) => {
         const h = Math.floor(ms / 3600000);
         const m = Math.floor((ms % 3600000) / 60000);
@@ -77,7 +81,7 @@ const TimerDisplay = ({ statusHistory, currentStatus, currentTime }) => {
             fontFamily: 'monospace',
             fontWeight: 'bold',
             fontSize: '0.65rem',
-            color: isActive ? '#d32f2f' : (isPaused ? '#f57c00' : (isStopped ? '#4caf50' : 'text.secondary')),
+            color: isExceeded ? '#d32f2f' : (isActive ? '#1a73e8' : (isPaused ? '#f57c00' : (isStopped ? '#4caf50' : 'text.secondary'))),
             display: 'flex',
             alignItems: 'center',
             gap: 0.3
@@ -354,6 +358,7 @@ const GithubAnalytics = () => {
                                                     statusHistory={issue.statusHistory || []}
                                                     currentStatus={issue.currentStatus}
                                                     currentTime={currentTime}
+                                                    pValue={issue.pValue}
                                                 />
                                             </Box>
                                         </Box>
