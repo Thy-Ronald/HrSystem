@@ -156,6 +156,7 @@ router.post('/login', authLimiter, async (req, res) => {
       role: user.role,
       name: user.name,
       email: user.email,
+      avatar_url: user.avatar_url,
     });
 
     // Return token and user info (without password)
@@ -167,6 +168,7 @@ router.post('/login', authLimiter, async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
+        avatar_url: user.avatar_url,
       },
     });
   } catch (error) {
@@ -219,6 +221,7 @@ router.post('/verify', async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
+        avatar_url: user.avatar_url,
       },
     });
   } catch (error) {
@@ -332,6 +335,7 @@ router.get('/github/callback', async (req, res) => {
       role: user.role,
       name: user.name,
       email: user.email,
+      avatar_url: user.avatar_url,
     });
 
     // 6. Redirect back to frontend with token

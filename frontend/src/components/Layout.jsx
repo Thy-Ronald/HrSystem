@@ -8,7 +8,8 @@ import {
   Container,
   Tab,
   Tabs,
-  Badge
+  Badge,
+  Avatar
 } from '@mui/material';
 import {
   Notifications as NotificationsIcon,
@@ -198,6 +199,12 @@ const Layout = ({ children, currentPath, onNavigate }) => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', ml: 1 }}>
+                  {user?.avatar_url && (
+                    <Avatar
+                      src={user.avatar_url}
+                      sx={{ width: 28, height: 28, mr: 1, border: '1px solid #e0e0e0' }}
+                    />
+                  )}
                   <Typography variant="body2" sx={{ color: '#333', fontWeight: 500, mr: 0.5 }}>
                     {user?.name || 'User'}
                   </Typography>

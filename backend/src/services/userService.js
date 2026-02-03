@@ -87,7 +87,7 @@ async function findUserByGithubId(githubId) {
 async function findUserById(id) {
   try {
     const users = await query(
-      'SELECT id, email, name, role, created_at FROM users WHERE id = ?',
+      'SELECT id, email, name, role, github_id, avatar_url, created_at FROM users WHERE id = ?',
       [id]
     );
     return users[0] || null;
