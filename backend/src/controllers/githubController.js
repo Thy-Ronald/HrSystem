@@ -1,4 +1,4 @@
-const { getGithubProfileWithRepos, getIssuesByUserForPeriod, getAccessibleRepositories, checkCacheStatus, checkRepoChanges, getCommitsByUserForPeriod, getLanguagesByUserForPeriod } = require('../services/githubService');
+const { getGithubProfileWithRepos, getIssuesByUserForPeriod, getAccessibleRepositories, checkCacheStatus, checkRepoChanges, getCommitsByUserForPeriod, getLanguagesByUserForPeriod, getIssueTimeline } = require('../services/githubService');
 
 async function handleGithubLookup(req, res, next) {
   try {
@@ -13,13 +13,13 @@ async function handleGithubLookup(req, res, next) {
 async function handleGetRepositories(req, res, next) {
   try {
     const allRepos = await getAccessibleRepositories();
-    
+
     // Filter to only return the two specific repositories to reduce API calls
     const allowedRepos = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
-    const filteredRepos = allRepos.filter(repo => 
+    const filteredRepos = allRepos.filter(repo =>
       allowedRepos.includes(repo.fullName)
     );
-    
+
     res.json({
       success: true,
       data: filteredRepos,
@@ -32,13 +32,13 @@ async function handleGetRepositories(req, res, next) {
 async function handleIssuesByPeriod(req, res, next) {
   try {
     const { repo, filter = 'today' } = req.query;
-    
+
     if (!repo) {
       const error = new Error('Repository is required. Use ?repo=owner/name');
       error.status = 400;
       throw error;
     }
-    
+
     const validFilters = ['today', 'yesterday', 'this-week', 'last-week', 'this-month'];
     // Allow standard filters or custom month format (month-MM-YYYY)
     const isValidFilter = validFilters.includes(filter) || (filter && filter.startsWith('month-') && filter.match(/^month-\d{2}-\d{4}$/));
@@ -47,7 +47,7 @@ async function handleIssuesByPeriod(req, res, next) {
       error.status = 400;
       throw error;
     }
-    
+
     const data = await getIssuesByUserForPeriod(repo, filter);
     res.json({
       success: true,
@@ -67,13 +67,13 @@ async function handleIssuesByPeriod(req, res, next) {
 async function handleCacheCheck(req, res, next) {
   try {
     const { repo, filter = 'today' } = req.query;
-    
+
     if (!repo) {
       const error = new Error('Repository is required. Use ?repo=owner/name');
       error.status = 400;
       throw error;
     }
-    
+
     const cacheInfo = checkCacheStatus(repo, filter);
     res.json({
       success: true,
@@ -94,13 +94,13 @@ async function handleCacheCheck(req, res, next) {
 async function handleRepoChanges(req, res, next) {
   try {
     const { repo } = req.query;
-    
+
     if (!repo) {
       const error = new Error('Repository is required. Use ?repo=owner/name');
       error.status = 400;
       throw error;
     }
-    
+
     const result = await checkRepoChanges(repo);
     res.json({
       success: true,
@@ -115,13 +115,13 @@ async function handleRepoChanges(req, res, next) {
 async function handleCommitsByPeriod(req, res, next) {
   try {
     const { repo, filter = 'today' } = req.query;
-    
+
     if (!repo) {
       const error = new Error('Repository is required. Use ?repo=owner/name');
       error.status = 400;
       throw error;
     }
-    
+
     const validFilters = ['today', 'yesterday', 'this-week', 'last-week', 'this-month'];
     // Allow standard filters or custom month format (month-MM-YYYY)
     const isValidFilter = validFilters.includes(filter) || (filter && filter.startsWith('month-') && filter.match(/^month-\d{2}-\d{4}$/));
@@ -130,7 +130,7 @@ async function handleCommitsByPeriod(req, res, next) {
       error.status = 400;
       throw error;
     }
-    
+
     const data = await getCommitsByUserForPeriod(repo, filter);
     res.json({
       success: true,
@@ -146,13 +146,13 @@ async function handleCommitsByPeriod(req, res, next) {
 async function handleLanguagesByPeriod(req, res, next) {
   try {
     const { repo, filter = 'all' } = req.query;
-    
+
     if (!repo) {
       const error = new Error('Repository is required. Use ?repo=owner/name');
       error.status = 400;
       throw error;
     }
-    
+
     // Allow 'all' for overall percentages, or standard period filters, or custom month format
     const validFilters = ['all', 'today', 'yesterday', 'this-week', 'last-week', 'this-month'];
     const isValidFilter = validFilters.includes(filter) || (filter && filter.startsWith('month-') && filter.match(/^month-\d{2}-\d{4}$/));
@@ -161,7 +161,7 @@ async function handleLanguagesByPeriod(req, res, next) {
       error.status = 400;
       throw error;
     }
-    
+
     const data = await getLanguagesByUserForPeriod(repo, filter);
     res.json({
       success: true,
@@ -174,4 +174,40 @@ async function handleLanguagesByPeriod(req, res, next) {
   }
 }
 
-module.exports = { handleGithubLookup, handleIssuesByPeriod, handleGetRepositories, handleCacheCheck, handleRepoChanges, handleCommitsByPeriod, handleLanguagesByPeriod };
+async function handleGetTimeline(req, res, next) {
+  try {
+    const { repo, filter = 'this-month', date } = req.query;
+
+    if (!repo) {
+      const error = new Error('Repository is required. Use ?repo=owner/name');
+      error.status = 400;
+      throw error;
+    }
+
+    // Validate filter / date
+    // If date is provided, filter is optional or ignored
+
+    const data = await getIssueTimeline(repo, filter, date);
+
+    res.json({
+      success: true,
+      data,
+      repo,
+      filter,
+      date,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = {
+  handleGithubLookup,
+  handleIssuesByPeriod,
+  handleGetRepositories,
+  handleCacheCheck,
+  handleRepoChanges,
+  handleCommitsByPeriod,
+  handleLanguagesByPeriod,
+  handleGetTimeline
+};

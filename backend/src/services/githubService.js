@@ -57,7 +57,7 @@ function getEtag(key) {
 function getCacheInfo(key, ttl = CACHE_TTL) {
   const entry = cache.get(key);
   if (!entry) return null;
-  
+
   const valid = Date.now() - entry.timestamp < ttl;
   return {
     timestamp: entry.timestamp,
@@ -76,7 +76,7 @@ function getCacheInfo(key, ttl = CACHE_TTL) {
 function clearCacheForRepo(repoFullName) {
   const filters = ['today', 'yesterday', 'this-week', 'last-week', 'this-month'];
   let clearedCount = 0;
-  
+
   for (const filter of filters) {
     const cacheKey = `issues_${repoFullName}_${filter}`;
     if (cache.has(cacheKey)) {
@@ -84,7 +84,7 @@ function clearCacheForRepo(repoFullName) {
       clearedCount++;
     }
   }
-  
+
   console.log(`[Cache] Cleared ${clearedCount} entries for repo: ${repoFullName}`);
 }
 
@@ -103,18 +103,18 @@ async function checkRepoChanges(repoFullName) {
   const [owner, repo] = repoFullName.split('/');
   const cacheKey = `etag_${repoFullName}`;
   const storedEtag = getEtag(cacheKey);
-  
+
   try {
     const headers = {
       ...withAuth(),
       Accept: 'application/vnd.github+json',
     };
-    
+
     // Add If-None-Match header if we have a stored ETag
     if (storedEtag) {
       headers['If-None-Match'] = storedEtag;
     }
-    
+
     // Use issues endpoint with minimal data (just check for changes)
     const response = await githubClient.get(`/repos/${owner}/${repo}/issues`, {
       headers,
@@ -126,18 +126,18 @@ async function checkRepoChanges(repoFullName) {
       },
       validateStatus: (status) => status === 200 || status === 304,
     });
-    
+
     if (response.status === 304) {
       // Not modified - no changes, doesn't count against rate limit!
       return { changed: false, etag: storedEtag };
     }
-    
+
     // Data changed - store new ETag
     const newEtag = response.headers.etag;
     if (newEtag) {
       etagCache.set(cacheKey, newEtag);
     }
-    
+
     return { changed: true, etag: newEtag };
   } catch (error) {
     console.error('[ETag Check] Error:', error.message);
@@ -175,7 +175,7 @@ async function getAccessibleRepositories() {
   try {
     // Fetch only the specific repositories we need
     const repos = [];
-    
+
     for (const repoInfo of allowedRepos) {
       try {
         const response = await githubClient.get(`/repos/${repoInfo.fullName}`, {
@@ -375,7 +375,7 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
   // Step 1: Check Redis cache first (same as commits)
   const cacheKey = generateCacheKey('issues', repoFullName, filter);
   const cached = await getCachedGitHubResponse(cacheKey);
-  
+
   if (cached && cached.data) {
     console.log(`[Issues Cache] ✅ Cache HIT for ${repoFullName} (${filter})`);
     return cached.data;
@@ -389,20 +389,20 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
   }
 
   const { startDate, endDate } = getDateRange(filter);
-  
+
   // Step 2: Get cached ETag for conditional request
   const cachedETag = await getCachedETag(cacheKey);
   const headers = withAuth();
-  
+
   // Step 3: Add If-None-Match header if we have cached ETag
   // Note: GitHub GraphQL API doesn't support ETags, so we skip this for issues
   // But we still use Redis caching for the response data
-  
+
   let hasNextPage = true;
   let cursor = null;
   let pageCount = 0;
   const maxPages = 10; // Limit to prevent excessive API calls
-  
+
   // Calculate cutoff date for early termination (issues updated before this won't have recent assignments)
   const cutoffDate = new Date(startDate);
   cutoffDate.setDate(cutoffDate.getDate() - 7); // Check issues updated in last 7 days before start date
@@ -412,6 +412,7 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
 
   const initUserStats = () => ({
     assigned: 0,
+    assignedP: 0,
     inProgress: 0,
     done: 0,
     reviewed: 0,
@@ -443,7 +444,7 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
 
   const getStatusFromLabels = (labels) => {
     const labelNames = labels.map((l) => l.name.toLowerCase());
-    
+
     for (const name of labelNames) {
       // Check in priority order: devChecked > devDeployed > reviewed > done > inProgress
       if (statusLabels.devChecked.includes(name)) return 'devChecked';
@@ -458,7 +459,7 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
   try {
     while (hasNextPage && pageCount < maxPages) {
       pageCount++;
-      
+
       // Enhanced query: includes labels and both OPEN/CLOSED states
       const query = `
         query GetIssues($owner: String!, $repo: String!, $cursor: String) {
@@ -487,6 +488,8 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
                     login
                   }
                 }
+                body
+                title
                 timelineItems(first: 20, itemTypes: [ASSIGNED_EVENT]) {
                   nodes {
                     ... on AssignedEvent {
@@ -540,7 +543,7 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
           const timelineNodes = issue.timelineItems?.nodes || [];
           const labels = issue.labels?.nodes || [];
           const isClosed = issue.state === 'CLOSED';
-          
+
           /**
            * Determine issue status from labels
            * 
@@ -551,14 +554,14 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
            * See ISSUE_STATUS_DOCUMENTATION.md for complete details
            */
           let status = getStatusFromLabels(labels);
-          
+
           // Find most recent assignment event for each user
           const userLastAssignment = new Map();
           for (const event of timelineNodes) {
             if (event.assignee?.login && event.createdAt) {
               const eventDate = new Date(event.createdAt);
               const username = event.assignee.login;
-              
+
               // Track most recent assignment
               if (!userLastAssignment.has(username) || userLastAssignment.get(username) < eventDate) {
                 userLastAssignment.set(username, eventDate);
@@ -574,9 +577,16 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
                 userStats.set(username, initUserStats());
               }
               const stats = userStats.get(username);
-              
+
               // Increment the appropriate counter
               stats[status]++;
+
+              // SUM P VALUE: Extract from title, body, and labels
+              let pValue = extractPValue(issue.title) + extractPValue(issue.body);
+              (issue.labels?.nodes || []).forEach(label => {
+                pValue += extractPValue(label.name);
+              });
+              stats.assignedP += pValue;
             }
           }
         }
@@ -596,6 +606,7 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
       .map(([username, stats]) => ({
         username,
         assigned: stats.assigned,
+        assignedP: stats.assignedP,
         inProgress: stats.inProgress,
         done: stats.done,
         reviewed: stats.reviewed,
@@ -630,6 +641,336 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
         throw err;
       }
     }
+    throw error;
+  }
+}
+
+/**
+ * Extract P value from issue title or body/description
+ * Looks for patterns like "P:120", "P(120)", "[P:120]", etc.
+ * @param {string} text - Issue title or body/description text
+ * @returns {number} Sum of all P values found, or 0 if none found
+ */
+function extractPValue(text) {
+  if (!text || typeof text !== 'string') return 0;
+
+
+  // Robust regex to match P:60, P(60), P-60, P 60, P=60, [P: 60], etc.
+  // This version handles optional parentheses and various separators.
+  const regex = /P\s*[:\s\-=\(]*\s*(\d+(?:\.\d+)?)\s*\)?/gi;
+  let sum = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match[1]) {
+      const value = parseFloat(match[1]);
+      if (!isNaN(value)) {
+        sum += value;
+      }
+    }
+  }
+  return sum;
+}
+
+/**
+ * Fetch detailed timeline for issues, including "P" values and status history
+ * @param {string} repoFullName - Repository full name (owner/repo)
+ * @param {string} filter - Filter type: today, yesterday, this-week, last-week, this-month
+ * @param {string} date - Optional specific date (YYYY-MM-DD)
+ * @returns {Promise<Array>} Array of issues with timeline data
+ */
+async function getIssueTimeline(repoFullName, filter = 'this-month', date = null) {
+  if (!repoFullName || !repoFullName.includes('/')) {
+    const error = new Error('Repository must be in format owner/repo');
+    error.status = 400;
+    throw error;
+  }
+
+  const [owner, repo] = repoFullName.split('/');
+
+  // Generate cache key for timeline (include date if present)
+  const cacheKey = generateCacheKey('timeline', repoFullName, filter, date);
+
+  const cached = await getCachedGitHubResponse(cacheKey);
+  if (cached && cached.data) {
+    console.log(`[Timeline Cache] ✅ Cache HIT for ${repoFullName} (${filter}, ${date})`);
+    return cached.data;
+  }
+
+  let startDate, endDate;
+  if (date) {
+    // Specific date mode
+    startDate = new Date(date);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(date);
+    endDate.setHours(23, 59, 59, 999);
+  } else {
+    // Filter mode
+    const range = getDateRange(filter);
+    startDate = range.startDate;
+    endDate = range.endDate;
+  }
+
+  // Match Ranking cutoff logic (usually 7 days before start)
+  const cutoffDate = new Date(startDate);
+  cutoffDate.setDate(cutoffDate.getDate() - 7);
+
+  try {
+    let hasNextPage = true;
+    let cursor = null;
+    let allIssues = [];
+    let pageCount = 0;
+    const maxPages = 15;
+
+    while (hasNextPage && pageCount < maxPages) {
+      pageCount++;
+
+      // Query to fetch body and timeline events (LabeledEvent)
+      const query = `
+        query GetIssueTimeline($owner: String!, $repo: String!, $cursor: String) {
+          repository(owner: $owner, name: $repo) {
+            issues(
+              first: 50
+              after: $cursor
+              states: [OPEN]
+              orderBy: { field: UPDATED_AT, direction: DESC }
+            ) {
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+              nodes {
+                id
+                number
+                title
+                url
+                body
+                state
+                updatedAt
+                createdAt
+                author {
+                  login
+                  avatarUrl
+                }
+                assignees(first: 5) {
+                  nodes {
+                    login
+                    name
+                    avatarUrl
+                  }
+                }
+                labels(first: 10) {
+                  nodes {
+                    name
+                    color
+                  }
+                }
+                timelineItems(first: 100, itemTypes: [LABELED_EVENT, UNLABELED_EVENT, ASSIGNED_EVENT]) {
+                  nodes {
+                    __typename
+                    ... on LabeledEvent {
+                      createdAt
+                      label {
+                        name
+                        color
+                      }
+                      actor {
+                        login
+                      }
+                    }
+                    ... on UnlabeledEvent {
+                      createdAt
+                      label {
+                        name
+                        color
+                      }
+                      actor {
+                        login
+                      }
+                    }
+                    ... on AssignedEvent {
+                      createdAt
+                      assignee {
+                         ... on User {
+                           login
+                           avatarUrl
+                         }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+
+      const response = await githubGraphQLClient.post(
+        '',
+        { query, variables: { owner, repo, cursor } },
+        { headers: withAuth() }
+      );
+
+      if (response.data.errors) {
+        console.error('GraphQL Errors:', response.data.errors);
+        throw new Error(response.data.errors[0]?.message || 'GraphQL query failed');
+      }
+
+      const issues = response.data.data?.repository?.issues?.nodes || [];
+      const pageInfo = response.data.data?.repository?.issues?.pageInfo;
+
+      let shouldContinue = true;
+
+      for (const issue of issues) {
+        const issueUpdatedAt = new Date(issue.updatedAt);
+        // If issue hasn't been updated since cutoff, and it's closed, we might stop. 
+        if (issueUpdatedAt < cutoffDate && issue.state === 'CLOSED') {
+          shouldContinue = false;
+        }
+
+        // Sum P values from title, body, and labels
+        let basePValue = extractPValue(issue.title) + extractPValue(issue.body);
+        (issue.labels?.nodes || []).forEach(label => {
+          basePValue += extractPValue(label.name);
+        });
+
+        // Reconstruct status history
+        const events = (issue.timelineItems?.nodes || []).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+        // Find ALL users assigned within the period
+        const userLastAssignment = new Map();
+        events.forEach(event => {
+          if (event.__typename === 'AssignedEvent' && event.assignee?.login && event.createdAt) {
+            const eventDate = new Date(event.createdAt);
+            const username = event.assignee.login;
+            if (!userLastAssignment.has(username) || userLastAssignment.get(username) < eventDate) {
+              userLastAssignment.set(username, eventDate);
+            }
+          }
+        });
+
+        const currentAssignees = new Set((issue.assignees?.nodes || []).map(a => a.login));
+
+        // For EACH matched user, add an entry to allIssues
+        for (const [username, assignmentDate] of userLastAssignment.entries()) {
+          if (currentAssignees.has(username) && assignmentDate >= startDate && assignmentDate <= endDate) {
+            const assigneeNode = issue.assignees?.nodes.find(n => n.login === username);
+
+            // Reconstruct status history for this issue
+            const statusHistory = [];
+            let currentStatus = 'Assigned';
+            let statusStartTime = new Date(issue.createdAt);
+
+            const mapLabelToStatus = (name) => {
+              const n = name.toLowerCase();
+              if (n.includes('in progress')) return 'In Progress';
+              if (n.includes('review')) return 'Review';
+              if (n.includes('local done')) return 'Local Done';
+              if (n.includes('dev deployed')) return 'Dev Deployed';
+              if (n.includes('dev checked')) return 'Dev Checked';
+              return null;
+            };
+
+            events.forEach(event => {
+              const eventDate = new Date(event.createdAt);
+              if (event.__typename === 'LabeledEvent' && event.label) {
+                const newStatus = mapLabelToStatus(event.label.name);
+                if (newStatus && newStatus !== currentStatus) {
+                  statusHistory.push({
+                    status: currentStatus,
+                    startDate: statusStartTime,
+                    endDate: eventDate,
+                    durationMs: eventDate - statusStartTime
+                  });
+                  currentStatus = newStatus;
+                  statusStartTime = eventDate;
+                }
+              }
+            });
+
+            // Add reconciliation logic for current labels
+            const currentLabels = (issue.labels?.nodes || []).map(l => l.name.toLowerCase());
+            let highestLabelStatus = null;
+            if (currentLabels.some(l => l.includes('dev checked'))) highestLabelStatus = 'Dev Checked';
+            else if (currentLabels.some(l => l.includes('dev deployed'))) highestLabelStatus = 'Dev Deployed';
+            else if (currentLabels.some(l => l.includes('local done'))) highestLabelStatus = 'Local Done';
+            else if (currentLabels.some(l => l.includes('review'))) highestLabelStatus = 'Review';
+            else if (currentLabels.some(l => l.includes('in progress'))) highestLabelStatus = 'In Progress';
+
+            if (highestLabelStatus && highestLabelStatus !== currentStatus) {
+              const transitionTime = new Date(issue.updatedAt);
+              if (transitionTime > statusStartTime) {
+                statusHistory.push({
+                  status: currentStatus,
+                  startDate: statusStartTime,
+                  endDate: transitionTime,
+                  durationMs: transitionTime - statusStartTime
+                });
+                currentStatus = highestLabelStatus;
+                statusStartTime = transitionTime;
+              }
+            }
+
+            const endTime = issue.state === 'CLOSED' ? new Date(issue.updatedAt) : new Date();
+            statusHistory.push({
+              status: currentStatus,
+              startDate: statusStartTime,
+              endDate: endTime,
+              durationMs: endTime - statusStartTime
+            });
+
+            allIssues.push({
+              id: `${issue.id}_${username}`,
+              number: issue.number,
+              title: issue.title,
+              url: issue.url,
+              state: issue.state,
+              pValue: basePValue,
+              createdAt: issue.createdAt,
+              updatedAt: issue.updatedAt,
+              author: issue.author,
+              assignee: assigneeNode,
+              statusHistory,
+              currentStatus
+            });
+
+          }
+        }
+      }
+
+      if (!shouldContinue || !pageInfo.hasNextPage) {
+        hasNextPage = false;
+      } else {
+        cursor = pageInfo.endCursor;
+      }
+    }
+
+    // Group by User
+    const issuesByUser = {};
+    allIssues.forEach(issue => {
+      if (issue.assignee) {
+        const username = issue.assignee.login;
+        if (!issuesByUser[username]) {
+          issuesByUser[username] = {
+            user: issue.assignee,
+            issues: [],
+            totalP: 0
+          };
+        }
+        issuesByUser[username].issues.push(issue);
+        issuesByUser[username].totalP += (issue.pValue || 0);
+      }
+    });
+
+    const result = Object.values(issuesByUser);
+
+    // Cache (shorter TTL for timeline?)
+    await setCachedGitHubResponse(cacheKey, result, null);
+
+    return result;
+
+  } catch (error) {
+    console.error('[GetTimeline] Error:', error);
     throw error;
   }
 }
@@ -671,7 +1012,7 @@ async function getCommitsByUserForPeriod(repoFullName, filter = 'today') {
   // Step 1: Check Redis cache first
   const cacheKey = generateCacheKey('commits', repoFullName, filter);
   const cached = await getCachedGitHubResponse(cacheKey);
-  
+
   if (cached && cached.data) {
     console.log(`[Commits Cache] ✅ Cache HIT for ${repoFullName} (${filter})`);
     return cached.data;
@@ -685,26 +1026,26 @@ async function getCommitsByUserForPeriod(repoFullName, filter = 'today') {
   }
 
   const { startDate, endDate } = getDateRange(filter);
-  
+
   // Step 2: Get cached ETag for conditional request
   const cachedETag = await getCachedETag(cacheKey);
   const headers = withAuth();
-  
+
   // Step 3: Add If-None-Match header if we have cached ETag
   if (cachedETag) {
     headers['If-None-Match'] = cachedETag;
     console.log(`[Commits Cache] 🔄 Conditional request with ETag: ${cachedETag.substring(0, 20)}...`);
   }
-  
+
   // Track commits per user
   const userCommits = new Map();
-  
+
   try {
     let hasNextPage = true;
     let page = 1;
     const maxPages = 10; // Limit to prevent excessive API calls
     let responseETag = null;
-    
+
     while (hasNextPage && page <= maxPages) {
       const response = await githubClient.get(`/repos/${owner}/${repo}/commits`, {
         headers,
@@ -728,7 +1069,7 @@ async function getCommitsByUserForPeriod(repoFullName, filter = 'today') {
       responseETag = response.headers.etag || response.headers['etag'] || null;
 
       const commits = response.data;
-      
+
       if (commits.length === 0) {
         hasNextPage = false;
         break;
@@ -774,7 +1115,7 @@ async function getCommitsByUserForPeriod(repoFullName, filter = 'today') {
         await refreshCacheTTL(cacheKey, cached.data, cachedETag);
         return cached.data;
       }
-      
+
       if (error.response.status === 404) {
         const err = new Error(`Repository ${repoFullName} not found`);
         err.status = 404;
@@ -833,15 +1174,15 @@ const LANGUAGE_MAP = {
  */
 function getLanguageFromFile(filename) {
   if (!filename) return null;
-  
+
   // Handle special cases
   if (filename.toLowerCase() === 'dockerfile' || filename.toLowerCase().startsWith('dockerfile.')) {
     return 'Dockerfile';
   }
-  
+
   const parts = filename.split('.');
   if (parts.length < 2) return null;
-  
+
   const extension = parts[parts.length - 1].toLowerCase();
   return LANGUAGE_MAP[extension] || null;
 }
@@ -874,7 +1215,7 @@ async function getLanguagesByUserForPeriod(repoFullName, filter = 'all') {
   // Step 1: Check Redis cache first
   const cacheKey = generateCacheKey('languages', repoFullName, filter);
   const cached = await getCachedGitHubResponse(cacheKey);
-  
+
   if (cached && cached.data) {
     console.log(`[Languages Cache] ✅ Cache HIT for ${repoFullName} (${filter})`);
     return cached.data;
@@ -890,34 +1231,34 @@ async function getLanguagesByUserForPeriod(repoFullName, filter = 'all') {
   // Step 2: Get cached ETag for conditional request
   const cachedETag = await getCachedETag(cacheKey);
   const headers = withAuth();
-  
+
   if (cachedETag) {
     headers['If-None-Match'] = cachedETag;
   }
-  
+
   // Track languages per user: { username: { language: count } }
   const userLanguages = new Map();
-  
+
   try {
     let hasNextPage = true;
     let page = 1;
     const maxPages = filter === 'all' ? 20 : 10; // More pages for overall data
     let responseETag = null;
-    
+
     while (hasNextPage && page <= maxPages) {
       // Build params - if filter is 'all', don't use date filtering
       const commitParams = {
         per_page: 100,
         page: page,
       };
-      
+
       // Only add date filters if not 'all'
       if (filter !== 'all') {
         const { startDate, endDate } = getDateRange(filter);
         commitParams.since = startDate.toISOString();
         commitParams.until = endDate.toISOString();
       }
-      
+
       // Fetch commits with file stats
       const response = await githubClient.get(`/repos/${owner}/${repo}/commits`, {
         headers,
@@ -933,7 +1274,7 @@ async function getLanguagesByUserForPeriod(repoFullName, filter = 'all') {
 
       responseETag = response.headers.etag || response.headers['etag'] || null;
       const commits = response.data;
-      
+
       if (commits.length === 0) {
         hasNextPage = false;
         break;
@@ -942,28 +1283,28 @@ async function getLanguagesByUserForPeriod(repoFullName, filter = 'all') {
       // Process each commit to get file changes
       // Limit to first 50 commits per page to avoid excessive API calls
       const commitsToProcess = commits.slice(0, 50);
-      
+
       for (const commit of commitsToProcess) {
         const author = commit.author || commit.committer;
         if (!author || !author.login) continue;
-        
+
         const username = author.login.toLowerCase().trim();
         const commitSha = commit.sha;
-        
+
         try {
           // Fetch commit details with file stats
           const commitResponse = await githubClient.get(`/repos/${owner}/${repo}/commits/${commitSha}`, {
             headers: withAuth(),
           });
-          
+
           const files = commitResponse.data.files || [];
-          
+
           // Initialize user language map if not exists
           if (!userLanguages.has(username)) {
             userLanguages.set(username, new Map());
           }
           const userLangMap = userLanguages.get(username);
-          
+
           // Count languages from changed files
           for (const file of files) {
             const language = getLanguageFromFile(file.filename);
@@ -972,7 +1313,7 @@ async function getLanguagesByUserForPeriod(repoFullName, filter = 'all') {
               userLangMap.set(language, currentCount + 1);
             }
           }
-          
+
           // Small delay to avoid hitting rate limits
           await new Promise(resolve => setTimeout(resolve, 100));
         } catch (fileError) {
@@ -981,7 +1322,7 @@ async function getLanguagesByUserForPeriod(repoFullName, filter = 'all') {
           // Continue with next commit
         }
       }
-      
+
       // If we processed fewer commits than available, don't fetch more pages
       if (commitsToProcess.length < commits.length) {
         hasNextPage = false;
@@ -997,7 +1338,7 @@ async function getLanguagesByUserForPeriod(repoFullName, filter = 'all') {
     const result = Array.from(userLanguages.entries()).map(([username, langMap]) => {
       // Calculate total files for this user
       const totalFiles = Array.from(langMap.values()).reduce((sum, count) => sum + count, 0);
-      
+
       // Sort languages by count and get top 5, calculate percentages
       const sortedLangs = Array.from(langMap.entries())
         .sort((a, b) => b[1] - a[1])
@@ -1006,7 +1347,7 @@ async function getLanguagesByUserForPeriod(repoFullName, filter = 'all') {
           const percentage = totalFiles > 0 ? Math.round((count / totalFiles) * 100) : 0;
           return { language: lang, count, percentage };
         });
-      
+
       return {
         username,
         topLanguages: sortedLangs,
@@ -1029,7 +1370,7 @@ async function getLanguagesByUserForPeriod(repoFullName, filter = 'all') {
         await refreshCacheTTL(cacheKey, cached.data, cachedETag);
         return cached.data;
       }
-      
+
       if (error.response.status === 404) {
         const err = new Error(`Repository ${repoFullName} not found`);
         err.status = 404;
@@ -1045,14 +1386,15 @@ async function getLanguagesByUserForPeriod(repoFullName, filter = 'all') {
   }
 }
 
-module.exports = { 
-  getGithubProfileWithRepos, 
-  getIssuesByUserForPeriod, 
-  getAccessibleRepositories, 
-  clearCacheForRepo, 
-  checkCacheStatus, 
+module.exports = {
+  getGithubProfileWithRepos,
+  getIssuesByUserForPeriod,
+  getAccessibleRepositories,
+  clearCacheForRepo,
+  checkCacheStatus,
   checkRepoChanges,
   getCommitsByUserForPeriod,
-  getLanguagesByUserForPeriod
+  getLanguagesByUserForPeriod,
+  getIssueTimeline
 };
 

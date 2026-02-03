@@ -1,5 +1,5 @@
 const express = require('express');
-const { handleGithubLookup, handleIssuesByPeriod, handleGetRepositories, handleCacheCheck, handleRepoChanges, handleCommitsByPeriod, handleLanguagesByPeriod } = require('../controllers/githubController');
+const { handleGithubLookup, handleIssuesByPeriod, handleGetRepositories, handleCacheCheck, handleRepoChanges, handleCommitsByPeriod, handleLanguagesByPeriod, handleGetTimeline } = require('../controllers/githubController');
 
 const router = express.Router();
 
@@ -20,6 +20,9 @@ router.get('/cache-check', handleCacheCheck);
 
 // GET /api/github/has-changes?repo=owner/name - Check if repo has changes using ETag (FREE - 304 doesn't count!)
 router.get('/has-changes', handleRepoChanges);
+
+// GET /api/github/timeline?repo=owner/name&filter=today|yesterday|this-week|last-week|this-month
+router.get('/timeline', handleGetTimeline);
 
 router.get('/:username', handleGithubLookup);
 

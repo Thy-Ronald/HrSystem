@@ -55,7 +55,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
     const item = navItems[newValue];
 
     // Only navigate to implemented pages
-    if (['dashboard', 'staff-ranking', 'monitoring'].includes(item.path)) {
+    if (['dashboard', 'staff-ranking', 'monitoring', 'github-analytics'].includes(item.path)) {
       onNavigate(item.path);
     }
   };

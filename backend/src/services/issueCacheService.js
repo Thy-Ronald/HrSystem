@@ -101,14 +101,14 @@ function deriveStatusFromLabels(labels) {
  */
 function extractPValue(text) {
   if (!text || typeof text !== 'string') return 0;
-  
+
   // Match patterns like "P:120", "P: 120", "P:120.5", etc.
   // Case-insensitive, allows optional whitespace after colon
   // Global flag to find all occurrences, capture group for the number
   const regex = /P\s*:\s*(\d+(?:\.\d+)?)/gi;
   let sum = 0;
   let match;
-  
+
   // Use exec in a loop to get all matches with capture groups
   while ((match = regex.exec(text)) !== null) {
     if (match[1]) {
@@ -118,7 +118,7 @@ function extractPValue(text) {
       }
     }
   }
-  
+
   return sum;
 }
 
@@ -640,7 +640,7 @@ async function getCachedIssues(repoFullName, filter = 'today', username = null) 
   try {
     // Execute status query first
     const statusResults = await query(statusSql, statusParams);
-    
+
     // Try to execute P value query, but handle case where body column doesn't exist
     let pValueResults = [];
     try {
@@ -649,9 +649,9 @@ async function getCachedIssues(repoFullName, filter = 'today', username = null) 
       // If body column doesn't exist yet, skip P value extraction
       // This can happen if migration hasn't been run
       const errorMessage = pValueError.message || String(pValueError);
-      if (errorMessage.includes('Unknown column') || 
-          errorMessage.includes('Invalid field') ||
-          errorMessage.includes('body') && errorMessage.includes('doesn\'t exist')) {
+      if (errorMessage.includes('Unknown column') ||
+        errorMessage.includes('Invalid field') ||
+        errorMessage.includes('body') && errorMessage.includes('doesn\'t exist')) {
         console.log(`[IssueCache] Body column not found, skipping P value extraction. Run migration: node backend/src/database/add_body_column_migration.js`);
         pValueResults = []; // Set to empty array so code continues normally
       } else {
@@ -698,21 +698,21 @@ async function getCachedIssues(repoFullName, filter = 'today', username = null) 
       }
 
       const processedIssues = userPValues.get(usernameKey);
-      
+
       // Only process each issue once per user
       if (!processedIssues.has(issueKey)) {
         processedIssues.add(issueKey);
-        
+
         // Extract P value from both title and body
         const titlePValue = extractPValue(row.title || '');
         const bodyPValue = extractPValue(row.body || '');
         const pValue = titlePValue + bodyPValue;
-        
+
         // Debug logging (can be removed later)
         if (pValue > 0) {
           console.log(`[IssueCache] Found P value for issue #${row.issue_number}: title=${titlePValue}, body=${bodyPValue}, total=${pValue}`);
         }
-        
+
         if (pValue > 0) {
           // Initialize stats if not exists
           if (!userStats.has(usernameKey)) {
@@ -727,7 +727,7 @@ async function getCachedIssues(repoFullName, filter = 'today', username = null) 
               assignedP: 0,
             });
           }
-          
+
           // Add P value to sum
           const stats = userStats.get(usernameKey);
           stats.assignedP = (stats.assignedP || 0) + pValue;

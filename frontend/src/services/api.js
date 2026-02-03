@@ -230,6 +230,44 @@ export async function fetchCommitsByPeriod(repo, filter = 'today', options = {})
 }
 
 /**
+ * Fetch timeline data from a repository grouped by user for a given period
+ * @param {string} repo - Repository full name (owner/repo)
+ * @param {string} filter - Filter: today, yesterday, this-week, last-week, this-month
+ * @returns {Promise<Array>} Array of users with issues and timeline data
+ */
+export async function getGithubTimeline(repo, filter = 'this-month', options = {}) {
+  const params = new URLSearchParams({ repo });
+  if (filter) params.append('filter', filter);
+  if (options.date) params.append('date', options.date); // Support specific date
+
+  const headers = {};
+
+  if (options.etag) {
+    headers['If-None-Match'] = options.etag;
+  }
+
+  const res = await fetch(`${API_BASE}/api/github/timeline?${params}`, {
+    headers,
+    signal: options.signal
+  });
+
+  if (res.status === 304) {
+    return null;
+  }
+
+  const data = await handleResponse(res);
+
+  if (options.includeEtag) {
+    return {
+      data,
+      etag: res.headers.get('ETag')
+    };
+  }
+
+  return data;
+}
+
+/**
  * Fetch languages used by each user from commits in a repository
  * @param {string} repo - Repository full name (owner/repo)
  * @param {string} filter - Filter: 'all' for overall percentages, or today, yesterday, this-week, last-week, this-month

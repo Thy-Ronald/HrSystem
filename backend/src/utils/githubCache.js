@@ -21,11 +21,13 @@ const { getTTLUntil6PM, getExpiresAt6PM } = require('./ttlHelpers');
  * @param {string} filter - Filter type (e.g., 'today', 'this-week')
  * @returns {string} Cache key
  */
-function generateCacheKey(type, repoFullName, filter = null) {
+function generateCacheKey(type, repoFullName, ...extras) {
   const parts = ['github', type, repoFullName.replace('/', '_')];
-  if (filter) {
-    parts.push(filter);
-  }
+  extras.forEach(extra => {
+    if (extra) {
+      parts.push(String(extra));
+    }
+  });
   return parts.join(':');
 }
 
@@ -43,11 +45,11 @@ async function getCachedGitHubResponse(cacheKey) {
   try {
     // Get cached entry from Redis (or memory fallback)
     const cached = await cacheService.get(cacheKey);
-    
+
     if (!cached) {
       return null;
     }
-    
+
     // Parse cached data (could be string or object)
     // Parse cached data
     // cacheService.get returns the data field if it exists, or the parsed JSON
@@ -64,23 +66,23 @@ async function getCachedGitHubResponse(cacheKey) {
     } else {
       cacheEntry = cached;
     }
-    
+
     // Extract actual data and metadata
     const actualData = cacheEntry.data || cacheEntry;
     const expiresAtStr = cacheEntry.expiresAt || cacheEntry._expiresAt;
     const etag = cacheEntry.etag || cached?.etag || null;
-    
+
     // Check if cache entry has expiresAt field
     if (expiresAtStr) {
       const expiresAt = new Date(expiresAtStr);
       const now = new Date();
-      
+
       // If expired, return null
       if (now >= expiresAt) {
         console.log(`[GitHub Cache] ❌ Expired: ${cacheKey} (expired at ${expiresAt.toISOString()})`);
         return null;
       }
-      
+
       console.log(`[GitHub Cache] ✅ HIT: ${cacheKey} (expires at ${expiresAt.toISOString()})`);
       return {
         data: actualData,
@@ -88,23 +90,23 @@ async function getCachedGitHubResponse(cacheKey) {
         expiresAt: expiresAt,
       };
     }
-    
+
     // Legacy format: check timestamp-based expiration
     if (cacheEntry.timestamp) {
       const age = Date.now() - cacheEntry.timestamp;
       const expiresAt = new Date(cacheEntry.timestamp + (cacheEntry.ttlSeconds || 600) * 1000);
-      
+
       if (Date.now() >= expiresAt.getTime()) {
         return null;
       }
-      
+
       return {
         data: actualData,
         etag: etag,
         expiresAt: expiresAt,
       };
     }
-    
+
     // Fallback: assume data is valid (shouldn't happen with new format)
     return {
       data: actualData,
@@ -135,7 +137,7 @@ async function setCachedGitHubResponse(cacheKey, data, etag = null) {
     // Calculate TTL until 6 PM
     const ttlSeconds = getTTLUntil6PM();
     const expiresAt = getExpiresAt6PM();
-    
+
     // Create cache entry with all required fields
     // cacheService.set wraps data in { data: <ourData>, timestamp, etag } format
     // So we store our cacheEntry object as the data
@@ -145,12 +147,12 @@ async function setCachedGitHubResponse(cacheKey, data, etag = null) {
       timestamp: Date.now(),
       etag: etag || null,
     };
-    
+
     // Store in Redis with TTL
     // cacheService.set(key, data, ttlSeconds, etag)
     // It wraps our cacheEntry in { data: cacheEntry, timestamp, etag }
     await cacheService.set(cacheKey, cacheEntry, ttlSeconds, etag);
-    
+
     console.log(`[GitHub Cache] ✅ SET: ${cacheKey} (expires at ${expiresAt.toISOString()}, TTL: ${ttlSeconds}s)`);
   } catch (error) {
     console.error(`[GitHub Cache] Error setting cache for ${cacheKey}:`, error.message);

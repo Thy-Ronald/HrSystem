@@ -13,6 +13,7 @@ import Information from './pages/Information';
 import Dashboard from './pages/Dashboard';
 import RankingPage from './pages/StaffRanking';
 import Monitoring from './pages/Monitoring';
+import GithubAnalytics from './pages/GithubAnalytics';
 import Auth from './pages/Auth';
 import Layout from './components/Layout';
 
@@ -25,6 +26,7 @@ const routeMap = {
   '/staff-ranking': 'staff-ranking',
   '/ranking': 'staff-ranking', // Alias
   '/monitoring': 'monitoring',
+  '/github-analytics': 'github-analytics',
 };
 
 // Get page from URL
@@ -41,6 +43,7 @@ function setPathFromPage(page, replace = false) {
     'information': '/information',
     'staff-ranking': '/staff-ranking',
     'monitoring': '/monitoring',
+    'github-analytics': '/github-analytics',
   };
   const path = pathMap[page] || '/';
   if (window.location.pathname !== path) {
@@ -126,6 +129,7 @@ function AppContent() {
       {currentPage === 'dashboard' && <Dashboard />}
       {currentPage === 'staff-ranking' && <RankingPage />}
       {currentPage === 'monitoring' && <Monitoring />}
+      {currentPage === 'github-analytics' && <GithubAnalytics />}
     </Layout>
   );
 }
