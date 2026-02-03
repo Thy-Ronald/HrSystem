@@ -50,7 +50,7 @@ const TimelineChart = ({ issues, startDate, endDate }) => {
         const e = new Date(end).getTime();
         const duration = e - s;
         const percent = (duration / totalDuration) * 100;
-        return Math.max(5, percent); // Increased min width (5%) to fit two letters/initials comfortably
+        return Math.max(3, percent); // Reduced min width to fit smaller rows
     };
 
     return (
@@ -66,8 +66,8 @@ const TimelineChart = ({ issues, startDate, endDate }) => {
                 pointerEvents: 'none',
                 zIndex: 0
             }}>
-                {/* Render grid lines approximately every 10% for now */}
-                {[0, 8.33, 16.66, 25, 33.33, 41.66, 50, 58.33, 66.66, 75, 83.33, 91.66, 100].map(p => (
+                {/* Render hourly grid lines */}
+                {Array.from({ length: 25 }, (_, i) => (i / 24) * 100).map(p => (
                     <Box
                         key={p}
                         sx={{
@@ -75,7 +75,7 @@ const TimelineChart = ({ issues, startDate, endDate }) => {
                             left: `${p}%`,
                             top: 0,
                             bottom: 0,
-                            borderLeft: p > 0 ? '1px dashed #E0E0E0' : 'none',
+                            borderLeft: p > 0 ? '1px dashed #F0F0F0' : 'none',
                             zIndex: 0
                         }}
                     />
@@ -88,12 +88,11 @@ const TimelineChart = ({ issues, startDate, endDate }) => {
                     <Box
                         key={issue.id}
                         sx={{
-                            height: 40,
-                            mb: 1,
+                            height: 32,
                             position: 'relative',
                             display: 'flex',
                             alignItems: 'center',
-                            '&:hover': { bgcolor: 'rgba(0,0,0,0.02)' }
+                            '&:hover': { bgcolor: 'rgba(0,0,0,0.01)' }
                         }}
                     >
                         {/* Render Status Segments */}
@@ -107,7 +106,8 @@ const TimelineChart = ({ issues, startDate, endDate }) => {
                                 if (segEnd < chartStart || segStart > chartEnd) return null;
 
                                 let left = getLeft(Math.max(segStart, chartStart));
-                                const width = getWidth(Math.max(segStart, chartStart), Math.min(segEnd, chartEnd));
+                                // width: 'fit-content' with min-width to ensure visibility
+                                const width = 5.0; // Slightly increased fixed width to fit full text in high-density view
 
                                 // Collision Prevention: Ensure this segment starts at least where the previous one ended
                                 if (left < lastEndPercent) {
@@ -124,25 +124,22 @@ const TimelineChart = ({ issues, startDate, endDate }) => {
                                 return (
                                     <Tooltip
                                         key={idx}
-                                        title={['Local Done', 'Dev Deployed', 'Dev Checked', 'Done', 'Time Up', 'timeUp', 'Time up'].includes(status.status)
-                                            ? `${status.status}: ${new Date(status.startDate).toLocaleTimeString()}`
-                                            : `${status.status}: ${new Date(status.startDate).toLocaleTimeString()} - ${new Date(status.endDate).toLocaleTimeString()}`}
+                                        title={`${status.status}: ${new Date(status.startDate).toLocaleTimeString()}`}
                                     >
                                         <Box
                                             sx={{
                                                 position: 'absolute',
                                                 left: `${left}%`,
                                                 width: `${finalWidth}%`,
-                                                height: 24,
+                                                height: 18,
                                                 bgcolor: color,
-                                                borderRadius: 1,
+                                                borderRadius: 0.5,
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 overflow: 'hidden',
                                                 px: 0.5,
-                                                boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                                                fontSize: '0.7rem',
+                                                fontSize: '0.6rem',
                                                 color: '#424242',
                                                 fontWeight: 'bold',
                                                 whiteSpace: 'nowrap',
@@ -150,7 +147,7 @@ const TimelineChart = ({ issues, startDate, endDate }) => {
                                                 zIndex: idx // Higher index for later statuses
                                             }}
                                         >
-                                            {finalWidth < 10 ? (statusAcronyms[status.status] || status.status.charAt(0)) : status.status}
+                                            {status.status}
                                         </Box>
                                     </Tooltip>
                                 );

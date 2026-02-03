@@ -50,16 +50,17 @@ const TimerDisplay = ({ statusHistory, currentStatus, currentTime }) => {
     };
 
     return (
-        <Typography variant="body2" sx={{
+        <Typography variant="caption" sx={{
             fontFamily: 'monospace',
             fontWeight: 'bold',
+            fontSize: '0.65rem',
             color: isActive ? '#d32f2f' : (isPaused ? '#f57c00' : (isStopped ? '#4caf50' : 'text.secondary')),
             display: 'flex',
             alignItems: 'center',
-            gap: 0.5
+            gap: 0.3
         }}>
-            {isActive && <CircularProgress size={10} color="inherit" sx={{ mr: 0.5 }} />}
-            {isPaused && <span style={{ fontSize: '0.8rem', marginRight: '4px' }}>⏸</span>}
+            {isActive && <CircularProgress size={8} color="inherit" sx={{ mr: 0.3 }} />}
+            {isPaused && <span style={{ fontSize: '0.65rem', marginRight: '2px' }}>⏸</span>}
             {formatDuration(duration)}
         </Typography>
     );
@@ -77,8 +78,8 @@ const GithubAnalytics = () => {
     // Default scroll to 10:00 AM
     useEffect(() => {
         if (scrollRef.current && !loading && timelineData.length > 0) {
-            // (10 hours / 24 hours) * 1500px = 625px
-            scrollRef.current.scrollLeft = 625;
+            // (10 hours / 24 hours) * 2400px = 1000px
+            scrollRef.current.scrollLeft = 1000;
         }
     }, [loading, timelineData]);
 
@@ -153,17 +154,18 @@ const GithubAnalytics = () => {
     const { start: chartStart, end: chartEnd } = getChartRange();
 
     return (
-        <Box sx={{ p: 3, height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
-                <Typography variant="h5" sx={{ fontWeight: 'bold', mr: 2 }}>
+        <Box sx={{ p: 2, height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <Box sx={{ mb: 1.5, display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mr: 1, color: '#333' }}>
                     GitHub Analytics
                 </Typography>
 
-                <FormControl size="small" sx={{ minWidth: 200 }}>
+                <FormControl size="small" sx={{ minWidth: 180 }}>
                     <Select
                         value={selectedRepo}
                         onChange={(e) => setSelectedRepo(e.target.value)}
                         displayEmpty
+                        sx={{ height: 32, fontSize: '0.85rem' }}
                     >
                         {repos.map(repo => (
                             <MenuItem key={repo.fullName} value={repo.fullName}>
@@ -178,35 +180,37 @@ const GithubAnalytics = () => {
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
                     style={{
-                        padding: '8px 12px',
+                        padding: '4px 8px',
                         borderRadius: '4px',
                         border: '1px solid #c4c4c4',
                         fontFamily: 'Roboto, Helvetica, Arial, sans-serif',
-                        fontSize: '1rem',
+                        fontSize: '0.85rem',
                         color: '#333',
-                        outline: 'none'
+                        outline: 'none',
+                        height: '32px',
+                        boxSizing: 'border-box'
                     }}
                 />
             </Box>
 
             <Paper sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
                 <Box ref={scrollRef} sx={{ flexGrow: 1, overflowX: 'auto', overflowY: 'auto' }}>
-                    <Box sx={{ minWidth: 1950, display: 'flex', flexDirection: 'column' }}>
+                    <Box sx={{ minWidth: 2900, display: 'flex', flexDirection: 'column' }}>
                         {/* Header Row */}
-                        <Box sx={{ display: 'flex', borderBottom: '1px solid #e0e0e0', bgcolor: '#f9fafb', position: 'sticky', top: 0, zIndex: 100 }}>
-                            <Box sx={{ width: 300, minWidth: 300, p: 2, borderRight: '1px solid #e0e0e0', fontWeight: 'bold', color: '#666', bgcolor: '#f9fafb', position: 'sticky', left: 0, zIndex: 101 }}>
+                        <Box sx={{ display: 'flex', borderBottom: '1px solid #e0e0e0', bgcolor: '#f9fafb', position: 'sticky', top: 0, zIndex: 100, height: 32 }}>
+                            <Box sx={{ width: 350, minWidth: 350, px: 1, display: 'flex', alignItems: 'center', borderRight: '1px solid #e0e0e0', fontWeight: 'bold', color: '#666', bgcolor: '#f9fafb', position: 'sticky', left: 0, zIndex: 101, fontSize: '0.75rem' }}>
                                 Name & Task
                             </Box>
-                            <Box sx={{ width: 1500, minWidth: 1500, p: 2, position: 'relative' }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', color: '#999', fontSize: '0.8rem' }}>
-                                    {['00:00', '02:00', '04:00', '06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00', '24:00'].map(time => (
-                                        <Typography key={time} variant="caption" sx={{ width: 0, overflow: 'visible', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                            <Box sx={{ width: 2400, minWidth: 2400, px: 2, display: 'flex', alignItems: 'center', position: 'relative' }}>
+                                <Box sx={{ display: 'flex', width: '100%', justifyContent: 'space-between', color: '#999', fontSize: '0.75rem' }}>
+                                    {Array.from({ length: 25 }, (_, i) => `${i.toString().padStart(2, '0')}:00`).map(time => (
+                                        <Typography key={time} variant="caption" sx={{ width: 0, overflow: 'visible', whiteSpace: 'nowrap', textAlign: 'center', fontSize: '0.7rem' }}>
                                             {time}
                                         </Typography>
                                     ))}
                                 </Box>
                             </Box>
-                            <Box sx={{ width: 150, minWidth: 150, p: 2, borderLeft: '1px solid #e0e0e0', fontWeight: 'bold', color: '#666', bgcolor: '#f9fafb', position: 'sticky', right: 0, zIndex: 101 }}>
+                            <Box sx={{ width: 150, minWidth: 150, px: 1, display: 'flex', alignItems: 'center', borderLeft: '1px solid #e0e0e0', fontWeight: 'bold', color: '#666', bgcolor: '#f9fafb', position: 'sticky', right: 0, zIndex: 101, fontSize: '0.75rem' }}>
                                 Details
                             </Box>
                         </Box>
@@ -222,37 +226,41 @@ const GithubAnalytics = () => {
                                         display: 'flex',
                                         bgcolor: '#f5f5f5',
                                         borderBottom: '1px solid #e0e0e0',
-                                        py: 1, pl: 2,
-                                        position: 'sticky', left: 0, right: 0, zIndex: 10
+                                        height: 32, alignItems: 'center',
+                                        position: 'relative'
                                     }}>
-                                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                                            {userData.user.login}
-                                        </Typography>
-                                        <Box sx={{ ml: 'auto', display: 'flex', gap: 2, alignItems: 'center', pr: 2 }}>
-                                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>
-                                                Total Assigned P: {userData.totalP || 0}
-                                                {(() => {
-                                                    const totalP = userData.totalP || 0;
-                                                    if (totalP > 0) {
-                                                        const finishTime = new Date(Date.now() + totalP * 60000);
-                                                        return (
-                                                            <span style={{ marginLeft: '8px', opacity: 0.8 }}>
-                                                                • Est. Finish: {finishTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                            </span>
-                                                        );
-                                                    }
-                                                    return null;
-                                                })()}
-                                            </Typography>
+                                        <Box sx={{
+                                            position: 'sticky',
+                                            left: 0,
+                                            zIndex: 10,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 2,
+                                            bgcolor: '#f5f5f5',
+                                            py: 0.5, pl: 1, pr: 2,
+                                            width: 'fit-content'
+                                        }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <Avatar
+                                                    src={userData.user.avatarUrl || userData.user.avatar_url}
+                                                    sx={{ width: 14, height: 14 }}
+                                                >
+                                                    {userData.user.login[0]}
+                                                </Avatar>
+                                                <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                                                    {userData.user.login} | Today 0/0 min | Today total p: {userData.totalP || 0}
+                                                </Typography>
+                                            </Box>
                                         </Box>
                                     </Box>
 
                                     {userData.issues.map(issue => (
-                                        <Box key={issue.id} sx={{ display: 'flex', borderBottom: '1px solid #f0f0f0', minHeight: 60 }}>
+                                        <Box key={issue.id} sx={{ display: 'flex', borderBottom: '1px solid #f0f0f0', minHeight: 40 }}>
                                             <Box sx={{
-                                                width: 300,
-                                                minWidth: 300,
-                                                p: 1.5,
+                                                width: 350,
+                                                minWidth: 350,
+                                                px: 1,
+                                                py: 0.5,
                                                 borderRight: '1px solid #e0e0e0',
                                                 display: 'flex',
                                                 flexDirection: 'column',
@@ -262,33 +270,34 @@ const GithubAnalytics = () => {
                                                 position: 'sticky', left: 0, zIndex: 5
                                             }}>
                                                 <Typography
-                                                    variant="body2"
+                                                    variant="caption"
                                                     noWrap
                                                     sx={{
                                                         color: '#1a73e8',
                                                         fontWeight: 600,
-                                                        fontSize: '0.85rem',
+                                                        fontSize: '0.75rem',
                                                         cursor: 'pointer',
                                                         '&:hover': { color: '#174ea6' },
                                                         display: 'flex',
                                                         alignItems: 'center',
-                                                        gap: 1,
-                                                        mb: 0.5
+                                                        gap: 0.5,
+                                                        textTransform: 'none'
                                                     }}
                                                     onClick={() => window.open(issue.url, '_blank')}
                                                 >
-                                                    <Box component="span" sx={{ bgcolor: '#e8f0fe', px: 0.5, borderRadius: 0.5, fontSize: '0.75rem' }}>
+                                                    <Box component="span" sx={{ color: '#1a73e8', opacity: 0.7, mr: 0.5 }}>
+                                                        {issue.title.split(' ')[0]}
+                                                    </Box>
+                                                    <Box component="span" sx={{ color: '#1a73e8', opacity: 0.7, mr: 0.5 }}>
                                                         #{issue.number}
                                                     </Box>
-                                                    {issue.title}
-                                                </Typography>
-                                                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                    <Assignment sx={{ fontSize: 14, opacity: 0.6 }} />
-                                                    P: {issue.pValue} mins
+                                                    <Box component="span" sx={{ color: '#333', fontSize: '0.72rem' }}>
+                                                        {issue.title.split(' ').slice(1).join(' ')}
+                                                    </Box>
                                                 </Typography>
                                             </Box>
 
-                                            <Box sx={{ width: 1500, minWidth: 1500, position: 'relative', borderRight: '1px solid #e0e0e0' }}>
+                                            <Box sx={{ width: 2400, minWidth: 2400, position: 'relative', borderRight: '1px solid #e0e0e0' }}>
                                                 <TimelineChart
                                                     issues={[issue]}
                                                     startDate={chartStart}
@@ -296,24 +305,23 @@ const GithubAnalytics = () => {
                                                 />
                                             </Box>
 
-                                            <Box sx={{ width: 150, minWidth: 150, p: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', bgcolor: '#fff', borderLeft: '1px solid #f0f0f0', position: 'sticky', right: 0, zIndex: 5 }}>
+                                            <Box sx={{ width: 150, minWidth: 150, p: 0.5, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', bgcolor: '#fff', borderLeft: '1px solid #f0f0f0', position: 'sticky', right: 0, zIndex: 5 }}>
                                                 <Typography
                                                     variant="caption"
                                                     sx={{
                                                         display: 'inline-block',
-                                                        px: 1,
-                                                        py: 0.5,
-                                                        bgcolor: issue.currentStatus === 'In Progress' ? '#fff9c4' :
-                                                            issue.currentStatus === 'Time Up' ? '#ffe0b2' :
-                                                                (['Local Done', 'Dev Deployed', 'Dev Checked'].includes(issue.currentStatus) ? '#e8f5e9' : '#f5f5f5'),
-                                                        color: issue.currentStatus === 'In Progress' ? '#fbc02d' :
+                                                        width: '90%',
+                                                        textAlign: 'center',
+                                                        py: 0.2,
+                                                        bgcolor: issue.currentStatus === 'In Progress' ? '#2979FF' :
                                                             issue.currentStatus === 'Time Up' ? '#ef6c00' :
-                                                                (['Local Done', 'Dev Deployed', 'Dev Checked'].includes(issue.currentStatus) ? '#2e7d32' : '#757575'),
-                                                        borderRadius: 1,
+                                                                (['Local Done', 'Dev Deployed', 'Dev Checked'].includes(issue.currentStatus) ? '#4caf50' : '#757575'),
+                                                        color: '#fff',
+                                                        borderRadius: '2px',
                                                         fontWeight: 'bold',
-                                                        fontSize: '0.7rem',
-                                                        mb: 0.5,
-                                                        textTransform: 'uppercase'
+                                                        fontSize: '0.65rem',
+                                                        mb: 0.2,
+                                                        textTransform: 'none'
                                                     }}
                                                 >
                                                     {issue.currentStatus}
