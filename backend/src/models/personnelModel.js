@@ -45,8 +45,11 @@ async function createPersonnelRecord(data) {
 async function getAllPersonnelRecords() {
     const sql = `
         SELECT 
-            id, date_started as dateStarted, surname, first_name as firstName, middle_name as middleName,
-            date_of_birth as dateOfBirth, place_of_birth as placeOfBirth, sex, civil_status as civilStatus, citizenship,
+            id, 
+            DATE_FORMAT(date_started, '%Y-%m-%d') as dateStarted, 
+            surname, first_name as firstName, middle_name as middleName,
+            DATE_FORMAT(date_of_birth, '%Y-%m-%d') as dateOfBirth, 
+            place_of_birth as placeOfBirth, sex, civil_status as civilStatus, citizenship,
             height, weight, blood_type as bloodType,
             sss_number as sssNumber, pag_ibig_number as pagIbigNumber, philhealth_number as philHealthNumber, 
             tin, employee_number as employeeNumber,

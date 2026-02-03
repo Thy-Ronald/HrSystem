@@ -84,9 +84,11 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
     };
 
     const [formData, setFormData] = useState(defaultFormData);
+    const [errors, setErrors] = useState({});
 
     React.useEffect(() => {
         if (open) {
+            setErrors({}); // Clear errors when modal opens
             if (initialData && (mode === 'edit' || mode === 'view')) {
                 // Ensure education object exists and has all levels
                 const mergedEducation = {
@@ -94,10 +96,19 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                     ...(initialData.education || {})
                 };
 
+                // Helper to format date for input (YYYY-MM-DD)
+                const formatDateForInput = (dateString) => {
+                    if (!dateString) return '';
+                    // Handle both ISO strings (2023-10-25T...) and plain date strings (2023-10-25)
+                    return dateString.includes('T') ? dateString.split('T')[0] : dateString;
+                };
+
                 // Merge initial data with default structure to prevent missing fields
                 setFormData({
                     ...defaultFormData,
                     ...initialData,
+                    dateStarted: formatDateForInput(initialData.dateStarted),
+                    dateOfBirth: formatDateForInput(initialData.dateOfBirth),
                     education: mergedEducation
                 });
             } else {
@@ -108,13 +119,59 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
 
     const handleChange = (e) => {
         if (mode === 'view') return;
-        const { name, value } = e.target || e; // Handle both event and direct value from shadcn select
+        let { name, value } = e.target || e;
+
+        // Auto-format ID fields
+        if (['sssNumber', 'pagIbigNumber', 'philHealthNumber', 'tin'].includes(name)) {
+            // Remove all non-digits
+            const digits = value.replace(/\D/g, '');
+
+            if (name === 'sssNumber') {
+                // SSS: XX-XXXXXXX-X (10 digits)
+                const limit = 10;
+                const clean = digits.slice(0, limit);
+                value = clean;
+                if (clean.length > 2) value = `${clean.slice(0, 2)}-${clean.slice(2)}`;
+                if (clean.length > 9) value = `${value.slice(0, 12)}-${clean.slice(9)}`;
+            } else if (name === 'pagIbigNumber') {
+                // Pag-IBIG: XXXX-XXXX-XXXX (12 digits)
+                const limit = 12;
+                const clean = digits.slice(0, limit);
+                value = clean;
+                if (clean.length > 4) value = `${clean.slice(0, 4)}-${clean.slice(4)}`;
+                if (clean.length > 8) value = `${value.slice(0, 9)}-${clean.slice(8)}`;
+            } else if (name === 'philHealthNumber') {
+                // PhilHealth: XX-XXXXXXXXX-X (12 digits)
+                const limit = 12;
+                const clean = digits.slice(0, limit);
+                value = clean;
+                if (clean.length > 2) value = `${clean.slice(0, 2)}-${clean.slice(2)}`;
+                if (clean.length > 11) value = `${value.slice(0, 14)}-${clean.slice(11)}`;
+            } else if (name === 'tin') {
+                // TIN: XXX-XXX-XXX-XXX (12 digits)
+                const limit = 12;
+                const clean = digits.slice(0, limit);
+                value = clean;
+                if (clean.length > 3) value = `${clean.slice(0, 3)}-${clean.slice(3)}`;
+                if (clean.length > 6) value = `${value.slice(0, 7)}-${clean.slice(6)}`;
+                if (clean.length > 9) value = `${value.slice(0, 11)}-${clean.slice(9)}`;
+            }
+        }
+
         setFormData(prev => ({ ...prev, [name]: value }));
+
+        // Clear error when user types
+        if (errors[name]) {
+            setErrors(prev => ({ ...prev, [name]: null }));
+        }
     };
 
     const handleSelectChange = (name, value) => {
         if (mode === 'view') return;
         setFormData(prev => ({ ...prev, [name]: value }));
+        if (errors[name]) {
+            setErrors(prev => ({ ...prev, [name]: null }));
+        }
     };
 
     const handleEducationChange = (level, field, value) => {
@@ -131,9 +188,39 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
         }));
     };
 
+    const validateForm = () => {
+        const newErrors = {};
+
+        // SSS Validation (XX-XXXXXXX-X)
+        if (formData.sssNumber && !/^\d{2}-\d{7}-\d{1}$/.test(formData.sssNumber)) {
+            newErrors.sssNumber = 'Format: XX-XXXXXXX-X';
+        }
+
+        // Pag-IBIG Validation (XXXX-XXXX-XXXX)
+        if (formData.pagIbigNumber && !/^\d{4}-\d{4}-\d{4}$/.test(formData.pagIbigNumber)) {
+            newErrors.pagIbigNumber = 'Format: XXXX-XXXX-XXXX';
+        }
+
+        // PhilHealth Validation (XX-XXXXXXXXX-X)
+        if (formData.philHealthNumber && !/^\d{2}-\d{9}-\d{1}$/.test(formData.philHealthNumber)) {
+            newErrors.philHealthNumber = 'Format: XX-XXXXXXXXX-X';
+        }
+
+        // TIN Validation (XXX-XXX-XXX-XXX)
+        if (formData.tin && !/^\d{3}-\d{3}-\d{3}-\d{3}$/.test(formData.tin)) {
+            newErrors.tin = 'Format: XXX-XXX-XXX-XXX';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSave(formData);
+
+        if (validateForm()) {
+            onSave(formData);
+        }
     };
 
     const SectionTitle = ({ title }) => (
@@ -337,7 +424,9 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                             value={formData.sssNumber}
                                             onChange={handleChange}
                                             placeholder="00-0000000-0"
+                                            className={errors.sssNumber ? "border-destructive focus-visible:ring-destructive" : ""}
                                         />
+                                        {errors.sssNumber && <span className="text-[10px] text-destructive font-medium">{errors.sssNumber}</span>}
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="pagIbigNumber" className="font-semibold text-slate-700">PAG-IBIG Number</Label>
@@ -347,7 +436,9 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                             value={formData.pagIbigNumber}
                                             onChange={handleChange}
                                             placeholder="0000-0000-0000"
+                                            className={errors.pagIbigNumber ? "border-destructive focus-visible:ring-destructive" : ""}
                                         />
+                                        {errors.pagIbigNumber && <span className="text-[10px] text-destructive font-medium">{errors.pagIbigNumber}</span>}
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="philHealthNumber" className="font-semibold text-slate-700">PhilHealth Number</Label>
@@ -357,7 +448,9 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                             value={formData.philHealthNumber}
                                             onChange={handleChange}
                                             placeholder="00-000000000-0"
+                                            className={errors.philHealthNumber ? "border-destructive focus-visible:ring-destructive" : ""}
                                         />
+                                        {errors.philHealthNumber && <span className="text-[10px] text-destructive font-medium">{errors.philHealthNumber}</span>}
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="tin" className="font-semibold text-slate-700">TIN</Label>
@@ -367,7 +460,9 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                             value={formData.tin}
                                             onChange={handleChange}
                                             placeholder="000-000-000-000"
+                                            className={errors.tin ? "border-destructive focus-visible:ring-destructive" : ""}
                                         />
+                                        {errors.tin && <span className="text-[10px] text-destructive font-medium">{errors.tin}</span>}
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="employeeNumber" className="font-semibold text-slate-700">Employee Number</Label>
