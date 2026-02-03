@@ -27,6 +27,39 @@ const etagCache = new Map(); // Store ETags for conditional requests
 const CACHE_TTL = 10000; // 10 seconds - shorter TTL since we use ETags
 const REPO_CACHE_TTL = 300000; // 5 minutes for repos
 
+// Pre-compiled regex for P-value extraction
+const P_VALUE_REGEX = /P\s*[:\s\-=\(]*\s*(\d+(?:\.\d+)?)\s*\)?/gi;
+
+// Status mapping configuration
+const STATUS_LABELS = {
+  'In Progress': 'In Progress',
+  'Review': 'Review',
+  'Local Done': 'Local Done',
+  'Dev Deployed': 'Dev Deployed',
+  'Dev Checked': 'Dev Checked'
+};
+
+const STATUS_PRIORITY_ORDER = [
+  'Dev Checked',
+  'Dev Deployed',
+  'Local Done',
+  'Review',
+  'In Progress'
+];
+
+/**
+ * Help map label names to canonical status names
+ */
+const mapLabelToStatus = (name) => {
+  const n = name.toLowerCase();
+  if (n.includes('in progress')) return 'In Progress';
+  if (n.includes('review')) return 'Review';
+  if (n.includes('local done')) return 'Local Done';
+  if (n.includes('dev deployed')) return 'Dev Deployed';
+  if (n.includes('dev checked')) return 'Dev Checked';
+  return null;
+};
+
 function getCached(key, ttl = CACHE_TTL) {
   const entry = cache.get(key);
   if (entry && Date.now() - entry.timestamp < ttl) {
@@ -654,14 +687,12 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
 function extractPValue(text) {
   if (!text || typeof text !== 'string') return 0;
 
-
-  // Robust regex to match P:60, P(60), P-60, P 60, P=60, [P: 60], etc.
-  // This version handles optional parentheses and various separators.
-  const regex = /P\s*[:\s\-=\(]*\s*(\d+(?:\.\d+)?)\s*\)?/gi;
   let sum = 0;
   let match;
 
-  while ((match = regex.exec(text)) !== null) {
+  // Use the pre-compiled P_VALUE_REGEX (reset index before use if using 'g' flag)
+  P_VALUE_REGEX.lastIndex = 0;
+  while ((match = P_VALUE_REGEX.exec(text)) !== null) {
     if (match[1]) {
       const value = parseFloat(match[1]);
       if (!isNaN(value)) {
@@ -765,7 +796,7 @@ async function getIssueTimeline(repoFullName, filter = 'this-month', date = null
                     color
                   }
                 }
-                timelineItems(first: 100, itemTypes: [LABELED_EVENT, UNLABELED_EVENT, ASSIGNED_EVENT]) {
+                timelineItems(last: 100, itemTypes: [LABELED_EVENT, UNLABELED_EVENT, ASSIGNED_EVENT]) {
                   nodes {
                     __typename
                     ... on LabeledEvent {
@@ -861,16 +892,6 @@ async function getIssueTimeline(repoFullName, filter = 'this-month', date = null
             let currentStatus = 'Assigned';
             let statusStartTime = new Date(issue.createdAt);
 
-            const mapLabelToStatus = (name) => {
-              const n = name.toLowerCase();
-              if (n.includes('in progress')) return 'In Progress';
-              if (n.includes('review')) return 'Review';
-              if (n.includes('local done')) return 'Local Done';
-              if (n.includes('dev deployed')) return 'Dev Deployed';
-              if (n.includes('dev checked')) return 'Dev Checked';
-              return null;
-            };
-
             events.forEach(event => {
               const eventDate = new Date(event.createdAt);
               if (event.__typename === 'LabeledEvent' && event.label) {
@@ -885,17 +906,27 @@ async function getIssueTimeline(repoFullName, filter = 'this-month', date = null
                   currentStatus = newStatus;
                   statusStartTime = eventDate;
                 }
+              } else if (event.__typename === 'UnlabeledEvent' && event.label) {
+                const removedStatus = mapLabelToStatus(event.label.name);
+                // If we removed the current status, revert to 'Assigned' as a fallback
+                if (removedStatus === currentStatus) {
+                  statusHistory.push({
+                    status: currentStatus,
+                    startDate: statusStartTime,
+                    endDate: eventDate,
+                    durationMs: eventDate - statusStartTime
+                  });
+                  currentStatus = 'Assigned';
+                  statusStartTime = eventDate;
+                }
               }
             });
 
             // Add reconciliation logic for current labels
-            const currentLabels = (issue.labels?.nodes || []).map(l => l.name.toLowerCase());
-            let highestLabelStatus = null;
-            if (currentLabels.some(l => l.includes('dev checked'))) highestLabelStatus = 'Dev Checked';
-            else if (currentLabels.some(l => l.includes('dev deployed'))) highestLabelStatus = 'Dev Deployed';
-            else if (currentLabels.some(l => l.includes('local done'))) highestLabelStatus = 'Local Done';
-            else if (currentLabels.some(l => l.includes('review'))) highestLabelStatus = 'Review';
-            else if (currentLabels.some(l => l.includes('in progress'))) highestLabelStatus = 'In Progress';
+            const currentLabels = (issue.labels?.nodes || []).map(l => l.name);
+            const highestLabelStatus = STATUS_PRIORITY_ORDER.find(status =>
+              currentLabels.some(labelName => mapLabelToStatus(labelName) === status)
+            );
 
             if (highestLabelStatus && highestLabelStatus !== currentStatus) {
               const transitionTime = new Date(issue.updatedAt);

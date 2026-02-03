@@ -17,33 +17,28 @@ import { getGithubTimeline, fetchRepositories } from '../services/api';
 import TimelineChart from '../components/TimelineChart';
 import { AccessTime, Assignment } from '@mui/icons-material';
 
-const TimerDisplay = ({ statusHistory, currentStatus }) => {
-    // Calculate initial duration
+const TimerDisplay = ({ statusHistory, currentStatus, currentTime }) => {
     const calculateDuration = () => {
-        return statusHistory.reduce((acc, seg) => {
+        let total = statusHistory.reduce((acc, seg) => {
             if (seg.status === 'In Progress') {
                 return acc + (seg.durationMs || 0);
             }
             return acc;
         }, 0);
+
+        // If currently in progress, add time since the last transition
+        if (currentStatus === 'In Progress' && statusHistory.length > 0) {
+            const lastSegment = statusHistory[statusHistory.length - 1];
+            if (lastSegment.status === 'In Progress') {
+                const startTime = new Date(lastSegment.startDate).getTime();
+                const now = currentTime || Date.now();
+                total += Math.max(0, now - startTime);
+            }
+        }
+        return total;
     };
 
-    const [duration, setDuration] = useState(calculateDuration());
-
-    useEffect(() => {
-        // If currently in progress, tick
-        if (currentStatus === 'In Progress') {
-            const interval = setInterval(() => {
-                setDuration(d => d + 1000);
-            }, 1000);
-            return () => clearInterval(interval);
-        }
-    }, [currentStatus]);
-
-    // Update if history changes (e.g. data refresh)
-    useEffect(() => {
-        setDuration(calculateDuration());
-    }, [statusHistory]);
+    const duration = calculateDuration();
 
     const formatDuration = (ms) => {
         const h = Math.floor(ms / 3600000);
@@ -76,6 +71,15 @@ const GithubAnalytics = () => {
     const [selectedRepo, setSelectedRepo] = useState('');
     const [repos, setRepos] = useState([]);
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
+    const [currentTime, setCurrentTime] = useState(Date.now());
+
+    // Central ticker for all timers
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentTime(Date.now());
+        }, 1000);
+        return () => clearInterval(interval);
+    }, []);
 
     // Fetch repositories on mount
     useEffect(() => {
@@ -137,7 +141,7 @@ const GithubAnalytics = () => {
             {/* Header Controls */}
             <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
                 <Typography variant="h5" sx={{ fontWeight: 'bold', mr: 2 }}>
-                    GitHub Analytics <span style={{ fontSize: '12px', color: '#ff4444' }}>(v1.3_DEBUG)</span>
+                    GitHub Analytics
                 </Typography>
 
                 <FormControl size="small" sx={{ minWidth: 200 }}>
@@ -285,18 +289,9 @@ const GithubAnalytics = () => {
                                             </Box>
                                             {issue.title}
                                         </Typography>
-                                        <Typography variant="caption" sx={{
-                                            color: issue.pValue === 0 ? '#ff0000' : 'text.secondary',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 0.5,
-                                            fontWeight: issue.pValue === 0 ? 'bold' : 'normal',
-                                            bgcolor: issue.pValue === 0 ? 'rgba(255,0,0,0.1)' : 'transparent',
-                                            px: 0.5,
-                                            borderRadius: 0.5
-                                        }}>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                             <Assignment sx={{ fontSize: 14, opacity: 0.6 }} />
-                                            P: {issue.pValue} mins {issue.pValue === 0 ? '(NOT DETECTED)' : ''}
+                                            P: {issue.pValue} mins
                                         </Typography>
                                     </Box>
 
@@ -331,8 +326,9 @@ const GithubAnalytics = () => {
 
                                         {/* Duration Timer */}
                                         <TimerDisplay
-                                            statusHistory={issue.statusHistory}
+                                            statusHistory={issue.statusHistory || []}
                                             currentStatus={issue.currentStatus}
+                                            currentTime={currentTime}
                                         />
                                     </Box>
                                 </Box>
