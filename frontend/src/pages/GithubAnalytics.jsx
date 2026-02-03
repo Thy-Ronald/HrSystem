@@ -16,6 +16,19 @@ import TimelineChart from '../components/TimelineChart';
 import { AccessTime, Assignment } from '@mui/icons-material';
 import useSocket from '../hooks/useSocket';
 
+// Status colors matching TimelineChart.jsx
+const STATUS_COLORS = {
+    'Assigned': '#81C784', // Light Green
+    'In Progress': '#FFD54F', // Yellow
+    'Review': '#2979FF', // Blue scale
+    'Local Done': '#CFD8DC', // Grey
+    'Dev Deployed': '#64B5F6', // Lighter Blue
+    'Dev Checked': '#4DB6AC', // Teal
+    'Time Up': '#FFE0B2', // Orange/Amber
+    'Done': '#CFD8DC',
+    'Unknown': '#E0E0E0'
+};
+
 const TimerDisplay = ({ statusHistory, currentStatus, currentTime }) => {
     const calculateDuration = () => {
         let total = statusHistory.reduce((acc, seg) => {
@@ -313,10 +326,8 @@ const GithubAnalytics = () => {
                                                         width: '90%',
                                                         textAlign: 'center',
                                                         py: 0.2,
-                                                        bgcolor: issue.currentStatus === 'In Progress' ? '#2979FF' :
-                                                            issue.currentStatus === 'Time Up' ? '#ef6c00' :
-                                                                (['Local Done', 'Dev Deployed', 'Dev Checked'].includes(issue.currentStatus) ? '#4caf50' : '#757575'),
-                                                        color: '#fff',
+                                                        bgcolor: STATUS_COLORS[issue.currentStatus] || STATUS_COLORS['Unknown'],
+                                                        color: ['In Progress', 'Assigned', 'Time Up'].includes(issue.currentStatus) ? '#424242' : '#fff',
                                                         borderRadius: '2px',
                                                         fontWeight: 'bold',
                                                         fontSize: '0.65rem',
