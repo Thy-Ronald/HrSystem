@@ -70,3 +70,15 @@ FROM
 WHERE 
   TABLE_SCHEMA = 'hr_system' 
   AND TABLE_NAME = 'staff_contract';
+
+-- Monitoring Requests table
+CREATE TABLE IF NOT EXISTS monitoring_requests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    admin_id INT NOT NULL,
+    target_user_id INT NOT NULL,
+    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE CASCADE
+);

@@ -16,14 +16,13 @@ class MonitoringService {
    * @param {string} connectionCode - Code for admin to connect
    * @returns {string} Session ID
    */
-  createSession(employeeSocketId, employeeName, connectionCode) {
+  createSession(employeeSocketId, employeeName) {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours default
 
     this.sessions.set(sessionId, {
       employeeSocketId,
       employeeName,
-      connectionCode,
       adminSocketIds: new Set(),
       streamActive: false,
       createdAt: new Date(),
@@ -33,22 +32,7 @@ class MonitoringService {
     return sessionId;
   }
 
-  /**
-   * Find session by connection code only
-   * @param {string} connectionCode - Connection code to validate
-   * @returns {Object|null} { sessionId, session } or null if not found
-   */
-  getSessionByCode(connectionCode) {
-    for (const [sessionId, session] of this.sessions.entries()) {
-      if (
-        session.connectionCode === connectionCode &&
-        !this.isSessionExpired(sessionId)
-      ) {
-        return { sessionId, session };
-      }
-    }
-    return null;
-  }
+
 
   /**
    * Get session by employee socket ID

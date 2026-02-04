@@ -20,6 +20,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
   Plus,
   Search,
   Eye,
@@ -200,6 +208,9 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
 
       <Dialog open={showFullView} onOpenChange={setShowFullView}>
         <DialogContent className="max-w-4xl w-[95vw] h-[90vh] p-0 bg-black border-slate-800 overflow-hidden [&>button]:text-white shadow-2xl rounded-2xl flex flex-col">
+          <DialogDescription className="sr-only">
+            Live screen share view of {session.employeeName}
+          </DialogDescription>
           <div className="w-full h-full flex flex-col">
             {/* Header - Relative positioning ensures it doesn't overlap the video content */}
             <div className="px-5 py-3 flex justify-between items-center bg-slate-900 border-b border-white/10 shrink-0">
@@ -260,8 +271,6 @@ const Monitoring = () => {
   const { isConnected: socketConnected } = useSocket();
   const {
     sessionId,
-    connectionCode,
-    setConnectionCode,
     loading,
     setLoading,
     sessions,
@@ -276,7 +285,10 @@ const Monitoring = () => {
     startSharing,
     stopSharing,
     resetSession,
-    emit
+    emit,
+    connectionRequest,
+    respondConnection,
+    requestConnection
   } = useMonitoring();
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -285,32 +297,32 @@ const Monitoring = () => {
   const [addFormError, setAddFormError] = useState('');
   const [addFormLoading, setAddFormLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+
+  const [selectedUser, setSelectedUser] = useState(null);
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      // Only search if we haven't selected a user yet (to avoid searching for the selected name)
+      if (showAddModal && addFormCode.length > 1 && !selectedUser) {
+        try {
+          // Ensure we import searchUsers from api.js first
+          const results = await import('../services/api').then(m => m.searchUsers(addFormCode));
+          setSearchResults(results || []);
+        } catch (err) {
+          console.error("Search failed", err);
+        }
+      } else {
+        setSearchResults([]);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [addFormCode, showAddModal, selectedUser]);
 
   const toast = useToast();
   const role = user?.role || null;
   const name = user?.name || '';
-
-  const handleSubmitConnectionCode = useCallback(() => {
-    if (!socketConnected) return toast.error('Check your connection');
-    if (connectionCode.trim().length < 4) return toast.error('Min 4 characters required');
-    setLoading(true);
-    emit('monitoring:auth', { role: user.role, name: user.name, connectionCode: connectionCode.trim() });
-  }, [user, socketConnected, connectionCode, emit, toast, setLoading]);
-
-  const handleAddConnection = () => {
-    const code = addFormCode.trim();
-    if (!code) return setAddFormError('Code required');
-
-    // Local check for duplicate connection
-    const isDuplicate = sessions.some(s => s.connectionCode === code);
-    if (isDuplicate) {
-      return setAddFormError('Already connected to this session');
-    }
-
-    if (clearConnectError) clearConnectError();
-    setAddFormLoading(true);
-    emit('monitoring:connect-by-code', { connectionCode: code });
-  };
 
   // Close modal when sessions update (if we just added one)
   useEffect(() => {
@@ -318,6 +330,7 @@ const Monitoring = () => {
       setShowAddModal(false);
       setAddFormLoading(false);
       setAddFormCode('');
+      setSelectedUser(null);
       setAddFormError('');
     }
   }, [sessions.length]);
@@ -345,142 +358,240 @@ const Monitoring = () => {
     emit('monitoring:leave-session', { sessionId: id });
   };
 
+  const sendConnectionRequest = async () => {
+    if (!selectedUser) {
+      return setAddFormError('Please select a user from the search results');
+    }
+
+    setAddFormLoading(true);
+    try {
+      const { createMonitoringRequest } = await import('../services/api');
+      await createMonitoringRequest(selectedUser.id);
+      toast.success(`Request sent to ${selectedUser.name}`);
+      setShowAddModal(false);
+      setAddFormCode('');
+      setSelectedUser(null);
+      setSearchResults([]);
+    } catch (error) {
+      console.error('Request failed:', error);
+      setAddFormError(error.message || 'Failed to send request');
+    } finally {
+      setAddFormLoading(false);
+    }
+  };
+
+
   if (!role) return <div className="p-20 flex justify-center items-center"><Loader2 className="h-10 w-10 text-blue-600 animate-spin" /></div>;
 
-  if (role === 'employee') {
+
+
+  // Pending Requests Component
+  const PendingRequests = () => {
+    const [requests, setRequests] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [confirmApproveId, setConfirmApproveId] = useState(null); // ID of request to confirm approval for
+
+    const fetchRequests = async () => {
+      try {
+        const { getMonitoringRequests } = await import('../services/api');
+        const data = await getMonitoringRequests();
+        setRequests(data);
+      } catch (error) {
+        console.error('Failed to fetch requests', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    useEffect(() => {
+      fetchRequests();
+      const interval = setInterval(fetchRequests, 10000); // Polling every 10s
+      return () => clearInterval(interval);
+    }, []);
+
+    const handleDecline = async (requestId) => {
+      try {
+        const { respondToMonitoringRequest } = await import('../services/api');
+        await respondToMonitoringRequest(requestId, 'rejected');
+        toast.success('Request Declined');
+        fetchRequests();
+      } catch (error) {
+        toast.error('Failed to decline request');
+      }
+    }
+
+    const handleConfirmApprove = async () => {
+      if (!confirmApproveId) return;
+
+      try {
+        // First start sharing (must be user triggered)
+        await startSharing();
+
+        // Then accept backend request
+        const { respondToMonitoringRequest } = await import('../services/api');
+        await respondToMonitoringRequest(confirmApproveId, 'approved');
+
+        toast.success('Request Approved & Sharing Started');
+        setConfirmApproveId(null);
+        setJustReconnected(false);
+        fetchRequests();
+      } catch (error) {
+        console.error(error);
+        toast.error('Failed to start sharing or approve request');
+        setConfirmApproveId(null);
+      }
+    };
+
+    // Always render the card, show empty state if needed
     return (
-      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center bg-slate-50 p-6">
-        <style>{GLOBAL_STYLES}</style>
-        <div className="max-w-md w-full">
-          {!sessionId ? (
-            <Card className="rounded-3xl border-slate-200 p-8 text-center shadow-xl bg-white">
-              <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-6">
-                <Key className="h-8 w-8 text-blue-600" />
-              </div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-2">Setup Connection</h2>
-              <p className="text-slate-500 mb-8 font-medium">Enter a code for admins to connect to your screen.</p>
-              <div className="relative mb-8">
-                <input
-                  type="text"
-                  value={connectionCode}
-                  onChange={(e) => setConnectionCode(e.target.value)}
-                  placeholder="Enter code"
-                  className="w-full px-4 py-4 rounded-xl border-2 border-slate-100 text-center text-2xl font-bold text-slate-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-300"
-                />
-              </div>
-              <Button
-                className="w-full bg-[#1a3e62] hover:bg-[#122c46] text-white font-bold h-14 rounded-2xl transition-all shadow-lg active:scale-95 text-lg"
-                onClick={handleSubmitConnectionCode}
-                disabled={loading || connectionCode.trim().length < 4}
-              >
-                {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : 'Start Session'}
-              </Button>
-            </Card>
+      <>
+        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white flex flex-col flex-1">
+
+          {requests.length === 0 ? (
+            <div className="p-8 text-center text-slate-500">
+              <p className="text-sm">No pending requests.</p>
+            </div>
           ) : (
-            <Card className="rounded-3xl border-slate-200 overflow-hidden shadow-2xl bg-white">
-              <div className="p-8 text-center">
-                {!isSharing ? (
-                  <>
-                    <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
-                      <Monitor className="h-8 w-8 text-blue-600" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-slate-900 mb-2">
-                      {justReconnected ? 'Session Restored' : 'Ready to Share'}
-                    </h2>
-                    <p className="text-slate-500 mb-8 font-medium italic">
-                      {justReconnected
-                        ? 'Your connection was restored. Please resume sharing to allow admins to view your screen.'
-                        : 'Admins can view your screen once you start sharing.'}
-                    </p>
-                    <div className="mb-8 p-6 bg-blue-50/50 rounded-2xl border-2 border-dashed border-blue-200 relative group">
-                      <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest block mb-2">Connection Code</span>
-                      <div className="text-4xl font-black text-blue-700 tracking-[0.2em] font-mono">{connectionCode}</div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setShowResetConfirm(true)}
-                        className="absolute top-2 right-2 text-blue-400 hover:text-blue-600 hover:bg-white rounded-full h-8 w-8 shadow-sm transition-all"
-                        title="Change Code"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <Button
-                      className="w-full bg-[#1a3e62] hover:bg-[#122c46] text-white font-bold h-14 rounded-2xl transition-all shadow-lg active:scale-95 text-lg"
-                      onClick={() => {
-                        startSharing();
-                        setJustReconnected(false);
-                      }}
-                    >
-                      {justReconnected ? 'Resume Sharing' : 'Start Sharing Screen'}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4 border-2 border-emerald-100 animate-pulse">
-                      <CheckCircle2 className="h-8 w-8 text-emerald-500" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-emerald-600 mb-1">Sharing Active</h2>
-                    <p className="text-slate-500 mb-8 font-medium">Your screen is live for connected administrators.</p>
-                    <div className="mb-8 flex justify-center">
-                      <div className="px-6 py-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
-                        <div className="text-left">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Session Code</span>
-                          <span className="text-xl font-bold text-slate-700 tracking-wider font-mono">{connectionCode}</span>
+            <div className="flex-1 overflow-auto">
+              <Table>
+                <TableHeader className="bg-slate-50/80 sticky top-0 z-10">
+                  <TableRow className="hover:bg-transparent border-b border-slate-200">
+                    <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap pl-6">Admin Name</TableHead>
+                    <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Status</TableHead>
+                    <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Received At</TableHead>
+                    <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap text-right pr-6">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {requests.map(req => (
+                    <TableRow key={req.id} className="hover:bg-slate-50/50 transition-colors">
+                      <TableCell className="py-4 pl-6 font-medium text-slate-900">
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-2">
+                            <span>{req.admin_name}</span>
+                            {req.status === 'approved' && (
+                              <div className="flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Live</span>
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-xs text-slate-400 font-normal">{req.admin_email}</span>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setShowResetConfirm(true)}
-                          className="h-8 w-8 p-0 hover:bg-slate-200 rounded-full text-slate-400"
-                        >
-                          <X className="h-4 w-4 rotate-45" />
-                        </Button>
-                      </div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      className="w-full text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 font-bold h-14 rounded-2xl transition-all shadow-sm active:scale-95 text-lg"
-                      onClick={stopSharing}
-                    >
-                      Stop Sharing
-                    </Button>
-                  </>
-                )}
-                {shareError && <p className="text-rose-500 text-xs mt-4 font-bold uppercase tracking-wider">{shareError}</p>}
-              </div>
-            </Card>
+                      </TableCell>
+                      <TableCell className="py-4">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${req.status === 'approved'
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'bg-amber-50 text-amber-700'
+                          }`}>
+                          {req.status === 'approved' ? 'Active' : 'Pending Approval'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-4 text-slate-600">{new Date(req.created_at).toLocaleString()}</TableCell>
+                      <TableCell className="py-4 text-slate-600 text-right pr-6">
+                        <div className="flex justify-end gap-2">
+                          {req.status === 'approved' ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-medium px-3"
+                              onClick={() => handleDecline(req.id)}
+                            >
+                              Disconnect
+                            </Button>
+                          ) : (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-medium px-3"
+                                onClick={() => handleDecline(req.id)}
+                              >
+                                Decline
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="h-8 bg-[#1a3e62] hover:bg-[#122c46] text-white font-medium px-4 shadow-sm"
+                                onClick={() => setConfirmApproveId(req.id)}
+                              >
+                                Approve
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </div>
-        <Dialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+
+        <Dialog open={!!confirmApproveId} onOpenChange={(open) => !open && setConfirmApproveId(null)}>
           <DialogContent className="sm:max-w-md bg-white">
             <DialogHeader>
-              <DialogTitle className="text-xl font-bold text-slate-900 leading-tight">Change Connection Code?</DialogTitle>
+              <DialogTitle className="text-xl font-bold text-slate-900">Start Sharing?</DialogTitle>
               <DialogDescription className="text-slate-500 pt-2">
-                Changing the code will disconnect any currently viewing administrators and stop your current screen share.
+                Approving this request will immediately start sharing your screen with the administrator.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="gap-2 sm:gap-0 pt-4">
               <Button
                 variant="ghost"
-                onClick={() => setShowResetConfirm(false)}
+                onClick={() => setConfirmApproveId(null)}
                 className="text-slate-600 hover:bg-slate-100 font-medium"
               >
                 Cancel
               </Button>
               <Button
-                variant="destructive"
-                className="bg-rose-600 hover:bg-rose-700 font-semibold"
-                onClick={() => {
-                  resetSession();
-                  setShowResetConfirm(false);
-                }}
+                className="bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold"
+                onClick={handleConfirmApprove}
               >
-                Change Code
+                Confirm & Share
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      </>
+    );
+  };
+
+  if (role === 'employee') {
+    return (
+      <div className="w-full min-h-full bg-white flex flex-col">
+        <style>{GLOBAL_STYLES}</style>
+
+        {/* Page Header */}
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+          <div>
+            <h1 className="text-xl font-normal text-[#202124] tracking-tight">
+              Monitoring Requests
+            </h1>
+          </div>
+          {isSharing && (
+            <Button
+              variant="outline"
+              className="text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 font-bold shadow-sm"
+              onClick={stopSharing}
+            >
+              Stop Sharing
+            </Button>
+          )}
+        </div>
+
+        {/* Main Content Area */}
+        <div className="p-8 flex-1 flex flex-col overflow-hidden">
+          <PendingRequests />
+
+          {/* Show error if any */}
+          {shareError && (
+            <div className="mt-4 p-4 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 text-sm text-center">
+              {shareError}
+            </div>
+          )}
+        </div>
+
       </div>
     );
   }
@@ -495,7 +606,7 @@ const Monitoring = () => {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
           <input
             type="text"
-            placeholder="Search employees..."
+            placeholder="Search active sessions..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-medium text-slate-700 placeholder:text-slate-400"
@@ -506,7 +617,7 @@ const Monitoring = () => {
           className="bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold h-11 px-6 rounded-xl shadow-md transition-all active:scale-95"
         >
           <Plus className="mr-2 h-5 w-5" />
-          Connect New
+          New Connection
         </Button>
       </div>
 
@@ -519,7 +630,7 @@ const Monitoring = () => {
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">No active sessions</h3>
             <p className="text-slate-500 max-w-xs text-center">
-              Click the button above to connect to an employee using their session code.
+              Click 'New Connection' to request to monitor an employee.
             </p>
           </div>
         ) : (
@@ -540,35 +651,68 @@ const Monitoring = () => {
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
         <DialogContent className="sm:max-w-md bg-white">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-slate-900 leading-tight">Connect to Employee</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-slate-900 leading-tight">Request Connection</DialogTitle>
+            <DialogDescription className="text-sm text-slate-500">
+              Search for an employee to request a monitoring session.
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4">
+            <label className="block text-sm font-medium text-slate-700 mb-2">Employee Name</label>
             <input
               type="text"
               value={addFormCode}
               onChange={e => {
                 setAddFormCode(e.target.value);
+                setSelectedUser(null); // Clear selection if user types
                 if (addFormError) setAddFormError('');
               }}
-              placeholder="Enter code"
+              placeholder="e.g. John Doe"
               className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
             />
             {addFormError && <p className="text-rose-500 text-xs mt-1 font-medium">{addFormError}</p>}
+
+            {searchResults.length > 0 && (
+              <div className="mt-2 border border-slate-200 rounded-lg max-h-48 overflow-y-auto shadow-sm">
+                {searchResults.map((user) => (
+                  <div
+                    key={user.id}
+                    className="px-4 py-2 hover:bg-slate-50 cursor-pointer border-b border-slate-50 last:border-0 flex justify-between items-center"
+                    onClick={() => {
+                      setAddFormCode(user.name);
+                      setSelectedUser(user);
+                      setSearchResults([]);
+                    }}
+                  >
+                    <span className="text-sm font-medium text-slate-700">{user.name}</span>
+                    <span className="text-xs text-slate-400">{user.email}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <p className="text-xs text-slate-500 mt-2">
+              This will send a request to the employee to accept the monitoring session.
+            </p>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               variant="ghost"
-              onClick={() => setShowAddModal(false)}
+              onClick={() => {
+                setShowAddModal(false);
+                setSearchResults([]);
+                setAddFormCode('');
+                setSelectedUser(null);
+              }}
               className="text-slate-600 hover:bg-slate-100 font-medium"
             >
               Cancel
             </Button>
             <Button
               className="bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold px-6"
-              onClick={handleAddConnection}
+              onClick={sendConnectionRequest}
               disabled={addFormLoading}
             >
-              Connect
+              Send Request
             </Button>
           </DialogFooter>
         </DialogContent>

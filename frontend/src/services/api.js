@@ -529,6 +529,62 @@ export async function deletePersonnelRecord(id) {
 }
 
 /**
+ * Search users by name (for connection requests)
+ * @param {string} query - Search query
+ * @returns {Promise<Array>} - Array of matching users
+ */
+export async function searchUsers(query) {
+  const res = await fetch(`${API_BASE}/api/users/search?q=${encodeURIComponent(query)}`, {
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(res);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Monitoring Request APIs
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Create a monitoring request
+ * @param {number} targetUserId 
+ * @returns {Promise<Object>}
+ */
+export async function createMonitoringRequest(targetUserId) {
+  const res = await fetch(`${API_BASE}/api/monitoring/requests`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ targetUserId }),
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Get pending monitoring requests (for employee)
+ * @returns {Promise<Array>}
+ */
+export async function getMonitoringRequests() {
+  const res = await fetch(`${API_BASE}/api/monitoring/requests`, {
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Respond to monitoring request (approve/reject)
+ * @param {number} requestId 
+ * @param {string} status - 'approved' | 'rejected'
+ * @returns {Promise<Object>}
+ */
+export async function respondToMonitoringRequest(requestId, status) {
+  const res = await fetch(`${API_BASE}/api/monitoring/requests/${requestId}/respond`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ status }),
+  });
+  return handleResponse(res);
+}
+
+/**
  * Fetch all personnel records
  * @returns {Promise<Array>} - Array of personnel records
  */

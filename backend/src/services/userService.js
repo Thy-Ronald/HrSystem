@@ -112,4 +112,24 @@ module.exports = {
   findUserByGithubId,
   findUserById,
   verifyPassword,
+  searchUsers
 };
+
+/**
+ * Search users by name or email
+ * @param {string} queryStr - Search query
+ * @returns {Promise<Array>} Array of matching users
+ */
+async function searchUsers(queryStr) {
+  try {
+    const searchTerm = `%${queryStr}%`;
+    const users = await query(
+      'SELECT id, name, email, role, avatar_url FROM users WHERE name LIKE ? OR email LIKE ? LIMIT 20',
+      [searchTerm, searchTerm]
+    );
+    return users;
+  } catch (error) {
+    throw error;
+  }
+}
+

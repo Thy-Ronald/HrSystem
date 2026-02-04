@@ -131,9 +131,32 @@ async function deletePersonnelRecord(id) {
     }
 }
 
+async function searchPersonnel(queryStr) {
+    const sql = `
+        SELECT 
+            id, 
+            surname, first_name as firstName, middle_name as middleName,
+            employee_number as employeeNumber
+        FROM personnel_data_sheet 
+        WHERE surname LIKE ? OR first_name LIKE ?
+        ORDER BY surname ASC, first_name ASC
+        LIMIT 20
+    `;
+    const searchTerm = `%${queryStr}%`;
+
+    try {
+        const records = await query(sql, [searchTerm, searchTerm]);
+        return records;
+    } catch (error) {
+        console.error('Error searching personnel records:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     createPersonnelRecord,
     getAllPersonnelRecords,
     updatePersonnelRecord,
-    deletePersonnelRecord
+    deletePersonnelRecord,
+    searchPersonnel
 };

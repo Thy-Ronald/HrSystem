@@ -54,5 +54,20 @@ module.exports = {
     createPersonnelRecord,
     getAllPersonnelRecords,
     updatePersonnelRecord,
-    deletePersonnelRecord
+    deletePersonnelRecord,
+    searchPersonnel
 };
+
+async function searchPersonnel(req, res) {
+    try {
+        const queryStr = req.query.q;
+        if (!queryStr) {
+            return res.status(400).json({ error: 'Query parameter q is required' });
+        }
+        const records = await personnelModel.searchPersonnel(queryStr);
+        res.json(records);
+    } catch (error) {
+        console.error('Controller error searching personnel:', error);
+        res.status(500).json({ error: 'Failed to search personnel' });
+    }
+}

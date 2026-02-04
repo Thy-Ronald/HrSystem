@@ -3,6 +3,7 @@ import { useAuth } from './AuthContext';
 import { useSocket } from '../hooks/useSocket';
 import { useScreenShare } from '../hooks/useScreenShare';
 import { useToast } from '../components/Toast';
+import { getToken } from '../utils/auth';
 
 const MonitoringContext = createContext();
 
@@ -13,7 +14,6 @@ export const MonitoringProvider = ({ children }) => {
 
     // Shared state
     const [sessionId, setSessionId] = useState(() => localStorage.getItem('monitoring_sessionId') || null);
-    const [connectionCode, setConnectionCode] = useState(() => localStorage.getItem('monitoring_connectionCode') || '');
     const [loading, setLoading] = useState(false);
 
     // Admin state
@@ -26,17 +26,13 @@ export const MonitoringProvider = ({ children }) => {
     // Employee state
     const [adminCount, setAdminCount] = useState(0);
     const [justReconnected, setJustReconnected] = useState(false);
+    const [connectionRequest, setConnectionRequest] = useState(null); // { adminName, adminSocketId }
 
     // Persistence effects
     useEffect(() => {
         if (sessionId) localStorage.setItem('monitoring_sessionId', sessionId);
         else localStorage.removeItem('monitoring_sessionId');
     }, [sessionId]);
-
-    useEffect(() => {
-        if (connectionCode) localStorage.setItem('monitoring_connectionCode', connectionCode);
-        else localStorage.removeItem('monitoring_connectionCode');
-    }, [connectionCode]);
 
     const sessionsRef = useRef(sessions);
     useEffect(() => {
@@ -60,13 +56,12 @@ export const MonitoringProvider = ({ children }) => {
     useEffect(() => {
         if (!isConnected) return;
 
-        const handleCreated = ({ sessionId: sid, connectionCode: code }) => {
+        const handleCreated = ({ sessionId: sid }) => {
             console.log('[MonitoringContext] Session created/restored:', sid);
             setSessionId(sid);
             setLoading(false);
-            if (code) setConnectionCode(code);
             setJustReconnected(true);
-            toast.success('System ready');
+            // toast.success('System ready'); // Reduced noise
         };
 
         const handleError = ({ message, sessionId: errSessionId }) => {
@@ -83,21 +78,21 @@ export const MonitoringProvider = ({ children }) => {
             }
         };
 
-        const handleConnectSuccess = ({ sessionId: sid, employeeName, connectionCode: code, streamActive: active }) => {
+        const handleConnectSuccess = ({ sessionId: sid, employeeName, streamActive: active }) => {
             setSessions(prev => {
                 const exists = prev.find(s => s.sessionId === sid);
                 if (exists) {
-                    return prev.map(s => s.sessionId === sid ? { ...s, streamActive: active, connectionCode: code || s.connectionCode } : s);
+                    return prev.map(s => s.sessionId === sid ? { ...s, streamActive: active } : s);
                 }
-                return [...prev, { sessionId: sid, employeeName, connectionCode: code, streamActive: active }];
+                return [...prev, { sessionId: sid, employeeName, streamActive: active }];
             });
             setConnectError(null);
             toast.success(`Connected to ${employeeName}`);
         };
 
-        const handleSessionJoined = ({ sessionId: sid, connectionCode: code, streamActive: active }) => {
+        const handleSessionJoined = ({ sessionId: sid, streamActive: active }) => {
             console.log(`[MonitoringContext] Joined session ${sid}, active: ${active}`);
-            setSessions(prev => prev.map(s => s.sessionId === sid ? { ...s, streamActive: active, connectionCode: code || s.connectionCode } : s));
+            setSessions(prev => prev.map(s => s.sessionId === sid ? { ...s, streamActive: active } : s));
         };
 
         const handleConnectError = ({ message }) => {
@@ -126,6 +121,18 @@ export const MonitoringProvider = ({ children }) => {
             setAdminCount(prev => Math.max(0, prev - 1));
         };
 
+        const handleConnectionRequest = ({ adminName, adminSocketId }) => {
+            setConnectionRequest({ adminName, adminSocketId });
+        };
+
+        const handleRequestSent = ({ employeeName }) => {
+            toast.success(`Request sent to ${employeeName}`);
+        };
+
+        const handleRequestDenied = ({ employeeName }) => {
+            toast.error(`Connection request denied by ${employeeName}`);
+        };
+
         subscribe('monitoring:session-created', handleCreated);
         subscribe('monitoring:error', handleError);
         subscribe('monitoring:connect-success', handleConnectSuccess);
@@ -136,6 +143,9 @@ export const MonitoringProvider = ({ children }) => {
         subscribe('monitoring:session-ended', onEnd);
         subscribe('monitoring:admin-joined', onJoin);
         subscribe('monitoring:admin-left', onLeave);
+        subscribe('monitoring:connection-request', handleConnectionRequest);
+        subscribe('monitoring:request-sent', handleRequestSent);
+        subscribe('monitoring:request-denied', handleRequestDenied);
 
         return () => {
             unsubscribe('monitoring:session-created', handleCreated);
@@ -148,6 +158,9 @@ export const MonitoringProvider = ({ children }) => {
             unsubscribe('monitoring:session-ended', onEnd);
             unsubscribe('monitoring:admin-joined', onJoin);
             unsubscribe('monitoring:admin-left', onLeave);
+            unsubscribe('monitoring:connection-request', handleConnectionRequest);
+            unsubscribe('monitoring:request-sent', handleRequestSent);
+            unsubscribe('monitoring:request-denied', handleRequestDenied);
         };
     }, [isConnected, subscribe, unsubscribe, toast]);
 
@@ -155,16 +168,17 @@ export const MonitoringProvider = ({ children }) => {
     useEffect(() => {
         if (user && isConnected) {
             if (role === 'admin') {
-                emit('monitoring:auth', { role: user.role, name: user.name });
-            } else if (role === 'employee' && connectionCode && !sessionId) {
+                emit('monitoring:auth', { token: getToken(), role: user.role, name: user.name });
+            } else if (role === 'employee') {
+                // Employee auths without code now
                 emit('monitoring:auth', {
+                    token: getToken(),
                     role: user.role,
-                    name: user.name,
-                    connectionCode: connectionCode.trim()
+                    name: user.name
                 });
             }
         }
-    }, [user, isConnected, role]); // connectionCode and sessions omitted from deps to avoid loop
+    }, [user, isConnected, role]); // sessions omitted from deps to avoid loop
 
     // Join all sessions when admin re-authenticates or sessions list changes
     useEffect(() => {
@@ -178,19 +192,28 @@ export const MonitoringProvider = ({ children }) => {
     const resetSession = useCallback(() => {
         stopSharing();
         setSessionId(null);
-        setConnectionCode('');
         setJustReconnected(false);
         localStorage.removeItem('monitoring_sessionId');
-        localStorage.removeItem('monitoring_connectionCode');
-        toast.info('Session reset. You can now set a new code.');
-    }, [stopSharing, toast]);
+        toast.info('Session reset.');
+        // Re-auth to get new session
+        if (isConnected && role === 'employee') {
+            emit('monitoring:auth', { role: user.role, name: user.name });
+        }
+    }, [stopSharing, toast, isConnected, role, user, emit]);
 
     const clearConnectError = useCallback(() => setConnectError(null), []);
 
+    const requestConnection = useCallback((employeeName) => {
+        emit('monitoring:request-connection', { employeeName });
+    }, [emit]);
+
+    const respondConnection = useCallback((adminSocketId, accepted) => {
+        emit('monitoring:respond-connection', { adminSocketId, accepted });
+        setConnectionRequest(null);
+    }, [emit]);
+
     const value = useMemo(() => ({
         sessionId,
-        connectionCode,
-        setConnectionCode,
         loading,
         setLoading,
         sessions,
@@ -204,10 +227,13 @@ export const MonitoringProvider = ({ children }) => {
         shareError,
         startSharing,
         stopSharing,
-        emit
+        emit,
+        connectionRequest,
+        setConnectionRequest,
+        requestConnection,
+        respondConnection
     }), [
         sessionId,
-        connectionCode,
         loading,
         sessions,
         connectError,
@@ -218,7 +244,10 @@ export const MonitoringProvider = ({ children }) => {
         shareError,
         startSharing,
         stopSharing,
-        emit
+        emit,
+        connectionRequest,
+        requestConnection,
+        respondConnection
     ]);
 
     return (
