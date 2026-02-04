@@ -313,19 +313,20 @@ const PendingRequests = React.memo(({ startSharing, isSharing, setJustReconnecte
 
   useEffect(() => {
     // 2. Socket Listen (Fallback/verification)
+    // REMOVED: GlobalResumeSharingModal now handles this globally.
+    // Keeping this useEffect structure if we need to listen to other things later, 
+    // or we can remove the dependency on subscribe for this specific feature.
+
+    /*
     const handleSessionCreated = (data) => {
       if (data.monitoringExpected) {
-        console.log('[Monitoring] Backend signal: monitoringExpected. Prompting resume.');
-        setResumeData(data.activeRequest);
-        setShowResumeModal(true);
+         // logic moved to GlobalResumeSharingModal
       }
     };
-
     subscribe('monitoring:session-created', handleSessionCreated);
-    return () => {
-      unsubscribe('monitoring:session-created', handleSessionCreated);
-    };
-  }, [subscribe, unsubscribe]);
+    return () => unsubscribe('monitoring:session-created', handleSessionCreated);
+    */
+  }, []);
 
   const handleConfirmApprove = async () => {
     if (!confirmApproveId) return;

@@ -92,9 +92,9 @@ const GlobalResumeSharingModal = () => {
                         Resume Monitoring?
                     </DialogTitle>
                     <DialogDescription className="text-slate-500 pt-2">
-                        You have an active monitoring session with <strong>{resumeData?.adminName || 'Admin'}</strong>.
+                        Your screen sharing session with <strong>{resumeData?.adminName || 'Admin'}</strong> was interrupted by a page refresh.
                         <br />
-                        Click below to resume screen sharing immediately.
+                        Click below to resume sharing.
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter className="gap-2 sm:gap-0 pt-4">

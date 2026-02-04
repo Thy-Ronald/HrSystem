@@ -168,8 +168,23 @@ router.post('/login', authLimiter, async (req, res) => {
       const requests = await monitoringRequestModel.getRequestsForUser(user.id);
       const approved = requests.find(r => r.status === 'approved');
       if (approved) {
-        monitoringExpected = true;
-        activeRequest = { adminName: approved.admin_name, requestId: approved.id };
+        // Optimization: Only prompt if the Admin is actually online (connected to socket)
+        const io = req.app.get('io');
+        let adminOnline = false;
+
+        if (io) {
+          const sockets = Array.from(io.sockets.sockets.values());
+          // Check if any socket matches the admin's user ID AND has authenticated
+          adminOnline = sockets.some(s => s.data.userId == approved.admin_id && s.data.authenticated);
+        }
+
+        if (adminOnline) {
+          monitoringExpected = true;
+          activeRequest = { adminName: approved.admin_name, requestId: approved.id };
+          console.log(`[Auth] User ${user.email} has approved request from ${approved.admin_name} (Online). Expecting monitoring.`);
+        } else {
+          console.log(`[Auth] User ${user.email} has approved request from ${approved.admin_name}, but Admin is OFFLINE. Suppressing prompt.`);
+        }
       }
     } catch (err) {
       console.error('Error checking monitoring status during login:', err);
@@ -240,8 +255,23 @@ router.post('/verify', async (req, res) => {
       const requests = await monitoringRequestModel.getRequestsForUser(decoded.userId);
       const approved = requests.find(r => r.status === 'approved');
       if (approved) {
-        monitoringExpected = true;
-        activeRequest = { adminName: approved.admin_name, requestId: approved.id };
+        // Optimization: Only prompt if the Admin is actually online (connected to socket)
+        const io = req.app.get('io');
+        let adminOnline = false;
+
+        if (io) {
+          const sockets = Array.from(io.sockets.sockets.values());
+          // Check if any socket matches the admin's user ID AND has authenticated
+          adminOnline = sockets.some(s => s.data.userId == approved.admin_id && s.data.authenticated);
+        }
+
+        if (adminOnline) {
+          monitoringExpected = true;
+          activeRequest = { adminName: approved.admin_name, requestId: approved.id };
+          console.log(`[Auth] User ${user.email} has approved request from ${approved.admin_name} (Online). Expecting monitoring.`);
+        } else {
+          console.log(`[Auth] User ${user.email} has approved request from ${approved.admin_name}, but Admin is OFFLINE. Suppressing prompt.`);
+        }
       }
     } catch (err) {
       console.error('Error checking monitoring status during verify:', err);
