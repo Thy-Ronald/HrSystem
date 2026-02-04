@@ -68,11 +68,21 @@ export function useScreenShare(role, sessionId) {
     try {
       setError(null);
 
-      // Request screen capture
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { cursor: 'always' },
+        video: {
+          cursor: 'always',
+          width: { max: 1280 },
+          height: { max: 720 },
+          frameRate: { max: 15 } // Reduce FPS to save CPU/Bandwidth
+        },
         audio: false,
       });
+
+      // Optimize for text/static content (typical work environment)
+      const track = stream.getVideoTracks()[0];
+      if (track && 'contentHint' in track) {
+        track.contentHint = 'text';
+      }
 
       localStreamRef.current = stream;
       setIsSharing(true);
