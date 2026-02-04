@@ -20,6 +20,7 @@ function generateToken(payload) {
       role: payload.role,
       name: payload.name,
       email: payload.email,
+      avatar_url: payload.avatar_url, // Added
       iat: Math.floor(Date.now() / 1000),
     },
     JWT_SECRET,

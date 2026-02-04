@@ -17,6 +17,7 @@ import { Signal, Loader2 } from 'lucide-react';
 const GlobalResumeSharingModal = () => {
     const { startSharing } = useMonitoring();
     const [resumeData, setResumeData] = useState(null);
+    const [triggerType, setTriggerType] = useState('login'); // default to login
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const toast = useToast();
@@ -24,14 +25,21 @@ const GlobalResumeSharingModal = () => {
     // Check for resume flag on mount
     useEffect(() => {
         const storedExpected = localStorage.getItem('monitoring_resume_expected');
+        const triggerType = localStorage.getItem('monitoring_trigger_type');
+
         if (storedExpected === 'true') {
-            console.log('[GlobalResume] Found local resume flag. Prompting immediately.');
             try {
                 const data = JSON.parse(localStorage.getItem('monitoring_resume_data') || '{}');
                 setResumeData(data);
+                setTriggerType(triggerType || 'login');
                 setIsOpen(true);
                 // Clean up flag immediately
                 localStorage.removeItem('monitoring_resume_expected');
+                // We DON'T clear trigger_type here immediately because we need it for the render 
+                // It will be cleared when we close or the user navigates away? 
+                // Actually, just reading it once on render is enough if we store it in state, 
+                // but reading from localStorage in render is fine if it persists until the user clicks something.
+                // Let's clear it when we handle stop/resume.
             } catch (e) {
                 console.error('Error parsing resume data', e);
             }
@@ -43,6 +51,7 @@ const GlobalResumeSharingModal = () => {
         try {
             // Remove the flag to prevent loop if it fails
             localStorage.removeItem('monitoring_resume_expected');
+            localStorage.removeItem('monitoring_trigger_type');
 
             await startSharing();
             setIsOpen(false);
@@ -69,6 +78,7 @@ const GlobalResumeSharingModal = () => {
             } else {
                 // Fallback if no ID (should not happen with new backend)
                 localStorage.removeItem('monitoring_resume_expected');
+                localStorage.removeItem('monitoring_trigger_type');
                 localStorage.removeItem('monitoring_sessionId');
                 toast.info('Session cleared');
             }
@@ -92,9 +102,12 @@ const GlobalResumeSharingModal = () => {
                         Resume Monitoring?
                     </DialogTitle>
                     <DialogDescription className="text-slate-500 pt-2">
-                        Your screen sharing session with <strong>{resumeData?.adminName || 'Admin'}</strong> was interrupted by a page refresh.
-                        <br />
-                        Click below to resume sharing.
+                        <DialogDescription className="text-slate-500 pt-2">
+                            {triggerType === 'refresh'
+                                ? <span>Your screen sharing session with <strong>{resumeData?.adminName || 'Admin'}</strong> was interrupted by a page refresh.<br />Click below to resume sharing.</span>
+                                : <span>You have an active monitoring session with <strong>{resumeData?.adminName || 'Admin'}</strong>.<br />Click below to resume screen sharing immediately.</span>
+                            }
+                        </DialogDescription>
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter className="gap-2 sm:gap-0 pt-4">

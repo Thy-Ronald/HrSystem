@@ -78,21 +78,20 @@ export const MonitoringProvider = ({ children }) => {
             }
         };
 
-        const handleConnectSuccess = ({ sessionId: sid, employeeName, streamActive: active }) => {
+        const handleConnectSuccess = ({ sessionId: sid, employeeName, avatarUrl, streamActive: active }) => {
             setSessions(prev => {
                 const exists = prev.find(s => s.sessionId === sid);
                 if (exists) {
-                    return prev.map(s => s.sessionId === sid ? { ...s, streamActive: active } : s);
+                    return prev.map(s => s.sessionId === sid ? { ...s, streamActive: active, avatarUrl } : s);
                 }
-                return [...prev, { sessionId: sid, employeeName, streamActive: active }];
+                return [...prev, { sessionId: sid, employeeName, avatarUrl, streamActive: active }];
             });
             setConnectError(null);
             toast.success(`Connected to ${employeeName}`);
         };
 
-        const handleSessionJoined = ({ sessionId: sid, streamActive: active }) => {
-            console.log(`[MonitoringContext] Joined session ${sid}, active: ${active}`);
-            setSessions(prev => prev.map(s => s.sessionId === sid ? { ...s, streamActive: active } : s));
+        const handleSessionJoined = ({ sessionId: sid, avatarUrl, streamActive: active }) => {
+            setSessions(prev => prev.map(s => s.sessionId === sid ? { ...s, streamActive: active, avatarUrl } : s));
         };
 
         const handleConnectError = ({ message }) => {

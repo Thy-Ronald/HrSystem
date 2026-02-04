@@ -13,16 +13,19 @@ class MonitoringService {
    * Create a new monitoring session
    * @param {string} employeeSocketId - Socket ID of the employee
    * @param {string} employeeName - Name of the employee
-   * @param {string} connectionCode - Code for admin to connect
+   * @param {string|number} employeeId - ID of the employee (User ID)
+   * @param {string} avatarUrl - URL of the employee's avatar
    * @returns {string} Session ID
    */
-  createSession(employeeSocketId, employeeName) {
+  createSession(employeeSocketId, employeeName, employeeId, avatarUrl) {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours default
 
     this.sessions.set(sessionId, {
       employeeSocketId,
       employeeName,
+      employeeId, // Store Employee ID for validation
+      avatarUrl, // Store Avatar URL
       adminSocketIds: new Set(),
       streamActive: false,
       createdAt: new Date(),
@@ -172,6 +175,9 @@ class MonitoringService {
       .map(([sessionId, session]) => ({
         sessionId,
         employeeName: session.employeeName,
+        employeeId: session.employeeId, // Expose Employee ID
+        avatarUrl: session.avatarUrl, // Expose Avatar URL
+        streamActive: session.streamActive,
         streamActive: session.streamActive,
         adminCount: session.adminSocketIds.size,
         createdAt: session.createdAt,

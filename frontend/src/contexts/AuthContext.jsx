@@ -20,7 +20,9 @@ export function AuthProvider({ children }) {
     const tokenToVerify = urlToken || storedToken;
 
     if (tokenToVerify) {
-      verifyToken(tokenToVerify);
+      // If urlToken exists, it's a "New Login" (OAuth callback).
+      // If only storedToken exists, it's a "Refresh".
+      verifyToken(tokenToVerify, !!urlToken);
       // If it was a URL token, clean the URL
       if (urlToken) {
         const newUrl = window.location.pathname;
@@ -31,7 +33,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const verifyToken = async (tokenToVerify) => {
+  const verifyToken = async (tokenToVerify, isNewLogin = false) => {
     console.log('[AuthContext] Verifying token...');
     try {
       const response = await fetch(`${API_BASE}/api/auth/verify`, {
@@ -60,6 +62,9 @@ export function AuthProvider({ children }) {
         if (data.monitoringExpected) {
           console.log('[AuthContext] Verify indicates monitoring expected. Storing flag.');
           localStorage.setItem('monitoring_resume_expected', 'true');
+          // If it's a new login (via URL/OAuth), treat it as 'login'. 
+          // If it's just verification of stored token (refresh), treat as 'refresh'.
+          localStorage.setItem('monitoring_trigger_type', isNewLogin ? 'login' : 'refresh');
           if (data.activeRequest) {
             localStorage.setItem('monitoring_resume_data', JSON.stringify(data.activeRequest));
           }
@@ -113,6 +118,7 @@ export function AuthProvider({ children }) {
         if (data.monitoringExpected) {
           console.log('[AuthContext] Login indicates monitoring expected. Storing flag.');
           localStorage.setItem('monitoring_resume_expected', 'true');
+          localStorage.setItem('monitoring_trigger_type', 'login');
           if (data.activeRequest) {
             localStorage.setItem('monitoring_resume_data', JSON.stringify(data.activeRequest));
           }
@@ -182,6 +188,9 @@ export function AuthProvider({ children }) {
     removeToken();
     setUser(null);
     setToken(null);
+    localStorage.removeItem('monitoring_resume_expected');
+    localStorage.removeItem('monitoring_trigger_type');
+    localStorage.removeItem('monitoring_resume_data');
   };
 
   const value = {

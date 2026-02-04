@@ -43,6 +43,7 @@ import {
   Key,
   Loader2
 } from 'lucide-react';
+import { UserAvatar } from '../components/UserAvatar';
 
 // ─────────────────────────────────────────────────────────────
 // Styles & Animations
@@ -152,6 +153,12 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
       <Card className={`h-full overflow-hidden transition-all duration-300 border-2 ${session.streamActive ? 'border-[#1a3e62] shadow-md' : 'border-slate-100 shadow-sm'} flex flex-col bg-white hover:translate-y-[-4px] hover:shadow-xl`}>
         <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <div className="flex items-center gap-3 min-w-0">
+            <UserAvatar
+              name={session.employeeName}
+              avatarUrl={session.avatarUrl}
+              size="sm"
+              className="border border-slate-100"
+            />
             <h3 className="font-bold text-slate-800 truncate">{session.employeeName}</h3>
             {session.streamActive && (
               <div className="flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
@@ -211,6 +218,7 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
           <DialogDescription className="sr-only">
             Live screen share view of {session.employeeName}
           </DialogDescription>
+          <DialogTitle className="sr-only">Screen Share</DialogTitle>
           <div className="w-full h-full flex flex-col">
             {/* Header - Relative positioning ensures it doesn't overlap the video content */}
             <div className="px-5 py-3 flex justify-between items-center bg-slate-900 border-b border-white/10 shrink-0">
@@ -266,7 +274,7 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
   );
 });
 
-const PendingRequests = React.memo(({ startSharing, isSharing, setJustReconnected }) => {
+const PendingRequests = React.memo(({ startSharing, stopSharing, isSharing, setJustReconnected }) => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confirmApproveId, setConfirmApproveId] = useState(null);
@@ -292,20 +300,41 @@ const PendingRequests = React.memo(({ startSharing, isSharing, setJustReconnecte
     return () => clearInterval(interval);
   }, [fetchRequests]);
 
+  /* New State for Disconnect Confirmation */
+  const [confirmDisconnectId, setConfirmDisconnectId] = useState(null);
+
   const handleDecline = async (requestId) => {
     try {
       const { respondToMonitoringRequest } = await import('../services/api');
       await respondToMonitoringRequest(requestId, 'rejected');
-      toast.success('Request Declined');
+      toast.success('Disconnected successfully');
       fetchRequests();
     } catch (error) {
-      toast.error('Failed to decline request');
+      toast.error('Failed to disconnect');
     }
   }
 
-  const handleManualDisconnect = async (requestId) => {
+  // Triggered when user clicks "Disconnect"
+  const handleManualDisconnectClick = (requestId) => {
+    setConfirmDisconnectId(requestId);
+  };
+
+  // Triggered when user confirms in the dialog
+  const proceedWithDisconnect = async () => {
+    if (!confirmDisconnectId) return;
+
+    // 1. Stop sharing immediately (Realtime)
+    if (isSharing) {
+      stopSharing();
+    }
+
+    // 2. Persistent flag to prevent auto-resume
     localStorage.setItem('monitoring_manual_disconnect', 'true');
-    await handleDecline(requestId);
+
+    // 3. Reject/Disconnect API call
+    await handleDecline(confirmDisconnectId);
+
+    setConfirmDisconnectId(null);
   };
 
   // Resume Sharing Logic (Strict: Backend-driven, User Gesture Required)
@@ -371,15 +400,24 @@ const PendingRequests = React.memo(({ startSharing, isSharing, setJustReconnecte
                 {requests.map(req => (
                   <TableRow key={req.id} className="hover:bg-slate-50/50 transition-colors">
                     <TableCell className="py-4 pl-6 font-medium text-slate-900">
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                          <span>{req.admin_name}</span>
-                          {req.status === 'approved' && (
-                            <div className="flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Live</span>
-                            </div>
-                          )}
+                      <div className="flex items-center gap-3">
+                        <UserAvatar
+                          name={req.admin_name}
+                          avatarUrl={req.admin_avatar_url}
+                          className="border-2 border-slate-100"
+                        />
+
+                        <div>
+                          <div className="text-base font-medium flex items-center gap-2">
+                            <span>{req.admin_name}</span>
+                            {req.status === 'approved' && (
+                              <div className="flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Live</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-400 font-normal">{req.admin_email}</div>
                         </div>
                         <span className="text-xs text-slate-400 font-normal">{req.admin_email}</span>
                       </div>
@@ -400,7 +438,7 @@ const PendingRequests = React.memo(({ startSharing, isSharing, setJustReconnecte
                             size="sm"
                             variant="ghost"
                             className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-medium px-3"
-                            onClick={() => handleManualDisconnect(req.id)}
+                            onClick={() => handleManualDisconnectClick(req.id)}
                           >
                             Disconnect
                           </Button>
@@ -432,6 +470,33 @@ const PendingRequests = React.memo(({ startSharing, isSharing, setJustReconnecte
           </div>
         )}
       </div>
+
+      <Dialog open={!!confirmDisconnectId} onOpenChange={(open) => !open && setConfirmDisconnectId(null)}>
+        <DialogContent className="sm:max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-900 leading-tight">Stop Monitoring?</DialogTitle>
+            <DialogDescription className="text-slate-500 pt-2">
+              Are you sure you want to disconnect? This will <strong>immediately stop screen sharing</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 pt-4">
+            <Button
+              variant="ghost"
+              onClick={() => setConfirmDisconnectId(null)}
+              className="text-slate-600 hover:bg-slate-100 font-medium"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={proceedWithDisconnect}
+              className="bg-rose-600 hover:bg-rose-700 font-semibold"
+            >
+              Yes, Disconnect
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!confirmApproveId} onOpenChange={(open) => !open && setConfirmApproveId(null)}>
         <DialogContent className="sm:max-w-md bg-white">
@@ -547,7 +612,21 @@ const Monitoring = () => {
         try {
           // Ensure we import searchUsers from api.js first
           const results = await import('../services/api').then(m => m.searchUsers(addFormCode));
-          setSearchResults(results || []);
+
+          // Filter out users we are already connected to
+          // We check 'sessions' which now should contain employeeId if my recent backend change works
+          // But even if it doesn't immediately, we can try to match by name or ID if available.
+          // Note: Backend might need a restart to propagate the new 'employeeId' field in sessions list.
+          const filteredResults = results.filter(u => {
+            // Check if already in 'sessions'
+            const isConnected = sessions.some(s =>
+              s.employeeId === u.id || // Best check (requires backend update)
+              s.employeeName === u.name // Fallback check
+            );
+            return !isConnected;
+          });
+
+          setSearchResults(filteredResults || []);
         } catch (err) {
           console.error("Search failed", err);
         }
@@ -649,6 +728,7 @@ const Monitoring = () => {
         <div className="p-8 flex-1 flex flex-col overflow-hidden">
           <PendingRequests
             startSharing={startSharing}
+            stopSharing={stopSharing}
             isSharing={isSharing}
             setJustReconnected={setJustReconnected}
           />
@@ -752,7 +832,20 @@ const Monitoring = () => {
                       setSearchResults([]);
                     }}
                   >
-                    <span className="text-sm font-medium text-slate-700">{user.name}</span>
+                    <div className="flex items-center gap-3">
+                      {user.avatar_url ? (
+                        <img
+                          src={user.avatar_url}
+                          alt={user.name}
+                          className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
+                          <span className="text-xs font-bold text-slate-500">{user.name.charAt(0).toUpperCase()}</span>
+                        </div>
+                      )}
+                      <span className="text-sm font-medium text-slate-700">{user.name}</span>
+                    </div>
                     <span className="text-xs text-slate-400">{user.email}</span>
                   </div>
                 ))}

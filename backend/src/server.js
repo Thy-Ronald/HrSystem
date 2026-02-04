@@ -124,6 +124,7 @@ async function startServer() {
       // Extract User ID from token if available (to link with persistent requests)
       let userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       let jwtToken = token;
+      let avatarUrl = null;
 
       if (token) {
         try {
@@ -131,7 +132,21 @@ async function startServer() {
           const decoded = verifyToken(token);
           if (decoded && decoded.userId) {
             userId = decoded.userId;
-            console.log(`[Monitoring] User authenticated with token. ID: ${userId}`);
+            avatarUrl = decoded.avatar_url; // Extract avatar_url
+            console.log(`[Monitoring] User authenticated with token. ID: ${userId}, Avatar: ${avatarUrl ? 'Yes' : 'No'}`);
+          }
+          // Fallback: If avatar missing from token (legacy token), fetch from DB
+          if (decoded && decoded.userId && !avatarUrl) {
+            try {
+              const userService = require('./services/userService');
+              const user = await userService.findUserById(decoded.userId);
+              if (user) {
+                avatarUrl = user.avatar_url;
+                console.log(`[Monitoring] Fetched avatar from DB for user ${userId}`);
+              }
+            } catch (dbErr) {
+              console.error('[Monitoring] Failed to fetch user avatar from DB:', dbErr);
+            }
           }
         } catch (err) {
           console.log('[Monitoring] Invalid token provided in auth, using temporary ID');
@@ -193,8 +208,8 @@ async function startServer() {
           }
 
           // Create new session for employee with connection code
-          sessionId = monitoringService.createSession(socket.id, sanitized.name);
-          console.log(`[Monitoring] Created new session ${sessionId} for employee ${sanitized.name}`);
+          sessionId = monitoringService.createSession(socket.id, sanitized.name, socket.data.userId, avatarUrl);
+          console.log(`[Monitoring] Created new session ${sessionId} for employee ${sanitized.name} (ID: ${socket.data.userId}, Avatar: ${avatarUrl ? avatarUrl.substring(0, 30) + '...' : 'None'})`);
         }
 
         socket.data.sessionId = sessionId; // IMPORTANT: Assign session ID to socket data
@@ -306,6 +321,7 @@ async function startServer() {
           adminSocket.emit('monitoring:connect-success', {
             sessionId,
             employeeName: session.employeeName,
+            avatarUrl: session.avatarUrl, // Added
             streamActive: session.streamActive
           });
 
@@ -376,23 +392,17 @@ async function startServer() {
 
       // Notify all admins
       const adminCount = session.adminSocketIds.size;
-      console.log(`[Monitoring] Notifying ${adminCount} admin(s) about stream start`);
 
       if (adminCount > 0) {
         session.adminSocketIds.forEach((adminId) => {
-          console.log(`[Monitoring] >>> Emitting stream-started to admin socket: ${adminId}`);
           io.to(adminId).emit('monitoring:stream-started', {
             sessionId,
             employeeName: session.employeeName,
           });
         });
-        console.log(`[Monitoring] All admins notified`);
-      } else {
-        console.log('[Monitoring] WARNING: No admins in session to notify!');
       }
 
       socket.emit('monitoring:sharing-started', { sessionId });
-      console.log(`[Monitoring] ========== END START SHARING EVENT ==========`);
     });
 
     // Employee: Stop sharing
@@ -404,18 +414,13 @@ async function startServer() {
 
       const sessionId = socket.data.sessionId;
 
-      /* LOGS ADDED FOR DEBUGGING */
-      console.log(`[Monitoring] Stop sharing received for session ${sessionId}`);
-
       monitoringService.setStreamActive(sessionId, false);
 
       // Notify all admins
       const session = monitoringService.getSession(sessionId);
       if (session) {
-        console.log(`[Monitoring] Notifying ${session.adminSocketIds.size} admins of stop`);
         session.adminSocketIds.forEach((adminId) => {
           io.to(adminId).emit('monitoring:stream-stopped', { sessionId });
-          console.log(`[Monitoring] Sent stream-stopped to ${adminId}`);
         });
       }
 
@@ -456,6 +461,7 @@ async function startServer() {
         sessionId,
         connectionCode: session.connectionCode,
         employeeName: session.employeeName,
+        avatarUrl: session.avatarUrl, // Added
         streamActive: session.streamActive,
       });
       console.log(`[Monitoring] Sent session-joined to admin ${socket.id}, streamActive: ${session.streamActive}`);
