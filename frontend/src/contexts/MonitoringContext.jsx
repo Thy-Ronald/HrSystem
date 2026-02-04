@@ -105,6 +105,7 @@ export const MonitoringProvider = ({ children }) => {
         };
 
         const onStop = ({ sessionId: id }) => {
+            console.log(`[MonitoringContext] Received stream-stopped for ${id}`);
             setSessions(prev => prev.map(s => s.sessionId === id ? { ...s, streamActive: false } : s));
         };
 
@@ -177,6 +178,10 @@ export const MonitoringProvider = ({ children }) => {
                     name: user.name
                 });
             }
+        } else if (!user && isSharing) {
+            // User logged out, stop sharing immediately
+            console.log('[Monitoring] User logged out, stopping share');
+            stopSharing();
         }
     }, [user, isConnected, role]); // sessions omitted from deps to avoid loop
 

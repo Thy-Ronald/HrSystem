@@ -159,10 +159,28 @@ router.post('/login', authLimiter, async (req, res) => {
       avatar_url: user.avatar_url,
     });
 
+    // Check for approved monitoring requests (Optimization for Immediate Resume)
+    let monitoringExpected = false;
+    let activeRequest = null;
+    try {
+      // Use the model directly if possible, or query DB
+      const monitoringRequestModel = require('../models/monitoringRequestModel');
+      const requests = await monitoringRequestModel.getRequestsForUser(user.id);
+      const approved = requests.find(r => r.status === 'approved');
+      if (approved) {
+        monitoringExpected = true;
+        activeRequest = { adminName: approved.admin_name, requestId: approved.id };
+      }
+    } catch (err) {
+      console.error('Error checking monitoring status during login:', err);
+    }
+
     // Return token and user info (without password)
     res.json({
       success: true,
       token,
+      monitoringExpected, // Flag for immediate UI resume
+      activeRequest,
       user: {
         id: user.id,
         email: user.email,
@@ -214,14 +232,31 @@ router.post('/verify', async (req, res) => {
       });
     }
 
+    // Check for approved monitoring requests (Optimization for Immediate Resume)
+    let monitoringExpected = false;
+    let activeRequest = null;
+    try {
+      const monitoringRequestModel = require('../models/monitoringRequestModel');
+      const requests = await monitoringRequestModel.getRequestsForUser(decoded.userId);
+      const approved = requests.find(r => r.status === 'approved');
+      if (approved) {
+        monitoringExpected = true;
+        activeRequest = { adminName: approved.admin_name, requestId: approved.id };
+      }
+    } catch (err) {
+      console.error('Error checking monitoring status during verify:', err);
+    }
+
     res.json({
       success: true,
+      monitoringExpected,
+      activeRequest,
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        avatar_url: user.avatar_url,
+        role: decoded.role,
+        name: decoded.name,
+        userId: decoded.userId,
+        email: decoded.email,
+        avatar_url: decoded.avatar_url,
       },
     });
   } catch (error) {

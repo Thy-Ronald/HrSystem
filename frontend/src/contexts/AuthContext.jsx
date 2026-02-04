@@ -55,6 +55,15 @@ export function AuthProvider({ children }) {
         setUser(data.user);
         setToken(tokenToVerify);
         saveToken(tokenToVerify);
+
+        // Immediate Resume Optimization (Refresh support)
+        if (data.monitoringExpected) {
+          console.log('[AuthContext] Verify indicates monitoring expected. Storing flag.');
+          localStorage.setItem('monitoring_resume_expected', 'true');
+          if (data.activeRequest) {
+            localStorage.setItem('monitoring_resume_data', JSON.stringify(data.activeRequest));
+          }
+        }
       } else {
         // Token invalid, remove it
         removeToken();
@@ -99,6 +108,16 @@ export function AuthProvider({ children }) {
         setUser(data.user);
         setToken(data.token);
         saveToken(data.token);
+
+        // Immediate Resume Optimization
+        if (data.monitoringExpected) {
+          console.log('[AuthContext] Login indicates monitoring expected. Storing flag.');
+          localStorage.setItem('monitoring_resume_expected', 'true');
+          if (data.activeRequest) {
+            localStorage.setItem('monitoring_resume_data', JSON.stringify(data.activeRequest));
+          }
+        }
+
         return { success: true, user: data.user, token: data.token };
       }
 

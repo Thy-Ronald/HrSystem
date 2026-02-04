@@ -177,8 +177,8 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
               />
             ) : (
               <div className="text-center opacity-40">
-                <EyeOff className="h-10 w-10 text-slate-500 mx-auto mb-2" />
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Offline</p>
+                <Users className="h-10 w-10 text-slate-500 mx-auto mb-2" />
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Disconnected</p>
               </div>
             )}
             {loading && session.streamActive && (
@@ -263,6 +263,243 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
         </DialogContent>
       </Dialog>
     </div>
+  );
+});
+
+const PendingRequests = React.memo(({ startSharing, isSharing, setJustReconnected }) => {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [confirmApproveId, setConfirmApproveId] = useState(null);
+  const [showResumeModal, setShowResumeModal] = useState(false);
+  const toast = useToast();
+  const { subscribe, unsubscribe } = useSocket();
+
+  const fetchRequests = useCallback(async () => {
+    try {
+      const { getMonitoringRequests } = await import('../services/api');
+      const data = await getMonitoringRequests();
+      setRequests(data);
+    } catch (error) {
+      console.error('Failed to fetch requests', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRequests();
+    const interval = setInterval(fetchRequests, 10000);
+    return () => clearInterval(interval);
+  }, [fetchRequests]);
+
+  const handleDecline = async (requestId) => {
+    try {
+      const { respondToMonitoringRequest } = await import('../services/api');
+      await respondToMonitoringRequest(requestId, 'rejected');
+      toast.success('Request Declined');
+      fetchRequests();
+    } catch (error) {
+      toast.error('Failed to decline request');
+    }
+  }
+
+  const handleManualDisconnect = async (requestId) => {
+    localStorage.setItem('monitoring_manual_disconnect', 'true');
+    await handleDecline(requestId);
+  };
+
+  // Resume Sharing Logic (Strict: Backend-driven, User Gesture Required)
+  const [resumeData, setResumeData] = useState(null);
+
+  useEffect(() => {
+    // 2. Socket Listen (Fallback/verification)
+    const handleSessionCreated = (data) => {
+      if (data.monitoringExpected) {
+        console.log('[Monitoring] Backend signal: monitoringExpected. Prompting resume.');
+        setResumeData(data.activeRequest);
+        setShowResumeModal(true);
+      }
+    };
+
+    subscribe('monitoring:session-created', handleSessionCreated);
+    return () => {
+      unsubscribe('monitoring:session-created', handleSessionCreated);
+    };
+  }, [subscribe, unsubscribe]);
+
+  const handleConfirmApprove = async () => {
+    if (!confirmApproveId) return;
+
+    try {
+      localStorage.removeItem('monitoring_manual_disconnect');
+      await startSharing();
+
+      const { respondToMonitoringRequest } = await import('../services/api');
+      await respondToMonitoringRequest(confirmApproveId, 'approved');
+
+      toast.success('Request Approved & Sharing Started');
+      setConfirmApproveId(null);
+      setJustReconnected(false);
+      fetchRequests();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to start sharing or approve request');
+      setConfirmApproveId(null);
+    }
+  };
+
+  return (
+    <>
+      <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white flex flex-col flex-1">
+        {requests.length === 0 ? (
+          <div className="p-8 text-center text-slate-500">
+            <p className="text-sm">No pending requests.</p>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-auto">
+            <Table>
+              <TableHeader className="bg-slate-50/80 sticky top-0 z-10">
+                <TableRow className="hover:bg-transparent border-b border-slate-200">
+                  <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap pl-6">Admin Name</TableHead>
+                  <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Status</TableHead>
+                  <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Received At</TableHead>
+                  <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap text-right pr-6">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {requests.map(req => (
+                  <TableRow key={req.id} className="hover:bg-slate-50/50 transition-colors">
+                    <TableCell className="py-4 pl-6 font-medium text-slate-900">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <span>{req.admin_name}</span>
+                          {req.status === 'approved' && (
+                            <div className="flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Live</span>
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-xs text-slate-400 font-normal">{req.admin_email}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${req.status === 'approved'
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'bg-amber-50 text-amber-700'
+                        }`}>
+                        {req.status === 'approved' ? 'Active' : 'Pending Approval'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="py-4 text-slate-600">{new Date(req.created_at).toLocaleString()}</TableCell>
+                    <TableCell className="py-4 text-slate-600 text-right pr-6">
+                      <div className="flex justify-end gap-2">
+                        {req.status === 'approved' ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-medium px-3"
+                            onClick={() => handleManualDisconnect(req.id)}
+                          >
+                            Disconnect
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-medium px-3"
+                              onClick={() => handleDecline(req.id)}
+                            >
+                              Decline
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-8 bg-[#1a3e62] hover:bg-[#122c46] text-white font-medium px-4 shadow-sm"
+                              onClick={() => setConfirmApproveId(req.id)}
+                            >
+                              Approve
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
+      <Dialog open={!!confirmApproveId} onOpenChange={(open) => !open && setConfirmApproveId(null)}>
+        <DialogContent className="sm:max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-900">Start Sharing?</DialogTitle>
+            <DialogDescription className="text-slate-500 pt-2">
+              Approving this request will prompt you to share your <strong>Entire Screen</strong>.
+              <br /><br />
+              Please select <strong>"Entire Screen"</strong> in the popup window that appears.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 pt-4">
+            <Button
+              variant="ghost"
+              onClick={() => setConfirmApproveId(null)}
+              className="text-slate-600 hover:bg-slate-100 font-medium"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold"
+              onClick={handleConfirmApprove}
+            >
+              Confirm & Share
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showResumeModal} onOpenChange={setShowResumeModal}>
+        <DialogContent className="sm:max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <Signal className="h-5 w-5 text-emerald-500" />
+              Resume Monitoring?
+            </DialogTitle>
+            <DialogDescription className="text-slate-500 pt-2">
+              You have an active monitoring session. Click below to resume screen sharing.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 pt-4">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                handleManualDisconnect(requests.find(r => r.status === 'approved')?.id);
+                setShowResumeModal(false);
+              }}
+              className="text-slate-600 hover:bg-slate-100 font-medium"
+            >
+              Stop Monitoring
+            </Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+              onClick={async () => {
+                try {
+                  localStorage.removeItem('monitoring_manual_disconnect');
+                  await startSharing();
+                  setShowResumeModal(false);
+                } catch (e) {
+                  toast.error('Failed to start sharing');
+                }
+              }}
+            >
+              Resume Sharing
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 });
 
@@ -384,179 +621,6 @@ const Monitoring = () => {
   if (!role) return <div className="p-20 flex justify-center items-center"><Loader2 className="h-10 w-10 text-blue-600 animate-spin" /></div>;
 
 
-
-  // Pending Requests Component
-  const PendingRequests = () => {
-    const [requests, setRequests] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [confirmApproveId, setConfirmApproveId] = useState(null); // ID of request to confirm approval for
-
-    const fetchRequests = async () => {
-      try {
-        const { getMonitoringRequests } = await import('../services/api');
-        const data = await getMonitoringRequests();
-        setRequests(data);
-      } catch (error) {
-        console.error('Failed to fetch requests', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    useEffect(() => {
-      fetchRequests();
-      const interval = setInterval(fetchRequests, 10000); // Polling every 10s
-      return () => clearInterval(interval);
-    }, []);
-
-    const handleDecline = async (requestId) => {
-      try {
-        const { respondToMonitoringRequest } = await import('../services/api');
-        await respondToMonitoringRequest(requestId, 'rejected');
-        toast.success('Request Declined');
-        fetchRequests();
-      } catch (error) {
-        toast.error('Failed to decline request');
-      }
-    }
-
-    const handleConfirmApprove = async () => {
-      if (!confirmApproveId) return;
-
-      try {
-        // First start sharing (must be user triggered)
-        await startSharing();
-
-        // Then accept backend request
-        const { respondToMonitoringRequest } = await import('../services/api');
-        await respondToMonitoringRequest(confirmApproveId, 'approved');
-
-        toast.success('Request Approved & Sharing Started');
-        setConfirmApproveId(null);
-        setJustReconnected(false);
-        fetchRequests();
-      } catch (error) {
-        console.error(error);
-        toast.error('Failed to start sharing or approve request');
-        setConfirmApproveId(null);
-      }
-    };
-
-    // Always render the card, show empty state if needed
-    return (
-      <>
-        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white flex flex-col flex-1">
-
-          {requests.length === 0 ? (
-            <div className="p-8 text-center text-slate-500">
-              <p className="text-sm">No pending requests.</p>
-            </div>
-          ) : (
-            <div className="flex-1 overflow-auto">
-              <Table>
-                <TableHeader className="bg-slate-50/80 sticky top-0 z-10">
-                  <TableRow className="hover:bg-transparent border-b border-slate-200">
-                    <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap pl-6">Admin Name</TableHead>
-                    <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Status</TableHead>
-                    <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Received At</TableHead>
-                    <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap text-right pr-6">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {requests.map(req => (
-                    <TableRow key={req.id} className="hover:bg-slate-50/50 transition-colors">
-                      <TableCell className="py-4 pl-6 font-medium text-slate-900">
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-2">
-                            <span>{req.admin_name}</span>
-                            {req.status === 'approved' && (
-                              <div className="flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Live</span>
-                              </div>
-                            )}
-                          </div>
-                          <span className="text-xs text-slate-400 font-normal">{req.admin_email}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-4">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${req.status === 'approved'
-                          ? 'bg-blue-50 text-blue-700'
-                          : 'bg-amber-50 text-amber-700'
-                          }`}>
-                          {req.status === 'approved' ? 'Active' : 'Pending Approval'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="py-4 text-slate-600">{new Date(req.created_at).toLocaleString()}</TableCell>
-                      <TableCell className="py-4 text-slate-600 text-right pr-6">
-                        <div className="flex justify-end gap-2">
-                          {req.status === 'approved' ? (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-medium px-3"
-                              onClick={() => handleDecline(req.id)}
-                            >
-                              Disconnect
-                            </Button>
-                          ) : (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-medium px-3"
-                                onClick={() => handleDecline(req.id)}
-                              >
-                                Decline
-                              </Button>
-                              <Button
-                                size="sm"
-                                className="h-8 bg-[#1a3e62] hover:bg-[#122c46] text-white font-medium px-4 shadow-sm"
-                                onClick={() => setConfirmApproveId(req.id)}
-                              >
-                                Approve
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </div>
-
-        <Dialog open={!!confirmApproveId} onOpenChange={(open) => !open && setConfirmApproveId(null)}>
-          <DialogContent className="sm:max-w-md bg-white">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-bold text-slate-900">Start Sharing?</DialogTitle>
-              <DialogDescription className="text-slate-500 pt-2">
-                Approving this request will immediately start sharing your screen with the administrator.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="gap-2 sm:gap-0 pt-4">
-              <Button
-                variant="ghost"
-                onClick={() => setConfirmApproveId(null)}
-                className="text-slate-600 hover:bg-slate-100 font-medium"
-              >
-                Cancel
-              </Button>
-              <Button
-                className="bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold"
-                onClick={handleConfirmApprove}
-              >
-                Confirm & Share
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </>
-    );
-  };
-
   if (role === 'employee') {
     return (
       <div className="w-full min-h-full bg-white flex flex-col">
@@ -582,7 +646,11 @@ const Monitoring = () => {
 
         {/* Main Content Area */}
         <div className="p-8 flex-1 flex flex-col overflow-hidden">
-          <PendingRequests />
+          <PendingRequests
+            startSharing={startSharing}
+            isSharing={isSharing}
+            setJustReconnected={setJustReconnected}
+          />
 
           {/* Show error if any */}
           {shareError && (

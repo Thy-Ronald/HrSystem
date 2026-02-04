@@ -16,6 +16,7 @@ import Monitoring from './pages/Monitoring';
 import GithubAnalytics from './pages/GithubAnalytics';
 import Auth from './pages/Auth';
 import Layout from './components/Layout';
+import GlobalResumeSharingModal from './components/GlobalResumeSharingModal';
 
 // Map URL paths to page keys
 const routeMap = {
@@ -115,6 +116,7 @@ function AppContent() {
   if (adminOnlyPages.includes(currentPage) && user?.role !== 'admin') {
     return (
       <Layout currentPath={currentPage} onNavigate={handleNavigate}>
+        <GlobalResumeSharingModal />
         <Container maxWidth="sm" sx={{ py: 10 }}>
           <Box sx={{ textAlign: 'center' }}>
             <WarningIcon sx={{ fontSize: 64, color: 'error.main', mb: 2, opacity: 0.8 }} />
@@ -137,6 +139,7 @@ function AppContent() {
 
   return (
     <Layout currentPath={currentPage} onNavigate={handleNavigate}>
+      <GlobalResumeSharingModal />
       {currentPage === 'contract-form' && <ContractForm />}
       {currentPage === 'information' && <Information />}
       {currentPage === 'dashboard' && <Dashboard />}

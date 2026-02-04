@@ -101,7 +101,7 @@ async function startServer() {
     console.log(`[Socket.IO] Client connected: ${socket.id}`);
 
     // Handle user authentication with JWT
-    socket.on('monitoring:auth', ({ role, name, token, connectionCode }) => {
+    socket.on('monitoring:auth', async ({ role, name, token, connectionCode }) => {
       // Rate limiting: 10 auth attempts per 15 minutes
       if (!socketRateLimiter.checkLimit(socket.id, 10, 15 * 60 * 1000)) {
         socket.emit('monitoring:error', {
@@ -198,9 +198,28 @@ async function startServer() {
         }
 
         socket.data.sessionId = sessionId; // IMPORTANT: Assign session ID to socket data
+
+        // Check for persistent approved requests to trigger "Resume Sharing" modal
+        let monitoringExpected = false;
+        let activeRequest = null;
+        try {
+          const monitoringRequestModel = require('./models/monitoringRequestModel');
+          const requests = await monitoringRequestModel.getRequestsForUser(userId);
+          const approved = requests.find(r => r.status === 'approved');
+          if (approved) {
+            monitoringExpected = true;
+            activeRequest = { adminName: approved.admin_name, requestId: approved.id };
+            console.log(`[Monitoring] Found approved request for ${sanitized.name}, expecting monitoring resume.`);
+          }
+        } catch (err) {
+          console.error('[Monitoring] Error checking requests during auth:', err);
+        }
+
         socket.emit('monitoring:session-created', {
           sessionId,
           token: jwtToken,
+          monitoringExpected,
+          activeRequest
         });
 
         // No longer auto-broadcast sessions - admins connect via request
@@ -384,13 +403,19 @@ async function startServer() {
       }
 
       const sessionId = socket.data.sessionId;
+
+      /* LOGS ADDED FOR DEBUGGING */
+      console.log(`[Monitoring] Stop sharing received for session ${sessionId}`);
+
       monitoringService.setStreamActive(sessionId, false);
 
       // Notify all admins
       const session = monitoringService.getSession(sessionId);
       if (session) {
+        console.log(`[Monitoring] Notifying ${session.adminSocketIds.size} admins of stop`);
         session.adminSocketIds.forEach((adminId) => {
           io.to(adminId).emit('monitoring:stream-stopped', { sessionId });
+          console.log(`[Monitoring] Sent stream-stopped to ${adminId}`);
         });
       }
 
@@ -559,14 +584,20 @@ async function startServer() {
       if (socket.data.role === 'employee' && socket.data.sessionId) {
         // Clean up employee session (marks as inactive but keeps for reconnection)
         const sessionId = socket.data.sessionId;
+
+        console.log(`[Monitoring] Employee disconnected in session ${sessionId}. cleaning up...`);
         monitoringService.cleanupEmployeeSession(socket.id);
 
         // Notify admins in this session that employee disconnected
         const session = monitoringService.getSession(sessionId);
         if (session) {
+          console.log(`[Monitoring] Disconnect: Notifying ${session.adminSocketIds.size} admins`);
           session.adminSocketIds.forEach(adminId => {
             io.to(adminId).emit('monitoring:stream-stopped', { sessionId });
+            console.log(`[Monitoring] Disconnect: Sent stream-stopped to ${adminId}`);
           });
+        } else {
+          console.log(`[Monitoring] Disconnect: Session ${sessionId} not found after cleanup`);
         }
       } else if (socket.data.role === 'admin' && socket.data.sessionId) {
         // Remove admin from session

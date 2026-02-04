@@ -71,6 +71,7 @@ export function useScreenShare(role, sessionId) {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           cursor: 'always',
+          displaySurface: 'monitor', // Hint browser to default to "Entire Screen"
           width: { max: 1280 },
           height: { max: 720 },
           frameRate: { max: 15 } // Reduce FPS to save CPU/Bandwidth
