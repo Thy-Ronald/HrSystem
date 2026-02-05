@@ -142,10 +142,12 @@ async function respondToRequest(req, res) {
                         adminSocket.join(employeeSessionId);
 
                         // Notify admin success
+                        const sessionData = monitoringService.getSession(employeeSessionId);
                         adminSocket.emit('monitoring:connect-success', {
                             sessionId: employeeSessionId,
                             employeeName: req.user.name || request.user_name || 'Employee', // Use req.user.name from auth
-                            streamActive: false // Usually starts false
+                            employeeId: currentUserId, // Added for reconnection
+                            streamActive: sessionData ? sessionData.streamActive : false
                         });
 
                         // Notify employee

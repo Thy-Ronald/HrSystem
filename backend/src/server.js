@@ -250,6 +250,16 @@ async function startServer() {
           activeRequest
         });
 
+        // Notify all admins about the new session (so they can add it to their list)
+        io.emit('monitoring:new-session', {
+          sessionId,
+          employeeName: sanitized.name,
+          employeeId: userId,
+          avatarUrl: avatarUrl,
+          streamActive: false
+        });
+        console.log(`[Monitoring] Broadcast new-session for ${sanitized.name}`);
+
         // No longer auto-broadcast sessions - admins connect via request
       } else if (sanitized.role === 'admin') {
         // Admin authenticated - they will connect to sessions via request
@@ -288,9 +298,15 @@ async function startServer() {
         return;
       }
 
-      // Check if already connected
-      if (session.adminSocketIds.has(socket.id)) {
-        socket.emit('monitoring:error', { message: 'Already connected to this employee' });
+      // Check if already connected and stream is active
+      if (session.adminSocketIds.has(socket.id) && session.streamActive) {
+        socket.emit('monitoring:error', { message: 'Already monitoring this employee' });
+        return;
+      }
+
+      // Check if employee is online
+      if (!session.employeeSocketId) {
+        socket.emit('monitoring:error', { message: 'Employee is currently offline' });
         return;
       }
 
@@ -334,7 +350,8 @@ async function startServer() {
           adminSocket.emit('monitoring:connect-success', {
             sessionId,
             employeeName: session.employeeName,
-            avatarUrl: session.avatarUrl, // Added
+            employeeId: session.employeeId, // Added
+            avatarUrl: session.avatarUrl,
             streamActive: session.streamActive
           });
 
@@ -403,17 +420,12 @@ async function startServer() {
       monitoringService.setStreamActive(sessionId, true);
       console.log(`[Monitoring] Stream active set to true for session ${sessionId}`);
 
-      // Notify all admins
-      const adminCount = session.adminSocketIds.size;
-
-      if (adminCount > 0) {
-        session.adminSocketIds.forEach((adminId) => {
-          io.to(adminId).emit('monitoring:stream-started', {
-            sessionId,
-            employeeName: session.employeeName,
-          });
-        });
-      }
+      // Notify all admins in the session room (Room-based emission for reliability)
+      console.log(`[Monitoring] Emitting stream-started to room ${sessionId}`);
+      io.to(sessionId).emit('monitoring:stream-started', {
+        sessionId,
+        employeeName: session.employeeName,
+      });
 
       socket.emit('monitoring:sharing-started', { sessionId });
     });
@@ -435,12 +447,11 @@ async function startServer() {
       if (session) {
         const stopReason = reason || 'manual';
 
-        // 1. Notify viewing admins via real-time stream stopped event
-        session.adminSocketIds.forEach(adminSocketId => {
-          io.to(adminSocketId).emit('monitoring:stream-stopped', {
-            sessionId,
-            reason: stopReason
-          });
+        // 1. Notify viewing admins via real-time stream stopped event (Room-based)
+        console.log(`[Monitoring] Emitting stream-stopped to room ${sessionId}, reason: ${stopReason}`);
+        io.to(sessionId).emit('monitoring:stream-stopped', {
+          sessionId,
+          reason: stopReason
         });
 
         // 2. Create persistent notification if it's NOT a manual disconnect
@@ -654,12 +665,10 @@ async function startServer() {
         // Notify admins in this session that employee disconnected
         const session = monitoringService.getSession(sessionId);
         if (session) {
-          console.log(`[Monitoring] Disconnect: Notifying ${session.adminSocketIds.size} admins`);
+          console.log(`[Monitoring] Disconnect: Notifying room ${sessionId}`);
 
-          // 1. Notify viewing admins via real-time stream stopped
-          session.adminSocketIds.forEach(adminId => {
-            io.to(adminId).emit('monitoring:stream-stopped', { sessionId, reason: 'offline' });
-          });
+          // 1. Notify viewing admins via real-time stream stopped (Room-based)
+          io.to(sessionId).emit('monitoring:stream-stopped', { sessionId, reason: 'offline' });
 
           // 2. Identify all admins to be notified persistently (Viewers + Owner)
           const adminsToNotify = new Set();

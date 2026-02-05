@@ -80,6 +80,9 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [showFullView, setShowFullView] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [reconnectSent, setReconnectSent] = useState(false);
+  const toast = useToast();
   const { emit } = useSocket();
   const fullVideoRef = useRef(null);
   const containerRef = useRef(null);
@@ -215,26 +218,49 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
             </Button>
           ) : (
             <Button
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold h-9 rounded-lg shadow-sm"
+              className={`flex-1 ${reconnectSent ? 'bg-slate-100 text-slate-500 hover:bg-slate-100' : 'bg-emerald-600 hover:bg-emerald-700 text-white'} font-semibold h-9 rounded-lg shadow-sm transition-all`}
               onClick={async (e) => {
                 e.stopPropagation();
-                // Import the send request logic or pass it down
-                // Since we are inside Memoized component, need to be careful.
-                // Ideally pass a 'onReconnect' prop.
-                // For now, we unfortunately didn't pass onReconnect.
-                // Quick fix: emit logic here or refactor parent. 
-                // We have access to 'useSocket' indirectly? No it's prop drilling or context.
-                // BUT MonitoringSessionCard uses useScreenShare... does NOT use useSocket directly.
-                // Ref check: Line 82: const { emit } = useSocket(); -> It IS used!
-                // So we can emit request connection directly.
-                if (emit) {
-                  emit('monitoring:request-connection', { employeeName: session.employeeName });
-                  // Optimistic UI update or toast?
+                if (!session.employeeId) {
+                  toast.error("Employee information missing. Please remove and re-add.");
+                  return;
+                }
+
+                setReconnecting(true);
+                try {
+                  const { createMonitoringRequest } = await import('../services/api');
+                  await createMonitoringRequest(session.employeeId);
+                  toast.success(`Reconnection request sent to ${session.employeeName}`);
+                  setReconnectSent(true);
+
+                  // Keep the legacy socket event for legacy-compatible clients
+                  if (emit) {
+                    emit('monitoring:request-connection', { employeeName: session.employeeName });
+                  }
+                } catch (err) {
+                  toast.error(err.message || "Failed to send reconnection request");
+                } finally {
+                  setReconnecting(false);
                 }
               }}
+              disabled={reconnecting || reconnectSent}
             >
-              <Signal className="mr-2 h-4 w-4" />
-              Reconnect
+              {reconnectSent ? (
+                <>
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Sent
+                </>
+              ) : reconnecting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Signal className="mr-2 h-4 w-4" />
+                  Reconnect
+                </>
+              )}
             </Button>
           )}
 
@@ -418,10 +444,13 @@ const PendingRequests = React.memo(({ startSharing, stopSharing, isSharing, setJ
 
     try {
       localStorage.removeItem('monitoring_manual_disconnect');
-      await startSharing();
 
       const { respondToMonitoringRequest } = await import('../services/api');
       await respondToMonitoringRequest(confirmApproveId, 'approved');
+
+      // Start sharing AFTER approval so the admin is already joined to the room
+      // and won't miss the 'monitoring:stream-started' event.
+      await startSharing();
 
       toast.success('Request Approved & Sharing Started');
       setConfirmApproveId(null);
@@ -673,8 +702,7 @@ const Monitoring = () => {
     resetSession,
     emit,
     connectionRequest,
-    respondConnection,
-    requestConnection
+    respondConnection
   } = useMonitoring();
 
   const [showAddModal, setShowAddModal] = useState(false);

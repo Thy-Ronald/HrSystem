@@ -78,20 +78,21 @@ export const MonitoringProvider = ({ children }) => {
             }
         };
 
-        const handleConnectSuccess = ({ sessionId: sid, employeeName, avatarUrl, streamActive: active }) => {
+        const handleConnectSuccess = ({ sessionId: sid, employeeName, employeeId, avatarUrl, streamActive: active }) => {
             setSessions(prev => {
                 const exists = prev.find(s => s.sessionId === sid);
                 if (exists) {
-                    return prev.map(s => s.sessionId === sid ? { ...s, streamActive: active, avatarUrl } : s);
+                    return prev.map(s => s.sessionId === sid ? { ...s, employeeId, streamActive: active, avatarUrl, lastSocketUpdate: Date.now() } : s);
                 }
-                return [...prev, { sessionId: sid, employeeName, avatarUrl, streamActive: active }];
+                return [...prev, { sessionId: sid, employeeName, employeeId, avatarUrl, streamActive: active, lastSocketUpdate: Date.now() }];
             });
             setConnectError(null);
             toast.success(`Connected to ${employeeName}`);
         };
 
         const handleSessionJoined = ({ sessionId: sid, avatarUrl, streamActive: active }) => {
-            setSessions(prev => prev.map(s => s.sessionId === sid ? { ...s, streamActive: active, avatarUrl } : s));
+            console.log(`[MonitoringContext] Syncing session-joined for ${sid}, active: ${active}`);
+            setSessions(prev => prev.map(s => s.sessionId === sid ? { ...s, streamActive: active, avatarUrl, lastSocketUpdate: Date.now() } : s));
         };
 
         const handleConnectError = ({ message }) => {
@@ -100,12 +101,21 @@ export const MonitoringProvider = ({ children }) => {
         };
 
         const onStart = ({ sessionId: id }) => {
-            setSessions(prev => prev.map(s => s.sessionId === id ? { ...s, streamActive: true } : s));
+            console.log(`[MonitoringContext] Incoming stream-started for ${id}`);
+            setSessions(prev => {
+                const updated = prev.map(s => s.sessionId === id ? { ...s, streamActive: true, lastSocketUpdate: Date.now() } : s);
+                console.log(`[MonitoringContext] Updated sessions (after start):`, updated.find(s => s.sessionId === id));
+                return updated;
+            });
         };
 
         const onStop = ({ sessionId: id, reason }) => {
-            console.log(`[MonitoringContext] Received stream-stopped for ${id}, reason: ${reason}`);
-            setSessions(prev => prev.map(s => s.sessionId === id ? { ...s, streamActive: false, disconnectReason: reason } : s));
+            console.log(`[MonitoringContext] Incoming stream-stopped for ${id}, reason: ${reason}`);
+            setSessions(prev => {
+                const updated = prev.map(s => s.sessionId === id ? { ...s, streamActive: false, disconnectReason: reason, lastSocketUpdate: Date.now() } : s);
+                console.log(`[MonitoringContext] Updated sessions (after stop):`, updated.find(s => s.sessionId === id));
+                return updated;
+            });
         };
 
         const onEnd = ({ sessionId: id }) => {
@@ -133,6 +143,17 @@ export const MonitoringProvider = ({ children }) => {
             toast.error(`Connection request denied by ${employeeName}`);
         };
 
+        const handleNewSession = (newSession) => {
+            console.log('[MonitoringContext] Real-time: New session available:', newSession.sessionId);
+            setSessions(prev => {
+                const exists = prev.find(s => s.sessionId === newSession.sessionId);
+                if (exists) return prev;
+                return [...prev, newSession];
+            });
+            // Automatically join the room for this new session
+            emit('monitoring:join-session', { sessionId: newSession.sessionId });
+        };
+
         subscribe('monitoring:session-created', handleCreated);
         subscribe('monitoring:error', handleError);
         subscribe('monitoring:connect-success', handleConnectSuccess);
@@ -146,6 +167,7 @@ export const MonitoringProvider = ({ children }) => {
         subscribe('monitoring:connection-request', handleConnectionRequest);
         subscribe('monitoring:request-sent', handleRequestSent);
         subscribe('monitoring:request-denied', handleRequestDenied);
+        subscribe('monitoring:new-session', handleNewSession);
 
         return () => {
             unsubscribe('monitoring:session-created', handleCreated);
@@ -161,6 +183,7 @@ export const MonitoringProvider = ({ children }) => {
             unsubscribe('monitoring:connection-request', handleConnectionRequest);
             unsubscribe('monitoring:request-sent', handleRequestSent);
             unsubscribe('monitoring:request-denied', handleRequestDenied);
+            unsubscribe('monitoring:new-session', handleNewSession);
         };
     }, [isConnected, subscribe, unsubscribe, toast]);
 
@@ -184,14 +207,60 @@ export const MonitoringProvider = ({ children }) => {
         }
     }, [user, isConnected, role]); // sessions omitted from deps to avoid loop
 
+    const fetchSessions = useCallback(async (silent = false) => {
+        if (role !== 'admin' || !isConnected) return;
+        if (!silent) setLoading(true);
+        try {
+            const { getMonitoringSessions } = await import('../services/api');
+            const response = await getMonitoringSessions();
+            const fetchedSessions = response.data || [];
+
+            setSessions(prev => {
+                // Merge logic: preserve streamActive/avatarUrl if we have more recent socket data
+                // but use fetched data as base
+                return fetchedSessions.map(fs => {
+                    const existing = prev.find(p => p.sessionId === fs.sessionId);
+                    if (existing) {
+                        // Race condition protection: If we had a socket update in the last 5 seconds,
+                        // don't let the (potentially stale) API response overwrite the status.
+                        const socketUpdateThreshold = 5000;
+                        const isRecentlyUpdatedBySocket = existing.lastSocketUpdate && (Date.now() - existing.lastSocketUpdate < socketUpdateThreshold);
+
+                        return {
+                            ...fs,
+                            ...existing,
+                            streamActive: isRecentlyUpdatedBySocket ? existing.streamActive : fs.streamActive
+                        };
+                    }
+                    return fs;
+                });
+            });
+            setConnectError(null);
+        } catch (err) {
+            console.error('[MonitoringContext] Fetch failed:', err);
+        } finally {
+            if (!silent) setLoading(false);
+        }
+    }, [role, isConnected]);
+
+    // Initial fetch and polling
+    useEffect(() => {
+        if (role === 'admin' && isConnected) {
+            fetchSessions();
+            const interval = setInterval(() => fetchSessions(true), 30000);
+            return () => clearInterval(interval);
+        }
+    }, [fetchSessions, role, isConnected]);
+
     // Join all sessions when admin re-authenticates or sessions list changes
     useEffect(() => {
         if (role === 'admin' && isConnected) {
+            console.log(`[MonitoringContext] Joining ${sessions.length} session rooms...`);
             sessions.forEach(s => {
                 emit('monitoring:join-session', { sessionId: s.sessionId });
             });
         }
-    }, [isConnected, role, sessions.length]); // Re-join if length changes or reconnected
+    }, [isConnected, role, sessions.map(s => s.sessionId).join(',')]); // Precise dependency on session IDs
 
     const resetSession = useCallback(() => {
         stopSharing();
@@ -206,10 +275,6 @@ export const MonitoringProvider = ({ children }) => {
     }, [stopSharing, toast, isConnected, role, user, emit]);
 
     const clearConnectError = useCallback(() => setConnectError(null), []);
-
-    const requestConnection = useCallback((employeeName) => {
-        emit('monitoring:request-connection', { employeeName });
-    }, [emit]);
 
     const respondConnection = useCallback((adminSocketId, accepted) => {
         emit('monitoring:respond-connection', { adminSocketId, accepted });
@@ -234,7 +299,6 @@ export const MonitoringProvider = ({ children }) => {
         emit,
         connectionRequest,
         setConnectionRequest,
-        requestConnection,
         respondConnection
     }), [
         sessionId,
@@ -250,7 +314,6 @@ export const MonitoringProvider = ({ children }) => {
         stopSharing,
         emit,
         connectionRequest,
-        requestConnection,
         respondConnection
     ]);
 
