@@ -29,16 +29,21 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
       onNotificationClick(contract.id);
     }
 
-    // Navigate to contracts screen
+    // Navigate based on type
     if (onNavigate) {
-      onNavigate('contract-form');
+      if (contract.type === 'monitoring_disconnect') {
+        onNavigate('monitoring');
+      } else {
+        // Default: Contract (or if type is missing/legacy)
+        onNavigate('contract-form');
 
-      // Trigger edit modal for this contract after a short delay to allow navigation
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('openContractEditModal', {
-          detail: { contractId: contract.id }
-        }));
-      }, 100);
+        // Trigger edit modal for this contract
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('openContractEditModal', {
+            detail: { contractId: contract.data ? contract.data.id : contract.id } // Handle nested data
+          }));
+        }, 100);
+      }
     }
 
     // Close dropdown
@@ -98,42 +103,61 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
           </div>
         ) : (
           <div className="divide-y divide-[#e4e6eb]">
-            {notifications.map((contract) => {
-              const daysUntilExpiry = getDaysUntilExpiry(contract);
-              const expirationDate = calculateExpirationDate(contract.assessmentDate, contract.termMonths)
-                || (contract.expirationDate ? new Date(contract.expirationDate) : null);
-              const read = isRead ? isRead(contract.id) : false;
+            {notifications.map((notification) => {
+              const read = isRead ? isRead(notification.id) : (notification.is_read || false);
+
+              let icon = <FileText className="h-5 w-5 text-blue-600" />;
+              let bgColor = "bg-blue-50";
+              let title = notification.title;
+              let message = notification.message;
+              let subtext = "";
+
+              if (notification.type === 'contract_expiry') {
+                // ... existing contract logic ...
+                const contract = notification.data || notification;
+                const daysUntilExpiry = getDaysUntilExpiry(contract);
+                const expirationDate = calculateExpirationDate(contract.assessmentDate, contract.termMonths)
+                  || (contract.expirationDate ? new Date(contract.expirationDate) : null);
+
+                subtext = (
+                  <>
+                    Expires: {expirationDate ? formatDate(expirationDate) : 'N/A'}
+                    {daysUntilExpiry !== null && (
+                      <span className="ml-2 font-medium text-[#e41e3f]">
+                        ({daysUntilExpiry} {daysUntilExpiry === 1 ? 'day' : 'days'} left)
+                      </span>
+                    )}
+                  </>
+                );
+              } else if (notification.type === 'monitoring_disconnect') {
+                icon = <div className="w-2 h-2 rounded-full bg-rose-500" />;
+                bgColor = "bg-rose-50";
+                subtext = <span className="text-xs text-slate-500">{new Date(notification.created_at).toLocaleString()}</span>
+              }
 
               return (
                 <div
-                  key={contract.id}
-                  onClick={() => handleNotificationClick(contract)}
+                  key={notification.id}
+                  onClick={() => handleNotificationClick(notification)}
                   className={`px-4 py-3 transition-colors cursor-pointer ${read ? 'bg-white' : 'bg-[#e7f3ff] hover:bg-[#d0e7ff]'
                     }`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 mt-1">
-                      <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
-                        <FileText className="h-5 w-5 text-blue-600" />
+                      <div className={`w-10 h-10 rounded-full ${bgColor} flex items-center justify-center`}>
+                        {icon}
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
                           <p className="text-sm font-semibold text-[#050505] mb-1">
-                            Contract Expiring Soon
+                            {title}
                           </p>
                           <p className="text-sm text-[#65676b] mb-1">
-                            <span className="font-medium text-[#050505]">{contract.name}</span> - {contract.position}
+                            {message}
                           </p>
-                          <p className="text-xs text-[#65676b]">
-                            Expires: {expirationDate ? formatDate(expirationDate) : 'N/A'}
-                            {daysUntilExpiry !== null && (
-                              <span className="ml-2 font-medium text-[#e41e3f]">
-                                ({daysUntilExpiry} {daysUntilExpiry === 1 ? 'day' : 'days'} left)
-                              </span>
-                            )}
-                          </p>
+                          {subtext && <p className="text-xs text-[#65676b]">{subtext}</p>}
                         </div>
                         {!read && (
                           <div className="flex-shrink-0">

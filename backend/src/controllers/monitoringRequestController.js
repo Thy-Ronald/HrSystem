@@ -123,6 +123,49 @@ async function respondToRequest(req, res) {
                     }
                 }
             }
+        } else if (status === 'rejected') {
+            // Notify admin when request is rejected
+            const io = req.app.get('io');
+            const Notification = require('../models/notificationModel');
+
+            if (io) {
+                // Find admin socket
+                let adminSocketId = null;
+                for (const [id, socket] of io.sockets.sockets) {
+                    if (String(socket.data.userId) === String(request.admin_id)) {
+                        adminSocketId = id;
+                        break;
+                    }
+                }
+
+                if (adminSocketId) {
+                    const adminSocket = io.sockets.sockets.get(adminSocketId);
+                    if (adminSocket && adminSocket.data.userId) {
+                        try {
+                            const notificationId = await Notification.create({
+                                user_id: adminSocket.data.userId,
+                                type: 'monitoring_request_declined',
+                                title: 'Request Declined',
+                                message: `${req.user.name || 'Employee'} declined your monitoring request.`,
+                                data: { requestId, employeeName: req.user.name }
+                            });
+
+                            // Emit real-time notification to admin
+                            io.to(adminSocketId).emit('notification:new', {
+                                id: notificationId,
+                                type: 'monitoring_request_declined',
+                                title: 'Request Declined',
+                                message: `${req.user.name || 'Employee'} declined your monitoring request.`,
+                                data: { requestId, employeeName: req.user.name },
+                                created_at: new Date().toISOString(),
+                                is_read: false
+                            });
+                        } catch (err) {
+                            console.error('Failed to create decline notification:', err);
+                        }
+                    }
+                }
+            }
         }
 
         res.json({ success: true, status });

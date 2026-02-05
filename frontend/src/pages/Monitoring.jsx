@@ -183,9 +183,20 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
                 onPlay={() => setLoading(false)}
               />
             ) : (
-              <div className="text-center opacity-40">
-                <Users className="h-10 w-10 text-slate-500 mx-auto mb-2" />
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Disconnected</p>
+              <div className="text-center opacity-70">
+                {session.disconnectReason === 'offline' ? (
+                  <Signal className="h-10 w-10 text-slate-500 mx-auto mb-2 opacity-50" />
+                ) : (
+                  <Users className="h-10 w-10 text-slate-500 mx-auto mb-2" />
+                )}
+
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">
+                  {session.disconnectReason === 'offline' ? 'Offline' : 'Disconnected'}
+                </p>
+                {/* Reconnect prompt for manual disconnects */}
+                {session.disconnectReason !== 'offline' && !session.streamActive && (
+                  <p className="text-[10px] text-slate-400 mt-1">User ended session</p>
+                )}
               </div>
             )}
             {loading && session.streamActive && (
@@ -194,14 +205,39 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
           </div>
         </div>
         <div className="p-3 flex gap-2 bg-slate-50/30">
-          <Button
-            className="flex-1 bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold h-9 rounded-lg"
-            disabled={!session.streamActive}
-            onClick={() => setShowFullView(true)}
-          >
-            <Eye className="mr-2 h-4 w-4" />
-            View
-          </Button>
+          {session.streamActive ? (
+            <Button
+              className="flex-1 bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold h-9 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#1a3e62]"
+              onClick={() => setShowFullView(true)}
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              View
+            </Button>
+          ) : (
+            <Button
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold h-9 rounded-lg shadow-sm"
+              onClick={async (e) => {
+                e.stopPropagation();
+                // Import the send request logic or pass it down
+                // Since we are inside Memoized component, need to be careful.
+                // Ideally pass a 'onReconnect' prop.
+                // For now, we unfortunately didn't pass onReconnect.
+                // Quick fix: emit logic here or refactor parent. 
+                // We have access to 'useSocket' indirectly? No it's prop drilling or context.
+                // BUT MonitoringSessionCard uses useScreenShare... does NOT use useSocket directly.
+                // Ref check: Line 82: const { emit } = useSocket(); -> It IS used!
+                // So we can emit request connection directly.
+                if (emit) {
+                  emit('monitoring:request-connection', { employeeName: session.employeeName });
+                  // Optimistic UI update or toast?
+                }
+              }}
+            >
+              <Signal className="mr-2 h-4 w-4" />
+              Reconnect
+            </Button>
+          )}
+
           <Button
             variant="outline"
             className="flex-1 text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 h-9 rounded-lg"
@@ -278,6 +314,7 @@ const PendingRequests = React.memo(({ startSharing, stopSharing, isSharing, setJ
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confirmApproveId, setConfirmApproveId] = useState(null);
+  const [confirmDeclineId, setConfirmDeclineId] = useState(null);
   const [showResumeModal, setShowResumeModal] = useState(false);
   const toast = useToast();
   const { subscribe, unsubscribe } = useSocket();
@@ -307,10 +344,12 @@ const PendingRequests = React.memo(({ startSharing, stopSharing, isSharing, setJ
     try {
       const { respondToMonitoringRequest } = await import('../services/api');
       await respondToMonitoringRequest(requestId, 'rejected');
-      toast.success('Disconnected successfully');
+      toast.success('Request declined');
+      setConfirmDeclineId(null);
       fetchRequests();
     } catch (error) {
-      toast.error('Failed to disconnect');
+      toast.error('Failed to decline request');
+      setConfirmDeclineId(null);
     }
   }
 
@@ -448,7 +487,7 @@ const PendingRequests = React.memo(({ startSharing, stopSharing, isSharing, setJ
                               size="sm"
                               variant="ghost"
                               className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-medium px-3"
-                              onClick={() => handleDecline(req.id)}
+                              onClick={() => setConfirmDeclineId(req.id)}
                             >
                               Decline
                             </Button>
@@ -470,6 +509,33 @@ const PendingRequests = React.memo(({ startSharing, stopSharing, isSharing, setJ
           </div>
         )}
       </div>
+
+      <Dialog open={!!confirmDeclineId} onOpenChange={(open) => !open && setConfirmDeclineId(null)}>
+        <DialogContent className="sm:max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-900 leading-tight">Decline Request?</DialogTitle>
+            <DialogDescription className="text-slate-500 pt-2">
+              Are you sure you want to decline this monitoring request? The admin will be notified of your decision.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 pt-4">
+            <Button
+              variant="ghost"
+              onClick={() => setConfirmDeclineId(null)}
+              className="text-slate-600 hover:bg-slate-100 font-medium"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => handleDecline(confirmDeclineId)}
+              className="bg-rose-600 hover:bg-rose-700 font-semibold"
+            >
+              Yes, Decline
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!confirmDisconnectId} onOpenChange={(open) => !open && setConfirmDisconnectId(null)}>
         <DialogContent className="sm:max-w-md bg-white">

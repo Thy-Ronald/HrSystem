@@ -8,6 +8,8 @@ const contractRouter = require('./routes/contracts');
 const issuesRouter = require('./routes/issues');
 const analyticsRouter = require('./routes/analytics');
 const monitoringRouter = require('./routes/monitoring');
+const notificationRoutes = require('./routes/notificationRoutes');
+const Notification = require('./models/notificationModel');
 const authRouter = require('./routes/auth');
 const personnelRouter = require('./routes/personnelRoutes');
 const { errorHandler } = require('./middlewares/errorHandler');
@@ -57,6 +59,7 @@ app.use('/api/monitoring/requests', require('./routes/monitoringRequestRoutes'))
 app.use('/api/monitoring', monitoringRouter);
 app.use('/api/personnel', personnelRouter);
 app.use('/api/users', require('./routes/userRoutes'));
+app.use('/api/notifications', notificationRoutes);
 
 // Expose io to controllers
 app.set('io', io);
@@ -406,7 +409,8 @@ async function startServer() {
     });
 
     // Employee: Stop sharing
-    socket.on('monitoring:stop-sharing', () => {
+    socket.on('monitoring:stop-sharing', (payload) => {
+      const { reason } = payload || {};
       if (socket.data.role !== 'employee' || !socket.data.sessionId) {
         socket.emit('monitoring:error', { message: 'Unauthorized' });
         return;
@@ -419,8 +423,37 @@ async function startServer() {
       // Notify all admins
       const session = monitoringService.getSession(sessionId);
       if (session) {
-        session.adminSocketIds.forEach((adminId) => {
-          io.to(adminId).emit('monitoring:stream-stopped', { sessionId });
+        session.adminSocketIds.forEach(async (adminId) => {
+          io.to(adminId).emit('monitoring:stream-stopped', {
+            sessionId,
+            reason: reason || 'manual'
+          });
+
+          const adminSocket = io.sockets.sockets.get(adminId);
+          if (adminSocket && adminSocket.data.userId) {
+            try {
+              const notificationId = await Notification.create({
+                user_id: adminSocket.data.userId,
+                type: 'monitoring_disconnect',
+                title: 'Monitoring Stopped',
+                message: `${session.employeeName} stopped sharing (${reason || 'manual'}).`,
+                data: { sessionId, reason: reason || 'manual', employeeName: session.employeeName }
+              });
+
+              // Emit real-time notification to admin
+              io.to(adminId).emit('notification:new', {
+                id: notificationId,
+                type: 'monitoring_disconnect',
+                title: 'Monitoring Stopped',
+                message: `${session.employeeName} stopped sharing (${reason || 'manual'}).`,
+                data: { sessionId, reason: reason || 'manual', employeeName: session.employeeName },
+                created_at: new Date().toISOString(),
+                is_read: false
+              });
+            } catch (err) {
+              console.error('Failed to create notification', err);
+            }
+          }
         });
       }
 
@@ -598,8 +631,12 @@ async function startServer() {
         const session = monitoringService.getSession(sessionId);
         if (session) {
           console.log(`[Monitoring] Disconnect: Notifying ${session.adminSocketIds.size} admins`);
-          session.adminSocketIds.forEach(adminId => {
-            io.to(adminId).emit('monitoring:stream-stopped', { sessionId });
+          session.adminSocketIds.forEach((adminId) => {
+            io.to(adminId).emit('monitoring:stream-stopped', {
+              sessionId,
+              reason: 'offline'
+            });
+
             console.log(`[Monitoring] Disconnect: Sent stream-stopped to ${adminId}`);
           });
         } else {

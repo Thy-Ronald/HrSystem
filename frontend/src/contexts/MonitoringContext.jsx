@@ -103,9 +103,9 @@ export const MonitoringProvider = ({ children }) => {
             setSessions(prev => prev.map(s => s.sessionId === id ? { ...s, streamActive: true } : s));
         };
 
-        const onStop = ({ sessionId: id }) => {
-            console.log(`[MonitoringContext] Received stream-stopped for ${id}`);
-            setSessions(prev => prev.map(s => s.sessionId === id ? { ...s, streamActive: false } : s));
+        const onStop = ({ sessionId: id, reason }) => {
+            console.log(`[MonitoringContext] Received stream-stopped for ${id}, reason: ${reason}`);
+            setSessions(prev => prev.map(s => s.sessionId === id ? { ...s, streamActive: false, disconnectReason: reason } : s));
         };
 
         const onEnd = ({ sessionId: id }) => {

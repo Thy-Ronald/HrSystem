@@ -609,3 +609,19 @@ export async function getCacheJobStatus() {
   const res = await fetch(`${API_BASE}/api/issues/job-status`);
   return handleResponse(res);
 }
+
+// --- Notifications ---
+export const getNotifications = async () => {
+  const res = await fetch(`${API_BASE}/api/notifications`, {
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(res);
+};
+
+export const markNotificationRead = async (id) => {
+  const res = await fetch(`${API_BASE}/api/notifications/${id}/read`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(res);
+};

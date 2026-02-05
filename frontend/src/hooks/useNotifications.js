@@ -1,16 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchExpiringContracts } from '../services/api';
+import { getNotifications, markNotificationRead } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useSocket } from './useSocket';
+import { requestNotificationPermission, showBrowserNotification } from '../utils/notifications';
 
 /**
- * Custom hook for managing contract expiration notifications
- * Tracks read/unread state like Facebook notifications
+ * Custom hook for managing notifications
+ * Tracks read/unread state
  * Only loads notifications for admin users
  */
 export function useNotifications() {
   const { user, isAuthenticated } = useAuth();
+  const { socket, isConnected } = useSocket();
   const [notifications, setNotifications] = useState([]);
-  const [readIds, setReadIds] = useState(new Set()); // Track read notification IDs
+  const [readIds, setReadIds] = useState(new Set()); // Track read notification IDs (locally for optimistic UI)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -26,14 +29,21 @@ export function useNotifications() {
     setLoading(true);
     setError(null);
     try {
-      // Fetch contracts expiring within 7 days
-      const expiringContracts = await fetchExpiringContracts(7);
-      console.log('📬 Notifications loaded:', expiringContracts?.length || 0, 'contracts expiring within 7 days');
-      const newNotifications = Array.isArray(expiringContracts) ? expiringContracts : [];
-      
-      // When new notifications arrive, only mark as unread if they're new (not in readIds)
-      // This preserves read state when refreshing
+      // Fetch all notifications (db + contracts)
+      const data = await getNotifications();
+      console.log('📬 Notifications loaded:', data?.length || 0);
+
+      const newNotifications = Array.isArray(data) ? data : [];
       setNotifications(newNotifications);
+
+      // Update readIds based on backend state
+      const serverReadIds = new Set(newNotifications.filter(n => n.is_read).map(n => n.id));
+      setReadIds(prev => {
+        const combined = new Set(prev);
+        serverReadIds.forEach(id => combined.add(id));
+        return combined;
+      });
+
     } catch (err) {
       // Handle 403 Forbidden gracefully (user might not be admin)
       if (err.status === 403 || err.message?.includes('Forbidden')) {
@@ -51,12 +61,19 @@ export function useNotifications() {
   }, [isAuthenticated, user]);
 
   // Mark a notification as read
-  const markAsRead = useCallback((notificationId) => {
+  const markAsRead = useCallback(async (notificationId) => {
+    // Optimistic update
     setReadIds((prev) => {
       const newSet = new Set(prev);
       newSet.add(notificationId);
       return newSet;
     });
+
+    try {
+      await markNotificationRead(notificationId);
+    } catch (err) {
+      console.error("Failed to mark notification as read", err);
+    }
   }, []);
 
   // Get unread notifications count
@@ -66,19 +83,56 @@ export function useNotifications() {
     // Only load if user is authenticated and is admin
     if (isAuthenticated && user?.role === 'admin') {
       loadNotifications();
-      
-      // Refresh notifications every 5 minutes
+
+      // Setup real-time notification listener if socket is connected
+      const handleNewNotification = async (notification) => {
+        console.log('📬 Real-time notification received:', notification);
+        setNotifications(prev => [notification, ...prev]);
+
+        // Show browser push notification for disconnect and declined request events
+        if (notification.type === 'monitoring_disconnect' || notification.type === 'monitoring_request_declined') {
+          // Request permission on first notification (better UX than on page load)
+          const permission = await requestNotificationPermission();
+
+          if (permission === 'granted') {
+            showBrowserNotification(notification.title, {
+              body: notification.message,
+              tag: notification.type,
+              requireInteraction: false,
+              onClick: () => {
+                // Focus window and navigate to monitoring page
+                window.focus();
+                if (window.location.pathname !== '/monitoring') {
+                  window.location.href = '/monitoring';
+                }
+              }
+            });
+          }
+        }
+      };
+
+      if (socket && isConnected) {
+        console.log('📬 Setting up real-time notification listener');
+        socket.on('notification:new', handleNewNotification);
+      }
+
+      // Fallback: Refresh notifications every 5 minutes
       const interval = setInterval(() => {
         loadNotifications();
       }, 5 * 60 * 1000);
 
-      return () => clearInterval(interval);
+      return () => {
+        if (socket) {
+          socket.off('notification:new', handleNewNotification);
+        }
+        clearInterval(interval);
+      };
     } else {
       // Clear notifications if user is not admin
       setNotifications([]);
       setError(null);
     }
-  }, [loadNotifications, isAuthenticated, user]);
+  }, [loadNotifications, isAuthenticated, user, socket, isConnected]);
 
   return {
     notifications,
