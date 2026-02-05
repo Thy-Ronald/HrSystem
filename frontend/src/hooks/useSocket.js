@@ -117,6 +117,12 @@ function cleanupSocket() {
 export function useSocket() {
   const [, forceUpdate] = useState({});
 
+  // Real-time Optimization: Ensure socket is initialized IMMEDIATELY 
+  // so child component effects can subscribe without waiting for a re-render/mount.
+  if (!socketInstance && typeof window !== 'undefined') {
+    getSocket();
+  }
+
   // Use useSyncExternalStore for proper subscription to external state
   const isConnected = useSyncExternalStore(
     (callback) => {
@@ -135,7 +141,7 @@ export function useSocket() {
   );
 
   useEffect(() => {
-    // Get or create the singleton socket
+    // Get or create the singleton socket (already initialized in hook body, but for safety)
     const socket = getSocket();
     connectionCount++;
     console.log(`[Socket.IO] Consumer connected (total: ${connectionCount}), socket ID: ${socket.id}`);
@@ -164,8 +170,9 @@ export function useSocket() {
    * @param {Function} callback - Event handler
    */
   const subscribe = useCallback((event, callback) => {
-    if (socketInstance) {
-      socketInstance.on(event, callback);
+    const s = socketInstance || getSocket();
+    if (s) {
+      s.on(event, callback);
     }
   }, []);
 

@@ -25,9 +25,13 @@ const { testConnection } = require('./config/database');
 const cacheService = require('./services/cacheService');
 const monitoringService = require('./services/monitoringService');
 
+// Fast lookup for user sockets: Map<userId, Set<socketId>>
+const userSockets = new Map();
+
 dotenv.config();
 
 const app = express();
+app.set('userSockets', userSockets);
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -173,6 +177,12 @@ async function startServer() {
       socket.data.userId = userId;
       socket.data.authenticated = true;
       socket.data.token = jwtToken;
+
+      // Maintain userSockets map (O(1) lookup)
+      if (!userSockets.has(String(userId))) {
+        userSockets.set(String(userId), new Set());
+      }
+      userSockets.get(String(userId)).add(socket.id);
 
       console.log(`[Monitoring] ${sanitized.role} authenticated: ${sanitized.name} (${socket.id}). UserID: ${socket.data.userId}`);
 
@@ -423,38 +433,40 @@ async function startServer() {
       // Notify all admins
       const session = monitoringService.getSession(sessionId);
       if (session) {
-        session.adminSocketIds.forEach(async (adminId) => {
-          io.to(adminId).emit('monitoring:stream-stopped', {
+        const stopReason = reason || 'manual';
+
+        // 1. Notify viewing admins via real-time stream stopped event
+        session.adminSocketIds.forEach(adminSocketId => {
+          io.to(adminSocketId).emit('monitoring:stream-stopped', {
             sessionId,
-            reason: reason || 'manual'
+            reason: stopReason
+          });
+        });
+
+        // 2. Create persistent notification if it's NOT a manual disconnect
+        // Manual disconnects are handled by monitoringRequestController.js
+        if (stopReason !== 'manual') {
+          // Identify unqiue user IDs from the session's admins
+          const adminUserIds = new Set();
+          session.adminSocketIds.forEach(sid => {
+            const s = io.sockets.sockets.get(sid);
+            if (s && s.data.userId) adminUserIds.add(String(s.data.userId));
           });
 
-          const adminSocket = io.sockets.sockets.get(adminId);
-          if (adminSocket && adminSocket.data.userId) {
+          adminUserIds.forEach(async (adminId) => {
             try {
-              const notificationId = await Notification.create({
-                user_id: adminSocket.data.userId,
+              await Notification.createAndNotify({
+                user_id: adminId,
                 type: 'monitoring_disconnect',
                 title: 'Monitoring Stopped',
-                message: `${session.employeeName} stopped sharing (${reason || 'manual'}).`,
-                data: { sessionId, reason: reason || 'manual', employeeName: session.employeeName }
-              });
-
-              // Emit real-time notification to admin
-              io.to(adminId).emit('notification:new', {
-                id: notificationId,
-                type: 'monitoring_disconnect',
-                title: 'Monitoring Stopped',
-                message: `${session.employeeName} stopped sharing (${reason || 'manual'}).`,
-                data: { sessionId, reason: reason || 'manual', employeeName: session.employeeName },
-                created_at: new Date().toISOString(),
-                is_read: false
-              });
+                message: `${session.employeeName} stopped sharing (${stopReason}).`,
+                data: { sessionId, reason: stopReason, employeeName: session.employeeName }
+              }, io, userSockets);
             } catch (err) {
-              console.error('Failed to create notification', err);
+              console.error('[Monitoring] Failed to notify admin via stop-sharing:', err);
             }
-          }
-        });
+          });
+        }
       }
 
       socket.emit('monitoring:sharing-stopped', { sessionId });
@@ -620,6 +632,18 @@ async function startServer() {
     socket.on('disconnect', () => {
       console.log(`[Socket.IO] Client disconnected: ${socket.id}`);
 
+      // Clean up userSockets map
+      if (socket.data.userId) {
+        const userId = String(socket.data.userId);
+        const sockets = userSockets.get(userId);
+        if (sockets) {
+          sockets.delete(socket.id);
+          if (sockets.size === 0) {
+            userSockets.delete(userId);
+          }
+        }
+      }
+
       if (socket.data.role === 'employee' && socket.data.sessionId) {
         // Clean up employee session (marks as inactive but keeps for reconnection)
         const sessionId = socket.data.sessionId;
@@ -631,14 +655,46 @@ async function startServer() {
         const session = monitoringService.getSession(sessionId);
         if (session) {
           console.log(`[Monitoring] Disconnect: Notifying ${session.adminSocketIds.size} admins`);
-          session.adminSocketIds.forEach((adminId) => {
-            io.to(adminId).emit('monitoring:stream-stopped', {
-              sessionId,
-              reason: 'offline'
-            });
 
-            console.log(`[Monitoring] Disconnect: Sent stream-stopped to ${adminId}`);
+          // 1. Notify viewing admins via real-time stream stopped
+          session.adminSocketIds.forEach(adminId => {
+            io.to(adminId).emit('monitoring:stream-stopped', { sessionId, reason: 'offline' });
           });
+
+          // 2. Identify all admins to be notified persistently (Viewers + Owner)
+          const adminsToNotify = new Set();
+
+          // Add viewing admins
+          session.adminSocketIds.forEach(sid => {
+            const s = io.sockets.sockets.get(sid);
+            if (s && s.data.userId) adminsToNotify.add(String(s.data.userId));
+          });
+
+          // 3. Special Case: Notify the "Owner" Admin (requester) even if they aren't viewing
+          (async () => {
+            try {
+              const monitoringRequestModel = require('./models/monitoringRequestModel');
+              const Notification = require('./models/notificationModel');
+              const requests = await monitoringRequestModel.getRequestsForUser(session.employeeId);
+              const activeRequest = requests.find(r => r.status === 'approved');
+              if (activeRequest) {
+                adminsToNotify.add(String(activeRequest.admin_id));
+              }
+
+              // 4. Batch notify all relevant admins (O(1) lookups inside)
+              adminsToNotify.forEach(async (adminId) => {
+                await Notification.createAndNotify({
+                  user_id: adminId,
+                  type: 'monitoring_disconnect',
+                  title: 'Monitoring Stopped',
+                  message: `${session.employeeName} went offline.`,
+                  data: { sessionId, reason: 'offline', employeeName: session.employeeName }
+                }, io, userSockets);
+              });
+            } catch (err) {
+              console.error('[Monitoring] Disconnect notify error:', err);
+            }
+          })();
         } else {
           console.log(`[Monitoring] Disconnect: Session ${sessionId} not found after cleanup`);
         }

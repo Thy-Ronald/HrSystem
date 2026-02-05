@@ -18,8 +18,8 @@ export function useNotifications() {
   const [error, setError] = useState(null);
 
   const loadNotifications = useCallback(async () => {
-    // Only load notifications for authenticated admin users
-    if (!isAuthenticated || user?.role !== 'admin') {
+    // Only load notifications for authenticated users
+    if (!isAuthenticated) {
       setNotifications([]);
       setError(null);
       setLoading(false);
@@ -96,8 +96,8 @@ export function useNotifications() {
   }, [loadNotifications]);
 
   useEffect(() => {
-    // Only load if user is authenticated and is admin
-    if (isAuthenticated && user?.role === 'admin') {
+    // Only load if user is authenticated
+    if (isAuthenticated) {
       loadNotifications();
 
       // Setup real-time notification listener if socket is connected
@@ -105,8 +105,12 @@ export function useNotifications() {
         console.log('📬 Real-time notification received:', notification);
         setNotifications(prev => [notification, ...prev]);
 
-        // Show browser push notification for disconnect and declined request events
-        if (notification.type === 'monitoring_disconnect' || notification.type === 'monitoring_request_declined') {
+        // Show browser push notification for monitoring events
+        if (
+          notification.type === 'monitoring_disconnect' ||
+          notification.type === 'monitoring_request_declined' ||
+          notification.type === 'monitoring_new_request'
+        ) {
           // Request permission on first notification (better UX than on page load)
           const permission = await requestNotificationPermission();
 

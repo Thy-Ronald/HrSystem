@@ -66,9 +66,21 @@ async function findPendingRequest(adminId, targetUserId) {
     }
 }
 
+async function getById(id) {
+    const sql = `SELECT * FROM monitoring_requests WHERE id = ?`;
+    try {
+        const result = await query(sql, [id]);
+        return result[0];
+    } catch (error) {
+        console.error('Error getting request by ID:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     createRequest,
     getRequestsForUser,
     updateRequestStatus,
-    findPendingRequest
+    findPendingRequest,
+    getById
 };

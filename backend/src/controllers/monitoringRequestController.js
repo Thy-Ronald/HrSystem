@@ -24,6 +24,38 @@ async function createRequest(req, res) {
         }
 
         const request = await monitoringRequestModel.createRequest(adminId, targetUserId);
+
+        // Real-time Optimization: Notify employee immediately via Socket.IO
+        const io = req.app.get('io');
+        const userSockets = req.app.get('userSockets');
+        const Notification = require('../models/notificationModel');
+
+        try {
+            // 1. Create a persistent notification for the employee
+            await Notification.createAndNotify({
+                user_id: targetUserId,
+                type: 'monitoring_new_request',
+                title: 'New Monitoring Request',
+                message: `${req.user.name} wants to monitor your screen.`,
+                data: { requestId: request.id, adminName: req.user.name }
+            }, io, userSockets);
+
+            // 2. Also emit a specific monitoring event for instant list refresh on the Monitoring page
+            if (io && userSockets) {
+                const employeeSockets = userSockets.get(String(targetUserId));
+                if (employeeSockets) {
+                    employeeSockets.forEach(socketId => {
+                        io.to(socketId).emit('monitoring:new-request', {
+                            requestId: request.id,
+                            adminName: req.user.name
+                        });
+                    });
+                }
+            }
+        } catch (err) {
+            console.error('[MonitoringRequest] Failed to emit real-time notifications:', err);
+        }
+
         res.status(201).json(request);
     } catch (error) {
         console.error('Controller error creating monitoring request:', error);
@@ -54,9 +86,9 @@ async function respondToRequest(req, res) {
             return res.status(400).json({ error: 'Invalid status' });
         }
 
-        // Fetch request to get Admin ID
-        const requests = await monitoringRequestModel.getRequestsForUser(currentUserId);
-        const request = requests.find(r => r.id === parseInt(requestId));
+        // Fetch request to get Admin ID and current status
+        const request = await monitoringRequestModel.getById(requestId);
+        const oldStatus = request?.status;
 
         if (!request) {
             return res.status(404).json({ error: 'Request not found' });
@@ -124,47 +156,27 @@ async function respondToRequest(req, res) {
                 }
             }
         } else if (status === 'rejected') {
-            // Notify admin when request is rejected
+            // Notify admin when request is rejected or disconnected
             const io = req.app.get('io');
+            const userSockets = req.app.get('userSockets');
             const Notification = require('../models/notificationModel');
 
-            if (io) {
-                // Find admin socket
-                let adminSocketId = null;
-                for (const [id, socket] of io.sockets.sockets) {
-                    if (String(socket.data.userId) === String(request.admin_id)) {
-                        adminSocketId = id;
-                        break;
-                    }
-                }
+            try {
+                const isDisconnect = oldStatus === 'approved';
+                const notificationType = isDisconnect ? 'monitoring_disconnect' : 'monitoring_request_declined';
+                const notificationMessage = isDisconnect
+                    ? `${req.user.name || 'Employee'} stopped sharing.`
+                    : `${req.user.name || 'Employee'} declined your monitoring request.`;
 
-                if (adminSocketId) {
-                    const adminSocket = io.sockets.sockets.get(adminSocketId);
-                    if (adminSocket && adminSocket.data.userId) {
-                        try {
-                            const notificationId = await Notification.create({
-                                user_id: adminSocket.data.userId,
-                                type: 'monitoring_request_declined',
-                                title: 'Request Declined',
-                                message: `${req.user.name || 'Employee'} declined your monitoring request.`,
-                                data: { requestId, employeeName: req.user.name }
-                            });
-
-                            // Emit real-time notification to admin
-                            io.to(adminSocketId).emit('notification:new', {
-                                id: notificationId,
-                                type: 'monitoring_request_declined',
-                                title: 'Request Declined',
-                                message: `${req.user.name || 'Employee'} declined your monitoring request.`,
-                                data: { requestId, employeeName: req.user.name },
-                                created_at: new Date().toISOString(),
-                                is_read: false
-                            });
-                        } catch (err) {
-                            console.error('Failed to create decline notification:', err);
-                        }
-                    }
-                }
+                await Notification.createAndNotify({
+                    user_id: request.admin_id,
+                    type: notificationType,
+                    title: 'Monitoring Stopped',
+                    message: notificationMessage,
+                    data: { requestId, employeeName: req.user.name, isDisconnect }
+                }, io, userSockets);
+            } catch (err) {
+                console.error('Failed to create rejection notification:', err);
             }
         }
 

@@ -333,9 +333,26 @@ const PendingRequests = React.memo(({ startSharing, stopSharing, isSharing, setJ
 
   useEffect(() => {
     fetchRequests();
-    const interval = setInterval(fetchRequests, 10000);
-    return () => clearInterval(interval);
-  }, [fetchRequests]);
+
+    const handleNewRequest = (data) => {
+      console.log('[Monitoring] Real-time request received:', data);
+      fetchRequests();
+    };
+
+    // Real-time Optimization: Listen for new requests via socket
+    subscribe('monitoring:new-request', handleNewRequest);
+
+    // Fallback: Poll every 30 seconds to catch missed events (High Reliability)
+    const interval = setInterval(() => {
+      console.log('[Monitoring] Fallback polling for requests...');
+      fetchRequests();
+    }, 30000);
+
+    return () => {
+      unsubscribe('monitoring:new-request', handleNewRequest);
+      clearInterval(interval);
+    };
+  }, [fetchRequests, subscribe, unsubscribe]);
 
   /* New State for Disconnect Confirmation */
   const [confirmDisconnectId, setConfirmDisconnectId] = useState(null);
