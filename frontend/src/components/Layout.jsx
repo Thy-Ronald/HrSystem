@@ -31,7 +31,7 @@ import { useAuth } from '../contexts/AuthContext';
 const Layout = ({ children, currentPath, onNavigate }) => {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
-  const { notifications, loading, count, markAsRead, isRead } = useNotifications();
+  const { notifications, loading, count, markAsRead, isRead, clearAll } = useNotifications();
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'admin';
 
@@ -191,6 +191,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
                     onNotificationClick={markAsRead}
                     isRead={isRead}
                     onNavigate={onNavigate}
+                    clearAll={clearAll}
                   />
                 )}
               </>

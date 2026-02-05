@@ -31,6 +31,12 @@ const Notification = {
         const sql = `UPDATE notifications SET is_read = TRUE WHERE user_id = ?`;
         await query(sql, [userId]);
         return true;
+    },
+
+    deleteAllForUser: async (userId) => {
+        const sql = `DELETE FROM notifications WHERE user_id = ?`;
+        await query(sql, [userId]);
+        return true;
     }
 };
 

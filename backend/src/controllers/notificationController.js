@@ -59,7 +59,19 @@ const markAsRead = async (req, res) => {
     }
 };
 
+const deleteAll = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        await Notification.deleteAllForUser(userId);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting all notifications:', error);
+        res.status(500).json({ message: 'Failed to delete notifications' });
+    }
+};
+
 module.exports = {
     getUnifiedNotifications,
-    markAsRead
+    markAsRead,
+    deleteAll
 };

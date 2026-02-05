@@ -625,3 +625,11 @@ export const markNotificationRead = async (id) => {
   });
   return handleResponse(res);
 };
+
+export const deleteAllNotifications = async () => {
+  const res = await fetch(`${API_BASE}/api/notifications/all`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(res);
+};

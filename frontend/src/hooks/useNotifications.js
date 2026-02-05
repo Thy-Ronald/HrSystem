@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getNotifications, markNotificationRead } from '../services/api';
+import { getNotifications, markNotificationRead, deleteAllNotifications } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from './useSocket';
 import { requestNotificationPermission, showBrowserNotification } from '../utils/notifications';
@@ -79,6 +79,22 @@ export function useNotifications() {
   // Get unread notifications count
   const unreadCount = notifications.filter((n) => !readIds.has(n.id)).length;
 
+  // Clear all notifications
+  const clearAll = useCallback(async () => {
+    console.log('🚀 clearAll function called');
+    try {
+      console.log('Calling deleteAllNotifications API...');
+      await deleteAllNotifications();
+      console.log('deleteAllNotifications completed, reloading...');
+      // Reload notifications to get fresh data (contract expiry notifications are virtual)
+      await loadNotifications();
+      console.log('Notifications reloaded successfully');
+    } catch (err) {
+      console.error("Failed to delete all notifications", err);
+      throw err; // Re-throw for UI to handle
+    }
+  }, [loadNotifications]);
+
   useEffect(() => {
     // Only load if user is authenticated and is admin
     if (isAuthenticated && user?.role === 'admin') {
@@ -142,5 +158,6 @@ export function useNotifications() {
     count: unreadCount, // Only count unread notifications
     markAsRead,
     isRead: (id) => readIds.has(id),
+    clearAll,
   };
 }
