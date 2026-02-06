@@ -82,5 +82,29 @@ module.exports = {
     getRequestsForUser,
     updateRequestStatus,
     findPendingRequest,
-    getById
+    getById,
+    getRequestsByAdmin
 };
+
+async function getRequestsByAdmin(adminId) {
+    const sql = `
+        SELECT 
+            mr.id, 
+            mr.target_user_id, 
+            mr.status, 
+            mr.created_at,
+            u.name as employee_name,
+            u.email as employee_email
+        FROM monitoring_requests mr
+        JOIN users u ON mr.target_user_id = u.id
+        WHERE mr.admin_id = ? AND mr.status IN ('pending', 'approved')
+        ORDER BY mr.created_at DESC
+    `;
+    try {
+        const requests = await query(sql, [adminId]);
+        return requests;
+    } catch (error) {
+        console.error('Error getting requests by admin:', error);
+        throw error;
+    }
+}

@@ -581,6 +581,19 @@ export async function getMonitoringSessions() {
 }
 
 /**
+ * Delete/Stop a monitoring session
+ * @param {string} sessionId
+ * @returns {Promise<Object>}
+ */
+export async function deleteMonitoringSession(sessionId) {
+  const res = await fetch(`${API_BASE}/api/monitoring/sessions/${sessionId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(res);
+}
+
+/**
  * Respond to monitoring request (approve/reject)
  * @param {number} requestId 
  * @param {string} status - 'approved' | 'rejected'

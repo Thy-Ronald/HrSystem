@@ -134,7 +134,7 @@ export const MonitoringProvider = ({ children }) => {
 
         const onJoin = ({ adminName }) => {
             setAdminCount(prev => prev + 1);
-            toast.info(`${adminName} joined`);
+            // toast.info(`${adminName} joined`); 
         };
 
         const onLeave = () => {

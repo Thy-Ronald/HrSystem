@@ -86,7 +86,7 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
   });
   const toast = useToast();
   const { emit } = useSocket();
-  const fullVideoRef = useRef(null);
+  const [fullVideoEl, setFullVideoEl] = useState(null); // Callback ref pattern
   const containerRef = useRef(null);
 
   // Intersection Observer to detect visibility
@@ -114,33 +114,50 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
 
   // Sync stream to full view video element
   useEffect(() => {
-    let timeoutId;
-    if (showFullView && remoteStream) {
-      timeoutId = setTimeout(() => {
-        if (fullVideoRef.current) {
-          fullVideoRef.current.srcObject = remoteStream;
-          fullVideoRef.current.play().catch(err => console.error('[CCTV] Fullscreen play error:', err));
-        }
-      }, 200);
+    // Rely on 'fullVideoEl' state to know when the video element is mounted in the DOM
+    if (showFullView && remoteStream && fullVideoEl) {
+      fullVideoEl.srcObject = remoteStream;
+      // Use requestAnimationFrame to ensure play happens after paint
+      requestAnimationFrame(() => {
+        fullVideoEl.play().catch(err => console.error('[CCTV] Fullscreen play error:', err));
+      });
+
+      // OPTIMIZATION: Pause the thumbnail video to save CPU/GPU (prevent double decoding)
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.pause();
+      }
+    } else {
+      // Resume thumbnail when modal closes
+      if (remoteVideoRef.current && remoteStream) {
+        remoteVideoRef.current.play().catch(err => { });
+      }
     }
-    return () => clearTimeout(timeoutId);
-  }, [showFullView, remoteStream]);
+  }, [showFullView, remoteStream, fullVideoEl]);
 
   // Viewport-aware streaming logic (Scalability Optimization)
   useEffect(() => {
+    let timeoutId;
     let active = true;
-    // Only start viewing if stream is active AND (visible OR in full view)
+
+    // DEBOUNCE: Only start viewing if stream is active AND (visible OR in full view)
+    // Wait 300ms to ensure user is actually looking at this card (not just scrolling past)
     if (session.streamActive && (isVisible || showFullView) && !shareConnected) {
       setLoading(true);
-      startViewing(session.sessionId);
+      timeoutId = setTimeout(() => {
+        if (active) startViewing(session.sessionId);
+      }, 300);
     }
-    // Stop viewing if (NOT visible AND NOT in full view) OR stream stopped
+    // Stop viewing IMMEDIATELY if (NOT visible AND NOT in full view) OR stream stopped
     else if (((!isVisible && !showFullView) || !session.streamActive) && shareConnected) {
       stopViewing();
       setLoading(false);
       if (!session.streamActive && active) setShowFullView(false);
     }
-    return () => { active = false; };
+
+    return () => {
+      active = false;
+      clearTimeout(timeoutId); // Cancel connection attempt if user scrolld away
+    };
   }, [session.streamActive, isVisible, showFullView, shareConnected, startViewing, stopViewing, session.sessionId]);
 
   useEffect(() => {
@@ -156,16 +173,29 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
   }, [session.streamActive, reconnectSent, session.sessionId]);
 
   const handleRemoveClick = () => setShowConfirm(true);
-  const handleConfirmRemove = () => {
-    onRemove(session.sessionId);
-    localStorage.removeItem(`reconnect_sent_${session.sessionId}`);
-    setShowConfirm(false);
+  const handleConfirmRemove = async () => {
+    try {
+      // 1. Optimistic UI Update (call onRemove immediately to hide card)
+      onRemove(session.sessionId);
+
+      // 2. Call Backend API to terminate session
+      const { deleteMonitoringSession } = await import('../services/api');
+      await deleteMonitoringSession(session.sessionId);
+
+      localStorage.removeItem(`reconnect_sent_${session.sessionId}`);
+      toast.success(`Session with ${session.employeeName} ended`);
+    } catch (error) {
+      console.error("Failed to terminate session:", error);
+      toast.error("Failed to fully terminate session");
+    } finally {
+      setShowConfirm(false);
+    }
   };
 
   return (
     <div ref={containerRef} style={{ height: '100%' }}>
       <Card className={`h-full overflow-hidden transition-all duration-300 border-2 ${session.streamActive ? 'border-[#1a3e62] shadow-md' : 'border-slate-100 shadow-sm'} flex flex-col bg-white hover:translate-y-[-4px] hover:shadow-xl`}>
-        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <div className="flex items-center gap-3 min-w-0">
             <UserAvatar
               name={session.employeeName}
@@ -310,7 +340,7 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
             {/* Content Area / Video Frame */}
             <div className="flex-1 w-full flex items-center justify-center bg-slate-950 overflow-hidden min-h-0">
               <video
-                ref={fullVideoRef}
+                ref={setFullVideoEl}
                 autoPlay
                 playsInline
                 muted
@@ -385,11 +415,14 @@ const PendingRequests = React.memo(({ startSharing, stopSharing, isSharing, setJ
     // Real-time Optimization: Listen for new requests via socket
     subscribe('monitoring:new-request', handleNewRequest);
 
-    // Fallback: Poll every 30 seconds to catch missed events (High Reliability)
+    // Fallback: Poll every 60 seconds to catch missed events (High Reliability)
+    // OPTIMIZATION: Only poll if tab is visible to save bandwidth/battery
     const interval = setInterval(() => {
-      console.log('[Monitoring] Fallback polling for requests...');
-      fetchRequests();
-    }, 30000);
+      if (document.visibilityState === 'visible') {
+        console.log('[Monitoring] Fallback polling for requests...');
+        fetchRequests();
+      }
+    }, 60000);
 
     return () => {
       unsubscribe('monitoring:new-request', handleNewRequest);
@@ -890,7 +923,7 @@ const Monitoring = () => {
       </div>
 
       {/* Content */}
-      <div className="p-6 lg:p-10">
+      <div className="p-4 lg:p-6">
         {sessions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200">
             <div className="bg-slate-50 p-6 rounded-full mb-4">
@@ -902,7 +935,7 @@ const Monitoring = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {sessions
               .filter(s => s.employeeName.toLowerCase().includes(searchQuery.toLowerCase()))
               .map(s => (

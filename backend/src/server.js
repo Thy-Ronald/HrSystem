@@ -250,17 +250,33 @@ async function startServer() {
           activeRequest
         });
 
-        // Notify all admins about the new session (so they can add it to their list)
-        io.emit('monitoring:new-session', {
-          sessionId,
-          employeeName: sanitized.name,
-          employeeId: userId,
-          avatarUrl: avatarUrl,
-          streamActive: false
-        });
-        console.log(`[Monitoring] Broadcast new-session for ${sanitized.name}`);
 
-        // No longer auto-broadcast sessions - admins connect via request
+        // Notify approved admins ONLY about the new session
+        try {
+          const monitoringRequestModel = require('./models/monitoringRequestModel');
+          const requests = await monitoringRequestModel.getRequestsForUser(userId);
+          const approvedAdmins = requests
+            .filter(r => r.status === 'approved')
+            .map(r => r.admin_id);
+
+          approvedAdmins.forEach(adminId => {
+            const sockets = userSockets.get(String(adminId));
+            if (sockets) {
+              sockets.forEach(socketId => {
+                io.to(socketId).emit('monitoring:new-session', {
+                  sessionId,
+                  employeeName: sanitized.name,
+                  employeeId: userId,
+                  avatarUrl: avatarUrl,
+                  streamActive: false
+                });
+              });
+            }
+          });
+          console.log(`[Monitoring] Targeted new-session for ${sanitized.name} to ${approvedAdmins.length} admins`);
+        } catch (err) {
+          console.error('[Monitoring] Failed to send targeted new-session:', err);
+        }
       } else if (sanitized.role === 'admin') {
         // Admin authenticated - they will connect to sessions via request
         socket.emit('monitoring:auth-success', {
