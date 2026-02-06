@@ -41,7 +41,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Key,
-  Loader2
+  Loader2,
+  History,
+  Inbox
 } from 'lucide-react';
 import { UserAvatar } from '../components/UserAvatar';
 
@@ -412,8 +414,16 @@ const PendingRequests = React.memo(({ startSharing, stopSharing, isSharing, setJ
       fetchRequests();
     };
 
+    const handleRequestCancelled = (data) => {
+      console.log('[Monitoring] Request cancelled:', data);
+      // Optimistically remove from list
+      setRequests((prev) => prev.filter(req => req.id != data.requestId));
+      toast.info("Monitoring request was cancelled by the admin");
+    };
+
     // Real-time Optimization: Listen for new requests via socket
     subscribe('monitoring:new-request', handleNewRequest);
+    subscribe('monitoring:request-cancelled', handleRequestCancelled);
 
     // Fallback: Poll every 60 seconds to catch missed events (High Reliability)
     // OPTIMIZATION: Only poll if tab is visible to save bandwidth/battery
@@ -426,6 +436,7 @@ const PendingRequests = React.memo(({ startSharing, stopSharing, isSharing, setJ
 
     return () => {
       unsubscribe('monitoring:new-request', handleNewRequest);
+      unsubscribe('monitoring:request-cancelled', handleRequestCancelled);
       clearInterval(interval);
     };
   }, [fetchRequests, subscribe, unsubscribe]);
@@ -756,6 +767,8 @@ const Monitoring = () => {
   } = useMonitoring();
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [confirmCancelId, setConfirmCancelId] = useState(null); // New state for confirmation
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [addFormCode, setAddFormCode] = useState('');
   const [addFormError, setAddFormError] = useState('');
@@ -764,6 +777,51 @@ const Monitoring = () => {
   const [searchResults, setSearchResults] = useState([]);
 
   const [selectedUser, setSelectedUser] = useState(null);
+
+  // New State for Sent Requests (Admin View)
+  const [sentRequests, setSentRequests] = useState([]);
+
+  const fetchSent = useCallback(async () => {
+    if (user?.role !== 'admin') return;
+    try {
+      const { getSentMonitoringRequests } = await import('../services/api');
+      const data = await getSentMonitoringRequests();
+      setSentRequests(data || []);
+    } catch (e) {
+      console.error('Failed to fetch sent requests', e);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      fetchSent();
+      const interval = setInterval(fetchSent, 15000); // Poll every 15s to keep it fresh
+      return () => clearInterval(interval);
+    }
+  }, [user, fetchSent]);
+
+  // Listen to socket for updates
+  const { subscribe, unsubscribe } = useSocket();
+  useEffect(() => {
+    // Refresh sent requests list when:
+    // 1. Employee accepts (connect-success)
+    // 2. Employee declines (request-declined)
+    // 3. Admin cancels from another tab (request-cancelled) - requires backend update
+    const handleRefresh = (data) => {
+      console.log('[Monitoring] Request status update received:', data);
+      fetchSent();
+    };
+
+    subscribe('monitoring:connect-success', handleRefresh);
+    subscribe('monitoring:request-declined', handleRefresh);
+    subscribe('monitoring:disconnect', handleRefresh); // In case of disconnect if relevant logic maps to it
+
+    return () => {
+      unsubscribe('monitoring:connect-success', handleRefresh);
+      unsubscribe('monitoring:request-declined', handleRefresh);
+      unsubscribe('monitoring:disconnect', handleRefresh);
+    };
+  }, [subscribe, unsubscribe, fetchSent]);
 
   // Debounced search effect
   useEffect(() => {
@@ -902,8 +960,8 @@ const Monitoring = () => {
       <style>{GLOBAL_STYLES}</style>
 
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm">
-        <div className="relative flex-1 max-w-xl">
+      <div className="sticky top-0 z-20 bg-slate-100 border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm">
+        <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
           <input
             type="text"
@@ -913,17 +971,28 @@ const Monitoring = () => {
             className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-medium text-slate-700 placeholder:text-slate-400"
           />
         </div>
-        <Button
-          onClick={() => setShowAddModal(true)}
-          className="bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold h-11 px-6 rounded-xl shadow-md transition-all active:scale-95"
-        >
-          <Plus className="mr-2 h-5 w-5" />
-          New Connection
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowHistoryModal(true)}
+            className="h-11 px-6 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold"
+          >
+            <History className="mr-2 h-5 w-5" />
+            History
+          </Button>
+          <Button
+            onClick={() => setShowAddModal(true)}
+            className="bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold h-11 px-6 rounded-xl shadow-md transition-all active:scale-95"
+          >
+            <Plus className="mr-2 h-5 w-5" />
+            New Connection
+          </Button>
+        </div>
       </div>
 
       {/* Content */}
       <div className="p-4 lg:p-6">
+        {/* Pending Requests Section removed from here */}
         {sessions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200">
             <div className="bg-slate-50 p-6 rounded-full mb-4">
@@ -1027,6 +1096,103 @@ const Monitoring = () => {
               disabled={addFormLoading}
             >
               Send Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showHistoryModal} onOpenChange={setShowHistoryModal}>
+        <DialogContent className="sm:max-w-md bg-white max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-900 leading-tight">
+              Request History
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto py-4">
+            {sentRequests.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="bg-slate-50 p-3 rounded-full mb-3">
+                  <Inbox className="h-6 w-6 text-slate-400" />
+                </div>
+                <h3 className="text-sm font-medium text-slate-900">No requests found</h3>
+                <p className="text-xs text-slate-500 mt-1 max-w-[200px]">
+                  You haven't sent any monitoring requests yet.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sentRequests.map(req => (
+                  <div key={req.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50 hover:bg-white hover:border-slate-200 transition-colors group">
+                    <div className="flex items-center gap-3">
+                      <UserAvatar name={req.employee_name} size="sm" />
+                      <div>
+                        <div className="font-semibold text-slate-700">{req.employee_name}</div>
+                        <div className="text-xs text-slate-400">Sent {new Date(req.created_at).toLocaleString()}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold uppercase tracking-wider">
+                        Pending
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-all"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmCancelId(req.id);
+                        }}
+                        title="Cancel Request"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Confirmation Dialog */}
+      <Dialog open={!!confirmCancelId} onOpenChange={(open) => !open && setConfirmCancelId(null)}>
+        <DialogContent className="sm:max-w-xs bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-slate-900">Cancel Request?</DialogTitle>
+            <DialogDescription className="text-slate-500 pt-2">
+              Are you sure you want to cancel this monitoring request?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 pt-4">
+            <Button
+              variant="ghost"
+              onClick={() => setConfirmCancelId(null)}
+              className="text-slate-600 hover:bg-slate-100 font-medium"
+            >
+              Back
+            </Button>
+            <Button
+              variant="destructive"
+              className="bg-rose-600 hover:bg-rose-700 font-semibold"
+              onClick={async () => {
+                if (!confirmCancelId) return;
+                const requestId = confirmCancelId;
+
+                // Optimistic Update
+                const originalRequests = [...sentRequests];
+                setSentRequests(prev => prev.filter(r => r.id !== requestId));
+                setConfirmCancelId(null); // Close modal immediately
+
+                try {
+                  const { cancelMonitoringRequest } = await import('../services/api');
+                  await cancelMonitoringRequest(requestId);
+                } catch (e) {
+                  console.error("Cancel failed", e);
+                  setSentRequests(originalRequests); // Revert on failure
+                }
+              }}
+            >
+              Yes, Cancel
             </Button>
           </DialogFooter>
         </DialogContent>

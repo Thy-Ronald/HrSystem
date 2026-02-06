@@ -189,8 +189,72 @@ async function respondToRequest(req, res) {
     }
 }
 
+// Admin gets their sent requests
+async function getSentRequests(req, res) {
+    try {
+        const adminId = req.user.userId;
+        const requests = await monitoringRequestModel.getRequestsByAdmin(adminId);
+        res.json(requests);
+    } catch (error) {
+        console.error('Controller error getting sent requests:', error);
+        res.status(500).json({ error: 'Failed to fetch sent requests' });
+    }
+}
+
+// Admin cancels a pending request
+async function cancelRequest(req, res) {
+    try {
+        const requestId = req.params.id;
+        const adminId = req.user.userId;
+
+        // Verify request belongs to admin and is pending
+        const request = await monitoringRequestModel.getById(requestId);
+        if (!request) {
+            return res.status(404).json({ error: 'Request not found' });
+        }
+        if (request.admin_id !== adminId) {
+            return res.status(403).json({ error: 'Not authorized to cancel this request' });
+        }
+        if (request.status !== 'pending') {
+            return res.status(400).json({ error: 'Can only cancel pending requests' });
+        }
+
+        // We can either delete it or mark as cancelled. Let's delete it for cleanliness or mark 'cancelled'
+        // For history tracking, 'cancelled' is better, but user asked to 'cancel', effectively removing it.
+        // Let's use `updateRequestStatus` to 'cancelled' to keep record if we want, OR just delete.
+        // Given the requirement is likely to "undo" the action, let's delete it so it mimics "never happened" or use a specific status.
+        // Let's go with DELETE / hard removal from pending lists. 
+        // Actually, let's just use updateRequestStatus('cancelled') so we don't break foreign keys etc if any.
+        // Wait, 'cancelled' validation might fail if I restricted status types.
+        // Let's check `monitoringRequestModel`.
+
+        // Use a new model method or existing update. The model doesn't enforce enum strictness in SQL usually unless defined.
+        // Let's add a DELETE method to model for true cancellation.
+        await monitoringRequestModel.deleteRequest(requestId);
+
+        // Real-time: IDially notify the employee that the request is gone (to remove from their list)
+        const io = req.app.get('io');
+        const userSockets = req.app.get('userSockets');
+        if (io && userSockets) {
+            const employeeSockets = userSockets.get(String(request.target_user_id));
+            if (employeeSockets) {
+                employeeSockets.forEach(socketId => {
+                    io.to(socketId).emit('monitoring:request-cancelled', { requestId });
+                });
+            }
+        }
+
+        res.json({ success: true, message: 'Request cancelled' });
+    } catch (error) {
+        console.error('Controller error cancelling request:', error);
+        res.status(500).json({ error: 'Failed to cancel request' });
+    }
+}
+
 module.exports = {
     createRequest,
     getMyRequests,
-    respondToRequest
+    respondToRequest,
+    getSentRequests,
+    cancelRequest
 };

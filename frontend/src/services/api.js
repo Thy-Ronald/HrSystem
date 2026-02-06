@@ -570,6 +570,30 @@ export async function getMonitoringRequests() {
 }
 
 /**
+ * Get sent monitoring requests (admin only)
+ * @returns {Promise<Array>}
+ */
+export async function getSentMonitoringRequests() {
+  const res = await fetch(`${API_BASE}/api/monitoring/requests/sent`, {
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Cancel a pending monitoring request (admin only)
+ * @param {string} requestId
+ * @returns {Promise<Object>}
+ */
+export async function cancelMonitoringRequest(requestId) {
+  const res = await fetch(`${API_BASE}/api/monitoring/requests/${requestId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(res);
+}
+
+/**
  * Get all active monitoring sessions (admin only)
  * @returns {Promise<Array>}
  */

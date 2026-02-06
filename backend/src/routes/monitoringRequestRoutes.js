@@ -35,6 +35,8 @@ const protect = (req, res, next) => {
 
 router.post('/', protect, monitoringRequestController.createRequest);
 router.get('/', protect, monitoringRequestController.getMyRequests);
+router.get('/sent', protect, monitoringRequestController.getSentRequests);
 router.put('/:id/respond', protect, monitoringRequestController.respondToRequest);
+router.delete('/:id', protect, monitoringRequestController.cancelRequest);
 
 module.exports = router;

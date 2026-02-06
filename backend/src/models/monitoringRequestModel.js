@@ -77,13 +77,25 @@ async function getById(id) {
     }
 }
 
+async function deleteRequest(id) {
+    const sql = `DELETE FROM monitoring_requests WHERE id = ?`;
+    try {
+        await query(sql, [id]);
+        return true;
+    } catch (error) {
+        console.error('Error deleting request:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     createRequest,
     getRequestsForUser,
     updateRequestStatus,
     findPendingRequest,
     getById,
-    getRequestsByAdmin
+    getRequestsByAdmin,
+    deleteRequest
 };
 
 async function getRequestsByAdmin(adminId) {
