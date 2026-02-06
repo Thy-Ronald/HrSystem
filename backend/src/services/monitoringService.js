@@ -182,7 +182,10 @@ class MonitoringService {
         adminCount: session.adminSocketIds.size,
         createdAt: session.createdAt,
         expiresAt: session.expiresAt,
+        expiresAt: session.expiresAt,
         timeRemaining: this.getTimeRemaining(sessionId),
+        // If no socket ID, they are offline
+        disconnectReason: !session.employeeSocketId ? 'offline' : null
       }));
   }
 
