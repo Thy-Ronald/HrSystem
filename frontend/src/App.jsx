@@ -115,38 +115,42 @@ function AppContent() {
   const adminOnlyPages = ['contract-form', 'information'];
   if (adminOnlyPages.includes(currentPage) && user?.role !== 'admin') {
     return (
-      <Layout currentPath={currentPage} onNavigate={handleNavigate}>
-        <GlobalResumeSharingModal />
-        <Container maxWidth="sm" sx={{ py: 10 }}>
-          <Box sx={{ textAlign: 'center' }}>
-            <WarningIcon sx={{ fontSize: 64, color: 'error.main', mb: 2, opacity: 0.8 }} />
-            <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>Access Denied</Typography>
-            <Typography color="text.secondary" sx={{ mb: 4 }}>
-              Only administrators can access this screen.
-            </Typography>
-            <Button
-              variant="contained"
-              onClick={() => handleNavigate('dashboard')}
-              sx={{ borderRadius: 1, textTransform: 'none', px: 4 }}
-            >
-              Go to Dashboard
-            </Button>
-          </Box>
-        </Container>
-      </Layout>
+      <MonitoringProvider>
+        <Layout currentPath={currentPage} onNavigate={handleNavigate}>
+          <GlobalResumeSharingModal />
+          <Container maxWidth="sm" sx={{ py: 10 }}>
+            <Box sx={{ textAlign: 'center' }}>
+              <WarningIcon sx={{ fontSize: 64, color: 'error.main', mb: 2, opacity: 0.8 }} />
+              <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>Access Denied</Typography>
+              <Typography color="text.secondary" sx={{ mb: 4 }}>
+                Only administrators can access this screen.
+              </Typography>
+              <Button
+                variant="contained"
+                onClick={() => handleNavigate('dashboard')}
+                sx={{ borderRadius: 1, textTransform: 'none', px: 4 }}
+              >
+                Go to Dashboard
+              </Button>
+            </Box>
+          </Container>
+        </Layout>
+      </MonitoringProvider>
     );
   }
 
   return (
-    <Layout currentPath={currentPage} onNavigate={handleNavigate}>
-      <GlobalResumeSharingModal />
-      {currentPage === 'contract-form' && <ContractForm />}
-      {currentPage === 'information' && <Information />}
-      {currentPage === 'dashboard' && <Dashboard />}
-      {currentPage === 'staff-ranking' && <RankingPage />}
-      {currentPage === 'monitoring' && <Monitoring />}
-      {currentPage === 'github-analytics' && <GithubAnalytics />}
-    </Layout>
+    <MonitoringProvider>
+      <Layout currentPath={currentPage} onNavigate={handleNavigate}>
+        <GlobalResumeSharingModal />
+        {currentPage === 'contract-form' && <ContractForm />}
+        {currentPage === 'information' && <Information />}
+        {currentPage === 'dashboard' && <Dashboard />}
+        {currentPage === 'staff-ranking' && <RankingPage />}
+        {currentPage === 'monitoring' && <Monitoring />}
+        {currentPage === 'github-analytics' && <GithubAnalytics />}
+      </Layout>
+    </MonitoringProvider>
   );
 }
 
@@ -157,9 +161,7 @@ function App() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <MonitoringProvider>
-          <AppContent />
-        </MonitoringProvider>
+        <AppContent />
       </ToastProvider>
     </AuthProvider>
   );

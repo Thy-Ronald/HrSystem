@@ -110,7 +110,7 @@ export function useScreenShare(role, sessionId) {
   /**
    * Stop screen sharing (Employee only)
    */
-  const stopSharing = useCallback(() => {
+  const stopSharing = useCallback((reason = 'manual') => {
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
@@ -119,9 +119,8 @@ export function useScreenShare(role, sessionId) {
     setIsSharing(false);
     setError(null);
 
-    if (role === 'employee') {
-      emit('monitoring:stop-sharing');
-    }
+    // Notify server to clean up session
+    emit('monitoring:stop-sharing', { reason });
 
     // Close all peer connections
     peerConnectionsRef.current.forEach((pc) => {
@@ -131,7 +130,17 @@ export function useScreenShare(role, sessionId) {
     iceCandidateQueuesRef.current.clear();
 
     setRemoteStream(null);
-  }, [role, emit]);
+  }, [emit]);
+
+  // Handle unmount cleanup
+  useEffect(() => {
+    return () => {
+      if (localStreamRef.current || peerConnectionsRef.current.size > 0) {
+        console.log('[WebRTC] Hook unmounting, stopping sharing/viewing...');
+        stopSharing('unmount');
+      }
+    };
+  }, [stopSharing]);
 
   /**
    * Initialize WebRTC peer connection (Employee)

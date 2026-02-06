@@ -81,7 +81,9 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
   const [showFullView, setShowFullView] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
-  const [reconnectSent, setReconnectSent] = useState(false);
+  const [reconnectSent, setReconnectSent] = useState(() => {
+    return localStorage.getItem(`reconnect_sent_${session.sessionId}`) === 'true';
+  });
   const toast = useToast();
   const { emit } = useSocket();
   const fullVideoRef = useRef(null);
@@ -149,12 +151,14 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
   useEffect(() => {
     if (session.streamActive && reconnectSent) {
       setReconnectSent(false);
+      localStorage.removeItem(`reconnect_sent_${session.sessionId}`);
     }
-  }, [session.streamActive, reconnectSent]);
+  }, [session.streamActive, reconnectSent, session.sessionId]);
 
   const handleRemoveClick = () => setShowConfirm(true);
   const handleConfirmRemove = () => {
     onRemove(session.sessionId);
+    localStorage.removeItem(`reconnect_sent_${session.sessionId}`);
     setShowConfirm(false);
   };
 
@@ -242,6 +246,7 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
                   await createMonitoringRequest(session.employeeId);
                   toast.success(`Reconnection request sent to ${session.employeeName}`);
                   setReconnectSent(true);
+                  localStorage.setItem(`reconnect_sent_${session.sessionId}`, 'true');
 
                   // Keep the legacy socket event for legacy-compatible clients
                   if (emit) {
@@ -358,7 +363,9 @@ const PendingRequests = React.memo(({ startSharing, stopSharing, isSharing, setJ
   const fetchRequests = useCallback(async () => {
     try {
       const { getMonitoringRequests } = await import('../services/api');
-      const data = await getMonitoringRequests();
+      const response = await getMonitoringRequests();
+      // Extract array from response (handleResponse returns whole object if no .data field)
+      const data = response?.requests || (Array.isArray(response) ? response : []);
       setRequests(data);
     } catch (error) {
       console.error('Failed to fetch requests', error);

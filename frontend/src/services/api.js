@@ -570,6 +570,17 @@ export async function getMonitoringRequests() {
 }
 
 /**
+ * Get all active monitoring sessions (admin only)
+ * @returns {Promise<Array>}
+ */
+export async function getMonitoringSessions() {
+  const res = await fetch(`${API_BASE}/api/monitoring/sessions`, {
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(res);
+}
+
+/**
  * Respond to monitoring request (approve/reject)
  * @param {number} requestId 
  * @param {string} status - 'approved' | 'rejected'

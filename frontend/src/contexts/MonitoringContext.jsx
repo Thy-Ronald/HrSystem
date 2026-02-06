@@ -27,6 +27,7 @@ export const MonitoringProvider = ({ children }) => {
     const [adminCount, setAdminCount] = useState(0);
     const [justReconnected, setJustReconnected] = useState(false);
     const [connectionRequest, setConnectionRequest] = useState(null); // { adminName, adminSocketId }
+    const joinedSessionsRef = useRef(new Set());
 
     // Persistence effects
     useEffect(() => {
@@ -213,7 +214,7 @@ export const MonitoringProvider = ({ children }) => {
         try {
             const { getMonitoringSessions } = await import('../services/api');
             const response = await getMonitoringSessions();
-            const fetchedSessions = response.data || [];
+            const fetchedSessions = Array.isArray(response) ? response : (response?.data || []);
 
             setSessions(prev => {
                 // Merge logic: preserve streamActive/avatarUrl if we have more recent socket data
@@ -235,6 +236,19 @@ export const MonitoringProvider = ({ children }) => {
                     return fs;
                 });
             });
+
+            // Room Join Optimization (Admin): Ensure we are in rooms for all listed sessions
+            // so we get real-time status updates even for non-visible cards.
+            if (fetchedSessions.length > 0 && isConnected) {
+                fetchedSessions.forEach(fs => {
+                    if (!joinedSessionsRef.current.has(fs.sessionId)) {
+                        console.log(`[MonitoringContext] Joining room for session: ${fs.sessionId}`);
+                        emit('monitoring:join-session', { sessionId: fs.sessionId });
+                        joinedSessionsRef.current.add(fs.sessionId);
+                    }
+                });
+            }
+
             setConnectError(null);
         } catch (err) {
             console.error('[MonitoringContext] Fetch failed:', err);
@@ -242,6 +256,13 @@ export const MonitoringProvider = ({ children }) => {
             if (!silent) setLoading(false);
         }
     }, [role, isConnected]);
+
+    // Clear joined tracking when socket disconnects to ensure re-join on next connection
+    useEffect(() => {
+        if (!isConnected) {
+            joinedSessionsRef.current.clear();
+        }
+    }, [isConnected]);
 
     // Initial fetch and polling
     useEffect(() => {

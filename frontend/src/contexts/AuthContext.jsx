@@ -191,6 +191,8 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('monitoring_resume_expected');
     localStorage.removeItem('monitoring_trigger_type');
     localStorage.removeItem('monitoring_resume_data');
+    localStorage.removeItem('monitoring_sessionId');
+    localStorage.removeItem('monitoring_sessions');
   };
 
   const value = {

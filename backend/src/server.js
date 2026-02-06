@@ -659,16 +659,17 @@ async function startServer() {
         // Clean up employee session (marks as inactive but keeps for reconnection)
         const sessionId = socket.data.sessionId;
 
-        console.log(`[Monitoring] Employee disconnected in session ${sessionId}. cleaning up...`);
+        console.log(`[Monitoring] DEBUG: Employee ${socket.data.name} (UID: ${socket.data.userId}) disconnected in session ${sessionId}`);
         monitoringService.cleanupEmployeeSession(socket.id);
 
         // Notify admins in this session that employee disconnected
         const session = monitoringService.getSession(sessionId);
         if (session) {
-          console.log(`[Monitoring] Disconnect: Notifying room ${sessionId}`);
+          console.log(`[Monitoring] DEBUG: Session ${sessionId} still active in service. Notifying room admins...`);
 
           // 1. Notify viewing admins via real-time stream stopped (Room-based)
           io.to(sessionId).emit('monitoring:stream-stopped', { sessionId, reason: 'offline' });
+          console.log(`[Monitoring] DEBUG: monitoring:stream-stopped emitted to room ${sessionId}`);
 
           // 2. Identify all admins to be notified persistently (Viewers + Owner)
           const adminsToNotify = new Set();
