@@ -46,6 +46,7 @@ import {
   Inbox
 } from 'lucide-react';
 import { UserAvatar } from '../components/UserAvatar';
+import { useScreenRecorder } from '../hooks/useScreenRecorder';
 
 // ─────────────────────────────────────────────────────────────
 // Styles & Animations
@@ -90,6 +91,9 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
   const { emit } = useSocket();
   const [fullVideoEl, setFullVideoEl] = useState(null); // Callback ref pattern
   const containerRef = useRef(null);
+
+  // Recording Hook
+  const { isRecording, formattedTime, startRecording, stopRecording } = useScreenRecorder();
 
   // Intersection Observer to detect visibility
   useEffect(() => {
@@ -212,6 +216,12 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
                 <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Live</span>
               </div>
             )}
+            {isRecording && (
+              <div className="flex items-center gap-1.5 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100 animate-pulse">
+                <div className="w-2 h-2 rounded-full bg-rose-500" />
+                <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">{formattedTime}</span>
+              </div>
+            )}
           </div>
         </div>
         <div
@@ -255,13 +265,37 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
         </div>
         <div className="p-3 flex gap-2 bg-slate-50/30">
           {session.streamActive ? (
-            <Button
-              className="flex-1 bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold h-9 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#1a3e62]"
-              onClick={() => setShowFullView(true)}
-            >
-              <Eye className="mr-2 h-4 w-4" />
-              View
-            </Button>
+            <>
+              <Button
+                className="flex-1 bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold h-8 text-xs rounded-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#1a3e62]"
+                onClick={() => setShowFullView(true)}
+              >
+                <Eye className="mr-1.5 h-3.5 w-3.5" />
+                View
+              </Button>
+              <Button
+                variant="outline"
+                className={`flex-1 ${isRecording ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100' : 'text-slate-600 hover:bg-slate-50'} gap-1.5 h-8 text-xs`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isRecording) {
+                    stopRecording();
+                  } else {
+                    // Get stream from video element or session if available
+                    const videoEl = remoteVideoRef.current;
+                    if (videoEl && videoEl.srcObject) {
+                      startRecording(videoEl.srcObject, `recording-${session.employeeName}`);
+                    } else {
+                      toast.error("No active stream to record");
+                    }
+                  }
+                }}
+                title={isRecording ? "Stop Recording" : "Record Screen"}
+              >
+                <div className={`w-2 h-2 rounded-${isRecording ? 'sm' : 'full'} ${isRecording ? 'bg-rose-600' : 'bg-rose-500'} flex-shrink-0`} />
+                <span>{isRecording ? 'Stop' : 'Record'}</span>
+              </Button>
+            </>
           ) : session.disconnectReason !== 'offline' ? (
             <Button
               className={`flex-1 ${reconnectSent ? 'bg-slate-100 text-slate-500 hover:bg-slate-100' : 'bg-emerald-600 hover:bg-emerald-700 text-white'} font-semibold h-9 rounded-lg shadow-sm transition-all`}
@@ -313,11 +347,15 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
 
           <Button
             variant="outline"
-            className="flex-1 text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 h-9 rounded-lg"
+            className={session.streamActive
+              ? "h-8 w-8 p-0 rounded-lg text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 flex-none"
+              : "flex-1 text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 h-9 rounded-lg"
+            }
             onClick={handleRemoveClick}
+            title="Remove Session"
           >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Remove
+            <Trash2 className={`${session.streamActive ? 'h-4 w-4' : 'mr-2 h-4 w-4'}`} />
+            {!session.streamActive && "Remove"}
           </Button>
         </div>
       </Card>
