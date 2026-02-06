@@ -145,6 +145,13 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
     return () => stopViewing();
   }, [stopViewing]);
 
+  // Reset reconnectSent state when session becomes active
+  useEffect(() => {
+    if (session.streamActive && reconnectSent) {
+      setReconnectSent(false);
+    }
+  }, [session.streamActive, reconnectSent]);
+
   const handleRemoveClick = () => setShowConfirm(true);
   const handleConfirmRemove = () => {
     onRemove(session.sessionId);
