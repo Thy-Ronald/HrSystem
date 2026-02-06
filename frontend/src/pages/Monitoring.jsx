@@ -798,10 +798,10 @@ const Monitoring = () => {
     }
   }, [showAddModal]);
 
-  const handleRemoveSession = (id) => {
+  const handleRemoveSession = useCallback((id) => {
     setSessions(prev => prev.filter(s => s.sessionId !== id));
     emit('monitoring:leave-session', { sessionId: id });
-  };
+  }, [emit, setSessions]);
 
   const sendConnectionRequest = async () => {
     if (!selectedUser) {

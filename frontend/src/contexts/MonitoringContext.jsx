@@ -27,6 +27,7 @@ export const MonitoringProvider = ({ children }) => {
     const [adminCount, setAdminCount] = useState(0);
     const [justReconnected, setJustReconnected] = useState(false);
     const [connectionRequest, setConnectionRequest] = useState(null); // { adminName, adminSocketId }
+    const [resumeData, setResumeData] = useState(null);
     const joinedSessionsRef = useRef(new Set());
 
     // Persistence effects
@@ -57,12 +58,20 @@ export const MonitoringProvider = ({ children }) => {
     useEffect(() => {
         if (!isConnected) return;
 
-        const handleCreated = ({ sessionId: sid }) => {
+        const handleCreated = ({ sessionId: sid, monitoringExpected, activeRequest }) => {
             console.log('[MonitoringContext] Session created/restored:', sid);
             setSessionId(sid);
             setLoading(false);
             setJustReconnected(true);
-            // toast.success('System ready'); // Reduced noise
+
+            if (monitoringExpected && activeRequest) {
+                console.log('[MonitoringContext] Server expecting resume for request:', activeRequest.requestId);
+                setResumeData(activeRequest);
+                // Also persist to localStorage in case they refresh while the modal is open
+                localStorage.setItem('monitoring_resume_expected', 'true');
+                localStorage.setItem('monitoring_resume_data', JSON.stringify(activeRequest));
+                localStorage.setItem('monitoring_trigger_type', 'login');
+            }
         };
 
         const handleError = ({ message, sessionId: errSessionId }) => {
@@ -255,7 +264,7 @@ export const MonitoringProvider = ({ children }) => {
         } finally {
             if (!silent) setLoading(false);
         }
-    }, [role, isConnected]);
+    }, [role, isConnected, emit]);
 
     // Clear joined tracking when socket disconnects to ensure re-join on next connection
     useEffect(() => {
@@ -268,7 +277,9 @@ export const MonitoringProvider = ({ children }) => {
     useEffect(() => {
         if (role === 'admin' && isConnected) {
             fetchSessions();
-            const interval = setInterval(() => fetchSessions(true), 30000);
+            // Optimization: Increase polling interval to 2 minutes. 
+            // Real-time events should handle most status changes.
+            const interval = setInterval(() => fetchSessions(true), 120000);
             return () => clearInterval(interval);
         }
     }, [fetchSessions, role, isConnected]);
@@ -276,12 +287,16 @@ export const MonitoringProvider = ({ children }) => {
     // Join all sessions when admin re-authenticates or sessions list changes
     useEffect(() => {
         if (role === 'admin' && isConnected) {
-            console.log(`[MonitoringContext] Joining ${sessions.length} session rooms...`);
             sessions.forEach(s => {
-                emit('monitoring:join-session', { sessionId: s.sessionId });
+                // Optimization: Use joinedSessionsRef to avoid redundant join emits
+                if (!joinedSessionsRef.current.has(s.sessionId)) {
+                    console.log(`[MonitoringContext] Auto-joining room: ${s.sessionId}`);
+                    emit('monitoring:join-session', { sessionId: s.sessionId });
+                    joinedSessionsRef.current.add(s.sessionId);
+                }
             });
         }
-    }, [isConnected, role, sessions.map(s => s.sessionId).join(',')]); // Precise dependency on session IDs
+    }, [isConnected, role, sessions.map(s => s.sessionId).join(','), emit]); // Added emit to deps
 
     const resetSession = useCallback(() => {
         stopSharing();
@@ -319,8 +334,9 @@ export const MonitoringProvider = ({ children }) => {
         stopSharing,
         emit,
         connectionRequest,
-        setConnectionRequest,
-        respondConnection
+        respondConnection,
+        resumeData,
+        setResumeData
     }), [
         sessionId,
         loading,
@@ -335,7 +351,9 @@ export const MonitoringProvider = ({ children }) => {
         stopSharing,
         emit,
         connectionRequest,
-        respondConnection
+        respondConnection,
+        resumeData,
+        setResumeData
     ]);
 
     return (

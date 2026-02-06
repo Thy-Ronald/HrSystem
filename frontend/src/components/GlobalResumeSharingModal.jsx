@@ -15,53 +15,58 @@ import {
 import { Signal, Loader2 } from 'lucide-react';
 
 const GlobalResumeSharingModal = () => {
-    const { startSharing } = useMonitoring();
-    const [resumeData, setResumeData] = useState(null);
+    const { resumeData, setResumeData, startSharing } = useMonitoring();
     const [triggerType, setTriggerType] = useState('login'); // default to login
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const toast = useToast();
 
-    // Check for resume flag on mount
+    // 1. Check for legacy resume flag on mount (Refresh case)
     useEffect(() => {
         const storedExpected = localStorage.getItem('monitoring_resume_expected');
-        const triggerType = localStorage.getItem('monitoring_trigger_type');
+        const storedTrigger = localStorage.getItem('monitoring_trigger_type');
 
         if (storedExpected === 'true') {
             try {
                 const data = JSON.parse(localStorage.getItem('monitoring_resume_data') || '{}');
                 setResumeData(data);
-                setTriggerType(triggerType || 'login');
+                setTriggerType(storedTrigger || 'refresh');
                 setIsOpen(true);
                 // Clean up flag immediately
                 localStorage.removeItem('monitoring_resume_expected');
-                // We DON'T clear trigger_type here immediately because we need it for the render 
-                // It will be cleared when we close or the user navigates away? 
-                // Actually, just reading it once on render is enough if we store it in state, 
-                // but reading from localStorage in render is fine if it persists until the user clicks something.
-                // Let's clear it when we handle stop/resume.
             } catch (e) {
                 console.error('Error parsing resume data', e);
             }
         }
-    }, []);
+    }, [setResumeData]);
+
+    // 2. React to context-driven resume state (Login case)
+    useEffect(() => {
+        if (resumeData && !isOpen) {
+            setIsOpen(true);
+            // If it came from context, it's likely a login or async restoration
+            const storedTrigger = localStorage.getItem('monitoring_trigger_type');
+            setTriggerType(storedTrigger || 'login');
+        }
+    }, [resumeData, isOpen]);
 
     const handleResume = async () => {
         setLoading(true);
         try {
-            // Remove the flag to prevent loop if it fails
+            // Remove flags to prevent loop
             localStorage.removeItem('monitoring_resume_expected');
             localStorage.removeItem('monitoring_trigger_type');
+            localStorage.removeItem('monitoring_resume_data');
 
             await startSharing();
+            setResumeData(null);
             setIsOpen(false);
             toast.success('Sharing resumed successfully');
         } catch (error) {
             console.error('Failed to resume sharing:', error);
             toast.error('Failed to start sharing. Please try again from the dashboard.');
-            // We keep the modal open or close it? 
-            // Better to close it and let them try manually if it fails hard
             setIsOpen(false);
+            setResumeData(null);
         } finally {
             setLoading(false);
         }
@@ -76,12 +81,15 @@ const GlobalResumeSharingModal = () => {
                 await respondToMonitoringRequest(requestId, 'rejected');
                 toast.success('Monitoring session stopped');
             } else {
-                // Fallback if no ID (should not happen with new backend)
-                localStorage.removeItem('monitoring_resume_expected');
-                localStorage.removeItem('monitoring_trigger_type');
-                localStorage.removeItem('monitoring_sessionId');
                 toast.info('Session cleared');
             }
+
+            localStorage.removeItem('monitoring_resume_expected');
+            localStorage.removeItem('monitoring_trigger_type');
+            localStorage.removeItem('monitoring_resume_data');
+            localStorage.removeItem('monitoring_sessionId');
+
+            setResumeData(null);
             setIsOpen(false);
         } catch (error) {
             console.error('Failed to stop session', error);
@@ -94,21 +102,24 @@ const GlobalResumeSharingModal = () => {
     if (!isOpen) return null;
 
     return (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog open={isOpen} onOpenChange={(open) => {
+            if (!open) {
+                setResumeData(null);
+            }
+            setIsOpen(open);
+        }}>
             <DialogContent className="sm:max-w-md bg-white">
                 <DialogHeader>
                     <DialogTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
                         <Signal className="h-5 w-5 text-emerald-500" />
                         Resume Monitoring?
                     </DialogTitle>
-                    <DialogDescription className="text-slate-500 pt-2">
-                        <DialogDescription className="text-slate-500 pt-2">
-                            {triggerType === 'refresh'
-                                ? <span>Your screen sharing session with <strong>{resumeData?.adminName || 'Admin'}</strong> was interrupted by a page refresh.<br />Click below to resume sharing.</span>
-                                : <span>You have an active monitoring session with <strong>{resumeData?.adminName || 'Admin'}</strong>.<br />Click below to resume screen sharing immediately.</span>
-                            }
-                        </DialogDescription>
-                    </DialogDescription>
+                    <div className="text-slate-500 pt-2 text-sm">
+                        {triggerType === 'refresh'
+                            ? <span>Your screen sharing session with <strong>{resumeData?.adminName || 'Admin'}</strong> was interrupted by a page refresh.<br />Click below to resume sharing.</span>
+                            : <span>You have an active monitoring session with <strong>{resumeData?.adminName || 'Admin'}</strong>.<br />Click below to resume screen sharing immediately.</span>
+                        }
+                    </div>
                 </DialogHeader>
                 <DialogFooter className="gap-2 sm:gap-0 pt-4">
                     <Button

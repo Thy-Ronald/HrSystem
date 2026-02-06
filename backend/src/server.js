@@ -273,7 +273,7 @@ async function startServer() {
     // Admin: Request connection to employee
     socket.on('monitoring:request-connection', ({ employeeName }) => {
       if (!socket.data.authenticated || socket.data.role !== 'admin') {
-        socket.emit('monitoring:error', { message: 'Unauthorized' });
+        console.warn(`[Monitoring] Unauthorized start-sharing attempt from ${socket.id}`);
         return;
       }
 
@@ -389,7 +389,7 @@ async function startServer() {
 
       if (!socket.data.authenticated || socket.data.role !== 'employee' || !socket.data.sessionId) {
         console.log(`[Monitoring] Unauthorized: authenticated=${socket.data.authenticated}, role=${socket.data.role}, sessionId=${socket.data.sessionId}`);
-        socket.emit('monitoring:error', { message: 'Unauthorized' });
+        console.warn(`[Monitoring] Unauthorized start-sharing attempt from ${socket.id}`);
         return;
       }
 
@@ -434,7 +434,7 @@ async function startServer() {
     socket.on('monitoring:stop-sharing', (payload) => {
       const { reason } = payload || {};
       if (socket.data.role !== 'employee' || !socket.data.sessionId) {
-        socket.emit('monitoring:error', { message: 'Unauthorized' });
+        console.warn(`[Monitoring] Unauthorized stop-sharing attempt from ${socket.id}`);
         return;
       }
 
@@ -486,7 +486,7 @@ async function startServer() {
     // Admin: Join session
     socket.on('monitoring:join-session', ({ sessionId }) => {
       if (!socket.data.authenticated || socket.data.role !== 'admin') {
-        socket.emit('monitoring:error', { message: 'Unauthorized' });
+        console.warn(`[Monitoring] Unauthorized start-sharing attempt from ${socket.id}`);
         return;
       }
 
@@ -545,7 +545,7 @@ async function startServer() {
     // WebRTC signaling: Offer
     socket.on('monitoring:offer', ({ sessionId, offer }) => {
       if (!socket.data.authenticated) {
-        socket.emit('monitoring:error', { message: 'Unauthorized' });
+        console.warn(`[Monitoring] Unauthorized start-sharing attempt from ${socket.id}`);
         return;
       }
 
@@ -582,7 +582,7 @@ async function startServer() {
     // WebRTC signaling: Answer
     socket.on('monitoring:answer', ({ sessionId, answer, toSocketId }) => {
       if (!socket.data.authenticated) {
-        socket.emit('monitoring:error', { message: 'Unauthorized' });
+        console.warn(`[Monitoring] Unauthorized start-sharing attempt from ${socket.id}`);
         return;
       }
 
