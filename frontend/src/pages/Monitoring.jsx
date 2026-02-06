@@ -196,9 +196,12 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">
                   {session.disconnectReason === 'offline' ? 'Offline' : 'Disconnected'}
                 </p>
-                {/* Reconnect prompt for manual disconnects */}
-                {session.disconnectReason !== 'offline' && !session.streamActive && (
-                  <p className="text-[10px] text-slate-400 mt-1">User ended session</p>
+                {session.disconnectReason === 'offline' ? (
+                  <p className="text-[10px] text-slate-400 mt-1 max-w-[150px] mx-auto leading-tight">
+                    Waiting for user to come online or resume connection
+                  </p>
+                ) : (
+                  !session.streamActive && <p className="text-[10px] text-slate-400 mt-1">User ended session</p>
                 )}
               </div>
             )}
@@ -216,7 +219,7 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
               <Eye className="mr-2 h-4 w-4" />
               View
             </Button>
-          ) : (
+          ) : session.disconnectReason !== 'offline' ? (
             <Button
               className={`flex-1 ${reconnectSent ? 'bg-slate-100 text-slate-500 hover:bg-slate-100' : 'bg-emerald-600 hover:bg-emerald-700 text-white'} font-semibold h-9 rounded-lg shadow-sm transition-all`}
               onClick={async (e) => {
@@ -262,7 +265,7 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
                 </>
               )}
             </Button>
-          )}
+          ) : null}
 
           <Button
             variant="outline"
@@ -445,20 +448,30 @@ const PendingRequests = React.memo(({ startSharing, stopSharing, isSharing, setJ
     try {
       localStorage.removeItem('monitoring_manual_disconnect');
 
+      // 1. Start sharing FIRST. This prompts the user with the screen picker.
+      // If they cancel, startSharing will throw an error and we skip the approval API.
+      await startSharing();
+
+      // 2. Only if sharing started successfully, approve the request in the database.
       const { respondToMonitoringRequest } = await import('../services/api');
       await respondToMonitoringRequest(confirmApproveId, 'approved');
-
-      // Start sharing AFTER approval so the admin is already joined to the room
-      // and won't miss the 'monitoring:stream-started' event.
-      await startSharing();
 
       toast.success('Request Approved & Sharing Started');
       setConfirmApproveId(null);
       setJustReconnected(false);
       fetchRequests();
     } catch (error) {
-      console.error(error);
-      toast.error('Failed to start sharing or approve request');
+      console.error('[Monitoring] Approval/Sharing failed:', error);
+
+      // Check if it's a cancellation or a real failure
+      const isCancellation = error.name === 'NotAllowedError' || error.message?.includes('Permission denied');
+
+      if (isCancellation) {
+        toast.info('Screen sharing cancelled. Request remains pending.');
+      } else {
+        toast.error('Failed to start sharing or approve request');
+      }
+
       setConfirmApproveId(null);
     }
   };
@@ -651,16 +664,6 @@ const PendingRequests = React.memo(({ startSharing, stopSharing, isSharing, setJ
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0 pt-4">
             <Button
-              variant="ghost"
-              onClick={() => {
-                handleManualDisconnect(requests.find(r => r.status === 'approved')?.id);
-                setShowResumeModal(false);
-              }}
-              className="text-slate-600 hover:bg-slate-100 font-medium"
-            >
-              Stop Monitoring
-            </Button>
-            <Button
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
               onClick={async () => {
                 try {
@@ -824,15 +827,6 @@ const Monitoring = () => {
               Monitoring Requests
             </h1>
           </div>
-          {isSharing && (
-            <Button
-              variant="outline"
-              className="text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 font-bold shadow-sm"
-              onClick={stopSharing}
-            >
-              Stop Sharing
-            </Button>
-          )}
         </div>
 
         {/* Main Content Area */}

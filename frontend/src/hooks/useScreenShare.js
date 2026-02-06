@@ -97,10 +97,13 @@ export function useScreenShare(role, sessionId) {
       stream.getVideoTracks()[0].addEventListener('ended', () => {
         stopSharing();
       });
+
+      return stream;
     } catch (err) {
       console.error('Error starting screen share:', err);
       setError(err.message || 'Failed to start screen sharing');
       setIsSharing(false);
+      throw err;
     }
   }, [role, emit, sessionId]);
 

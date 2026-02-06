@@ -112,14 +112,6 @@ const GlobalResumeSharingModal = () => {
                 </DialogHeader>
                 <DialogFooter className="gap-2 sm:gap-0 pt-4">
                     <Button
-                        variant="ghost"
-                        onClick={handleStop}
-                        disabled={loading}
-                        className="text-slate-600 hover:bg-slate-100 font-medium"
-                    >
-                        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Stop Monitoring'}
-                    </Button>
-                    <Button
                         className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
                         onClick={handleResume}
                         disabled={loading}
