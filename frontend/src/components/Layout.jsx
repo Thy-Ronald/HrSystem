@@ -31,7 +31,18 @@ import { useAuth } from '../contexts/AuthContext';
 const Layout = ({ children, currentPath, onNavigate }) => {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
-  const { notifications, loading, count, markAsRead, isRead, clearAll } = useNotifications();
+  const bellRef = React.useRef(null);
+  const {
+    notifications,
+    loading,
+    loadingMore,
+    hasMore,
+    loadMore,
+    count,
+    markAsRead,
+    isRead,
+    clearAll
+  } = useNotifications();
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'admin';
 
@@ -172,6 +183,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
             {isAdmin && (
               <>
                 <Button
+                  ref={bellRef}
                   variant="ghost"
                   size="icon"
                   onClick={() => setNotificationOpen(!notificationOpen)}
@@ -188,10 +200,14 @@ const Layout = ({ children, currentPath, onNavigate }) => {
                     onClose={() => setNotificationOpen(false)}
                     notifications={notifications}
                     loading={loading}
+                    loadingMore={loadingMore}
+                    hasMore={hasMore}
+                    loadMore={loadMore}
                     onNotificationClick={markAsRead}
                     isRead={isRead}
                     onNavigate={onNavigate}
                     clearAll={clearAll}
+                    toggleRef={bellRef}
                   />
                 )}
               </>

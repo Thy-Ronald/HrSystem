@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { formatDate } from '../utils/format';
 import { calculateExpirationDate } from '../features/contracts/utils/contractHelpers';
 import { Button } from "@/components/ui/button"
-import { X, Bell, FileText, Trash2 } from "lucide-react"
+import { X, Bell, FileText, Trash2, MoreHorizontal, Circle, UserMinus, UserPlus, UserX, AlertTriangle } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -15,270 +15,282 @@ import {
 /**
  * Facebook-style notification dropdown component
  */
-export function NotificationDropdown({ open, onClose, notifications, loading, onNotificationClick, isRead, onNavigate, clearAll }) {
+export function NotificationDropdown({ open, onClose, notifications, loading, onNotificationClick, isRead, onNavigate, clearAll, loadMore, hasMore, loadingMore, toggleRef }) {
   const dropdownRef = useRef(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [filter, setFilter] = useState('all'); // 'all' | 'unread'
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // CRITICAL: If the clear confirmation dialog is open, do NOT close the dropdown.
-      // Radix UI Dialog renders in a portal, so clicks on it will be seen as "outside" the dropdown.
-      if (showClearConfirm) {
-        console.log('🛡️ Click outside ignored because Dialog is open');
+      if (showClearConfirm) return;
+
+      // Don't close if clicking the toggle button itself
+      if (toggleRef?.current && toggleRef.current.contains(event.target)) {
         return;
       }
 
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        console.log('🚪 Closing dropdown via click outside');
         onClose();
       }
     };
 
-    // Only listen for clicks if the dropdown is open OR the confirmation is showing
     if (open || showClearConfirm) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [open, onClose, showClearConfirm]);
 
-  useEffect(() => {
-    console.log('🔍 showClearConfirm state:', showClearConfirm);
-  }, [showClearConfirm]);
-
-  const handleNotificationClick = (contract) => {
-    // Mark as read when clicked
-    if (onNotificationClick && !isRead(contract.id)) {
-      onNotificationClick(contract.id);
+  const handleNotificationClick = (notification) => {
+    if (onNotificationClick && !isRead(notification.id)) {
+      onNotificationClick(notification.id);
     }
 
-    // Navigate based on type
     if (onNavigate) {
-      if (contract.type === 'monitoring_disconnect' || contract.type === 'monitoring_request_declined') {
+      if (notification.type === 'monitoring_disconnect' || notification.type === 'monitoring_request_declined') {
         onNavigate('monitoring');
       } else {
-        // Default: Contract (or if type is missing/legacy)
         onNavigate('contract-form');
-
-        // Trigger edit modal for this contract
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('openContractEditModal', {
-            detail: { contractId: contract.data ? contract.data.id : contract.id } // Handle nested data
+            detail: { contractId: notification.data ? notification.data.id : notification.id }
           }));
         }, 100);
       }
     }
-
-    // Close dropdown
     onClose();
   };
 
   const handleClearAll = async () => {
-    console.log('🗑️ handleClearAll called');
-    console.log('clearAll function:', clearAll);
     try {
-      if (!clearAll) {
-        console.error('clearAll function is undefined!');
-        return;
-      }
-      console.log('Calling clearAll...');
-      await clearAll();
-      console.log('clearAll completed successfully');
+      if (clearAll) await clearAll();
       setShowClearConfirm(false);
       onClose();
     } catch (error) {
       console.error('Failed to clear notifications:', error);
       setShowClearConfirm(false);
-      // Optionally show error toast
     }
   };
-  // If we shouldn't show the dropdown but the confirmation is still open, 
-  // we still need to render the Dialog part (portals).
-  // However, it's cleaner to always render the Dialog at the bottom and 
-  // just hide the dropdown div if !open
 
   const getDaysUntilExpiry = (contract) => {
     const expirationDate = calculateExpirationDate(contract.assessmentDate, contract.termMonths)
       || (contract.expirationDate ? new Date(contract.expirationDate) : null);
-
     if (!expirationDate) return null;
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const expiry = new Date(expirationDate);
     expiry.setHours(0, 0, 0, 0);
-
-    const days = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
-    return days;
+    return Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
   };
+
+  const filteredNotifications = notifications.filter(n => {
+    if (filter === 'unread') return !isRead(n.id);
+    return true;
+  });
+
+  const groupNotifications = (notifs) => {
+    const today = [];
+    const earlier = [];
+    const now = new Date();
+    notifs.forEach(n => {
+      const created = new Date(n.created_at);
+      const diffInHours = (now - created) / (1000 * 60 * 60);
+      if (diffInHours < 24) today.push(n);
+      else earlier.push(n);
+    });
+    return { today, earlier };
+  };
+
+  const { today, earlier } = groupNotifications(filteredNotifications);
+
+  const renderNotificationItem = (notification) => {
+    const read = isRead ? isRead(notification.id) : (notification.is_read || false);
+
+    // Default values
+    let icon = <Bell className="h-6 w-6 text-white" />;
+    let iconBg = "bg-slate-500";
+    let subtext = "";
+
+    // Type-specific icon and color logic
+    if (notification.type === 'contract_expiry') {
+      const contract = notification.data || notification;
+      const days = getDaysUntilExpiry(contract);
+      icon = <FileText className="h-6 w-6 text-white" />;
+      iconBg = "bg-blue-600";
+      subtext = `${days !== null ? `(${days} days left)` : ''}`;
+    } else if (notification.type === 'monitoring_disconnect') {
+      icon = <UserMinus className="h-6 w-6 text-white" />;
+      iconBg = "bg-rose-500";
+    } else if (notification.type === 'monitoring_request_declined') {
+      icon = <UserX className="h-6 w-6 text-white" />;
+      iconBg = "bg-rose-600";
+    } else if (notification.type === 'monitoring_new_request') {
+      icon = <UserPlus className="h-6 w-6 text-white" />;
+      iconBg = "bg-emerald-500";
+    } else if (notification.type === 'error' || notification.type === 'alert') {
+      icon = <AlertTriangle className="h-6 w-6 text-white" />;
+      iconBg = "bg-amber-500";
+    }
+
+    return (
+      <div
+        key={notification.id}
+        onClick={() => handleNotificationClick(notification)}
+        className={`px-3 py-3 mx-2 my-1 rounded-lg transition-colors cursor-pointer flex items-center gap-4 hover:bg-slate-100 ${!read ? 'bg-blue-50/50' : ''
+          }`}
+      >
+        <div className="flex-shrink-0">
+          <div className={`w-12 h-12 rounded-full ${iconBg} flex items-center justify-center shadow-sm`}>
+            {icon}
+          </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className={`text-[15px] leading-tight ${!read ? 'font-semibold text-slate-900' : 'text-slate-600'}`}>
+            <span className="text-slate-900 font-bold">{notification.title}</span> {notification.message}
+          </p>
+          <p className={`text-xs mt-1 ${!read ? 'text-blue-600 font-semibold' : 'text-slate-500'}`}>
+            {formatTimeAgo(notification.created_at)} • {formatAbsoluteTimestamp(notification.created_at)} {subtext}
+          </p>
+        </div>
+        {!read && (
+          <div className="flex-shrink-0 pr-1">
+            <div className="w-3 h-3 rounded-full bg-blue-600"></div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  function formatTimeAgo(dateString) {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInSec = Math.floor((now - date) / 1000);
+    if (diffInSec < 60) return 'Just now';
+    if (diffInSec < 3600) return `${Math.floor(diffInSec / 60)}m`;
+    if (diffInSec < 86400) return `${Math.floor(diffInSec / 3600)}h`;
+    if (diffInSec < 604800) return `${Math.floor(diffInSec / 86400)}d`;
+    return formatDate(date);
+  }
+
+  function formatAbsoluteTimestamp(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleString([], {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  }
 
   return (
     <>
       {open && (
         <div
           ref={dropdownRef}
-          className="absolute top-full right-0 mt-2 w-96 bg-white rounded-lg shadow-2xl border border-[#dadce0] z-[1000] max-h-[600px] overflow-hidden flex flex-col"
-          style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+          className="absolute top-full right-0 mt-2 w-96 bg-white rounded-xl shadow-2xl border border-[#dadce0] z-[1000] flex flex-col overflow-hidden"
+          style={{
+            boxShadow: '0 12px 28px 0 rgba(0, 0, 0, 0.2), 0 2px 4px 0 rgba(0, 0, 0, 0.1)',
+            maxHeight: 'calc(100vh - 80px)',
+            width: '360px'
+          }}
         >
           {/* Header */}
-          <div className="px-4 py-3 border-b border-[#dadce0] flex items-center justify-between bg-white sticky top-0">
-            <h3 className="text-lg font-semibold text-[#202124]">Notifications</h3>
-            <div className="flex items-center gap-2">
-              {notifications.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    console.log('🗑️ Trash button clicked!');
-                    console.log('showClearConfirm:', showClearConfirm);
-                    setShowClearConfirm(true);
-                    console.log('setShowClearConfirm(true) called');
-                  }}
-                  className="h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-full"
-                  title="Clear all notifications"
-                >
-                  <Trash2 className="h-4 w-4" />
+          <div className="px-4 pt-4 pb-2">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-2xl font-bold text-slate-900">Notifications</h3>
+              <div className="flex gap-1">
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-slate-100" onClick={() => setShowClearConfirm(true)}>
+                  <MoreHorizontal className="h-5 w-5 text-slate-600" />
                 </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                className="h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full"
+              </div>
+            </div>
+            <div className="flex gap-2 mb-2">
+              <button
+                onClick={() => setFilter('all')}
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${filter === 'all' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
               >
-                <X className="h-4 w-4" />
-              </Button>
+                All
+              </button>
+              <button
+                onClick={() => setFilter('unread')}
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${filter === 'unread' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+              >
+                Unread
+              </button>
             </div>
           </div>
 
-          {/* Content */}
-          <div className="overflow-y-auto flex-1">
+          {/* Scrollable Content */}
+          <div className="overflow-y-auto flex-1 custom-scrollbar" style={{ maxHeight: '500px', minHeight: '300px' }}>
             {loading ? (
-              <div className="p-8 text-center text-[#5f6368]">
-                <div className="animate-spin h-6 w-6 border-2 border-[#1a73e8] border-t-transparent rounded-full mx-auto mb-2"></div>
-                <p>Loading notifications...</p>
+              <div className="p-8 text-center">
+                <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
               </div>
-            ) : notifications.length === 0 ? (
-              <div className="p-8 text-center text-[#5f6368]">
-                <div className="bg-slate-50 p-4 rounded-full mb-4 shadow-inner">
-                  <Bell className="h-10 w-10 text-slate-300" />
-                </div>
-                <p className="font-medium">No notifications</p>
-                <p className="text-sm">All contracts are up to date</p>
+            ) : filteredNotifications.length === 0 ? (
+              <div className="p-8 text-center text-slate-500">
+                <Bell className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                <p className="font-medium text-slate-900 text-lg">No notifications</p>
+                <p className="text-sm">You're all caught up!</p>
               </div>
             ) : (
-              <div className="divide-y divide-[#e4e6eb]">
-                {notifications.map((notification) => {
-                  const read = isRead ? isRead(notification.id) : (notification.is_read || false);
-
-                  let icon = <FileText className="h-5 w-5 text-blue-600" />;
-                  let bgColor = "bg-blue-50";
-                  let title = notification.title;
-                  let message = notification.message;
-                  let subtext = "";
-
-                  if (notification.type === 'contract_expiry') {
-                    // ... existing contract logic ...
-                    const contract = notification.data || notification;
-                    const daysUntilExpiry = getDaysUntilExpiry(contract);
-                    const expirationDate = calculateExpirationDate(contract.assessmentDate, contract.termMonths)
-                      || (contract.expirationDate ? new Date(contract.expirationDate) : null);
-
-                    subtext = (
-                      <>
-                        Expires: {expirationDate ? formatDate(expirationDate) : 'N/A'}
-                        {daysUntilExpiry !== null && (
-                          <span className="ml-2 font-medium text-[#e41e3f]">
-                            ({daysUntilExpiry} {daysUntilExpiry === 1 ? 'day' : 'days'} left)
-                          </span>
-                        )}
-                      </>
-                    );
-                  } else if (notification.type === 'monitoring_disconnect') {
-                    icon = <div className="w-2 h-2 rounded-full bg-rose-500" />;
-                    bgColor = "bg-rose-50";
-                    subtext = <span className="text-xs text-slate-500">{new Date(notification.created_at).toLocaleString()}</span>
-                  }
-
-                  return (
-                    <div
-                      key={notification.id}
-                      onClick={() => handleNotificationClick(notification)}
-                      className={`px-4 py-3 transition-colors cursor-pointer ${read ? 'bg-white' : 'bg-[#e7f3ff] hover:bg-[#d0e7ff]'
-                        }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 mt-1">
-                          <div className={`w-10 h-10 rounded-full ${bgColor} flex items-center justify-center`}>
-                            {icon}
-                          </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1">
-                              <p className="text-sm font-semibold text-[#050505] mb-1">
-                                {title}
-                              </p>
-                              <p className="text-sm text-[#65676b] mb-1">
-                                {message}
-                              </p>
-                              {subtext && <p className="text-xs text-[#65676b]">{subtext}</p>}
-                            </div>
-                            {!read && (
-                              <div className="flex-shrink-0">
-                                <div className="w-2 h-2 rounded-full bg-[#1877f2]"></div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+              <div className="pb-2">
+                {today.length > 0 && (
+                  <>
+                    <div className="px-4 py-2 flex items-center justify-between">
+                      <span className="font-bold text-slate-900">Today</span>
                     </div>
-                  );
-                })}
+                    {today.map(renderNotificationItem)}
+                  </>
+                )}
+                {earlier.length > 0 && (
+                  <>
+                    <div className="px-4 py-2 mt-2 flex items-center justify-between">
+                      <span className="font-bold text-slate-900">Earlier</span>
+                      {filter === 'all' && (
+                        <button className="text-blue-600 text-sm font-medium hover:bg-blue-50 px-2 py-1 rounded">See all</button>
+                      )}
+                    </div>
+                    {earlier.map(renderNotificationItem)}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Load More as "See all" footer or inline */}
+            {hasMore && (
+              <div className="px-4 py-2">
+                <Button
+                  variant="ghost"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="w-full text-blue-600 hover:bg-blue-50 font-semibold py-6 rounded-lg transition-all"
+                >
+                  {loadingMore ? (
+                    <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                  ) : (
+                    'Load More Notifications'
+                  )}
+                </Button>
               </div>
             )}
           </div>
-
-          {/* Footer */}
-          {notifications.length > 0 && (
-            <div className="px-4 py-3 border-t border-[#dadce0] bg-[#f0f2f5]">
-              <Button
-                variant="link"
-                className="w-full text-center text-sm font-semibold text-blue-600 hover:text-blue-700 hover:no-underline"
-              >
-                See All Notifications
-              </Button>
-            </div>
-          )}
         </div>
       )}
 
-      {/* Clear All Confirmation Dialog - Outside dropdown for proper overlay */}
-      <Dialog open={showClearConfirm} onOpenChange={(isOpen) => {
-        console.log('Dialog onOpenChange:', isOpen);
-        setShowClearConfirm(isOpen);
-      }}>
+      {/* Clear All Confirmation Dialog */}
+      <Dialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
         <DialogContent className="sm:max-w-md bg-white">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-slate-900 leading-tight">Clear All Notifications?</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-slate-900">Clear All Notifications?</DialogTitle>
             <DialogDescription className="text-slate-500 pt-2">
               Are you sure you want to delete all notifications? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0 pt-4">
-            <Button
-              variant="ghost"
-              onClick={() => setShowClearConfirm(false)}
-              className="text-slate-600 hover:bg-slate-100 font-medium"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleClearAll}
-              className="bg-rose-600 hover:bg-rose-700 font-semibold"
-            >
-              Yes, Clear All
-            </Button>
+          <DialogFooter className="gap-2 pt-4">
+            <Button variant="ghost" onClick={() => setShowClearConfirm(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleClearAll}>Yes, Clear All</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

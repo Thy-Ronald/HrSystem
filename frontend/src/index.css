@@ -111,3 +111,22 @@
 .animate-slide-in {
   animation: slide-in 0.3s ease-out forwards;
 }
+
+/* Custom scrollbar for dropdowns */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #bcc0c4;
+  border-radius: 10px;
+  border: 2px solid white;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #65676b;
+}

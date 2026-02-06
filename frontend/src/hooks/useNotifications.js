@@ -15,26 +15,47 @@ export function useNotifications() {
   const [notifications, setNotifications] = useState([]);
   const [readIds, setReadIds] = useState(new Set()); // Track read notification IDs (locally for optimistic UI)
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const limit = 4;
 
-  const loadNotifications = useCallback(async () => {
+  const loadNotifications = useCallback(async (pageNum = 1, append = false) => {
     // Only load notifications for authenticated users
     if (!isAuthenticated) {
       setNotifications([]);
       setError(null);
       setLoading(false);
+      setLoadingMore(false);
       return;
     }
 
-    setLoading(true);
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+
     setError(null);
     try {
-      // Fetch all notifications (db + contracts)
-      const data = await getNotifications();
-      console.log('📬 Notifications loaded:', data?.length || 0);
+      // Fetch notifications with pagination
+      const data = await getNotifications(pageNum, limit);
+      console.log(`📬 Notifications loaded (page ${pageNum}):`, data?.notifications?.length || 0);
 
-      const newNotifications = Array.isArray(data) ? data : [];
-      setNotifications(newNotifications);
+      const newNotifications = Array.isArray(data?.notifications) ? data.notifications : [];
+
+      setNotifications(prev => {
+        if (append) {
+          // Append but filter out duplicates just in case (e.g. real-time ones added)
+          const existingIds = new Set(prev.map(n => n.id));
+          const filteredNew = newNotifications.filter(n => !existingIds.has(n.id));
+          return [...prev, ...filteredNew];
+        }
+        return newNotifications;
+      });
+
+      setHasMore(data?.hasMore || false);
 
       // Update readIds based on backend state
       const serverReadIds = new Set(newNotifications.filter(n => n.is_read).map(n => n.id));
@@ -57,8 +78,16 @@ export function useNotifications() {
       }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [isAuthenticated, user]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    const nextPage = page + 1;
+    setPage(nextPage);
+    await loadNotifications(nextPage, true);
+  }, [page, hasMore, loadingMore, loadNotifications]);
 
   // Mark a notification as read
   const markAsRead = useCallback(async (notificationId) => {
@@ -86,8 +115,9 @@ export function useNotifications() {
       console.log('Calling deleteAllNotifications API...');
       await deleteAllNotifications();
       console.log('deleteAllNotifications completed, reloading...');
-      // Reload notifications to get fresh data (contract expiry notifications are virtual)
-      await loadNotifications();
+      // Reset to page 1 and reload
+      setPage(1);
+      await loadNotifications(1, false);
       console.log('Notifications reloaded successfully');
     } catch (err) {
       console.error("Failed to delete all notifications", err);
@@ -98,12 +128,19 @@ export function useNotifications() {
   useEffect(() => {
     // Only load if user is authenticated
     if (isAuthenticated) {
-      loadNotifications();
+      // Reset to page 1 on mount or auth change
+      setPage(1);
+      loadNotifications(1, false);
 
       // Setup real-time notification listener if socket is connected
       const handleNewNotification = async (notification) => {
         console.log('📬 Real-time notification received:', notification);
-        setNotifications(prev => [notification, ...prev]);
+        // Add to the top of the list
+        setNotifications(prev => {
+          // Check if already exists (prevent duplicates if fetch and socket happen close together)
+          if (prev.some(n => n.id === notification.id)) return prev;
+          return [notification, ...prev];
+        });
 
         // Show browser push notification for monitoring events
         if (
@@ -136,9 +173,10 @@ export function useNotifications() {
         socket.on('notification:new', handleNewNotification);
       }
 
-      // Fallback: Refresh notifications every 5 minutes
+      // Fallback: Refresh notifications every 5 minutes (reset to page 1)
       const interval = setInterval(() => {
-        loadNotifications();
+        setPage(1);
+        loadNotifications(1, false);
       }, 5 * 60 * 1000);
 
       return () => {
@@ -157,8 +195,14 @@ export function useNotifications() {
   return {
     notifications,
     loading,
+    loadingMore,
+    hasMore,
+    loadMore,
     error,
-    refresh: loadNotifications,
+    refresh: () => {
+      setPage(1);
+      loadNotifications(1, false);
+    },
     count: unreadCount, // Only count unread notifications
     markAsRead,
     isRead: (id) => readIds.has(id),

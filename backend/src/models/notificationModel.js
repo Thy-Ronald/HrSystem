@@ -10,14 +10,14 @@ const Notification = {
         return result.insertId;
     },
 
-    getAllForUser: async (userId) => {
+    getAllForUser: async (userId, limit = 50, offset = 0) => {
         const sql = `
       SELECT * FROM notifications 
       WHERE user_id = ? 
       ORDER BY created_at DESC 
-      LIMIT 50
+      LIMIT ? OFFSET ?
     `;
-        const rows = await query(sql, [userId]);
+        const rows = await query(sql, [userId, limit, offset]);
         return rows;
     },
 

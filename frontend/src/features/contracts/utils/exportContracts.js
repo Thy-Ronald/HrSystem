@@ -26,7 +26,7 @@ export async function exportContractsToSpreadsheet(contracts, currentTime = new 
       const ExcelJSModule = await import('exceljs');
       // Handle both CommonJS and ES module exports
       ExcelJS = ExcelJSModule.default || ExcelJSModule;
-      
+
       // Verify Workbook is available
       if (!ExcelJS || !ExcelJS.Workbook) {
         throw new Error('ExcelJS module structure not recognized');
@@ -53,8 +53,8 @@ export async function exportContractsToSpreadsheet(contracts, currentTime = new 
     // Add data
     contracts.forEach(contract => {
       const expirationDate = calculateExpirationDate(contract.assessmentDate, contract.termMonths);
-      const expirationDateStr = expirationDate 
-        ? formatDate(expirationDate) 
+      const expirationDateStr = expirationDate
+        ? formatDate(expirationDate)
         : (contract.expirationDate ? formatDate(contract.expirationDate) : 'N/A');
 
       worksheet.addRow({
@@ -80,11 +80,11 @@ export async function exportContractsToSpreadsheet(contracts, currentTime = new 
     // This prevents truncation issues like "########" for dates
     worksheet.columns.forEach((column, index) => {
       let maxColumnLength = 0;
-      
+
       // Check header length
       const headerLength = column.header ? column.header.length : 0;
       maxColumnLength = Math.max(maxColumnLength, headerLength);
-      
+
       // Check all cell values in the column
       column.eachCell({ includeEmpty: false }, (cell) => {
         const cellValue = cell.value;
@@ -95,7 +95,7 @@ export async function exportContractsToSpreadsheet(contracts, currentTime = new 
           }
         }
       });
-      
+
       // Set width with padding (minimum 12 characters, add 4 for padding)
       // This ensures dates and long names are fully visible
       column.width = Math.max(12, maxColumnLength + 4);
@@ -106,7 +106,7 @@ export async function exportContractsToSpreadsheet(contracts, currentTime = new 
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
-    
+
     link.href = url;
     link.download = `contracts_export_${new Date().toISOString().split('T')[0]}.xlsx`;
     link.style.visibility = 'hidden';
@@ -143,8 +143,8 @@ export function exportContractsToCSV(contracts, currentTime = new Date()) {
   const rows = contracts.map((contract) => {
     // Calculate expiration date
     const expirationDate = calculateExpirationDate(contract.assessmentDate, contract.termMonths);
-    const expirationDateStr = expirationDate 
-      ? formatDate(expirationDate) 
+    const expirationDateStr = expirationDate
+      ? formatDate(expirationDate)
       : (contract.expirationDate ? formatDate(contract.expirationDate) : 'N/A');
 
     return [
@@ -166,15 +166,15 @@ export function exportContractsToCSV(contracts, currentTime = new Date()) {
   const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
-  
+
   link.setAttribute('href', url);
   link.setAttribute('download', `contracts_export_${new Date().toISOString().split('T')[0]}.csv`);
   link.style.visibility = 'hidden';
-  
+
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  
+
   URL.revokeObjectURL(url);
 }
 
@@ -191,11 +191,11 @@ export async function exportContractsToPDF(contracts, currentTime = new Date()) 
   try {
     // Dynamic import with error handling for missing library
     let jsPDF, autoTable;
-    
+
     try {
       const jspdfModule = await import(/* @vite-ignore */ 'jspdf');
       jsPDF = jspdfModule.jsPDF || jspdfModule.default;
-      
+
       const autotableModule = await import(/* @vite-ignore */ 'jspdf-autotable');
       autoTable = autotableModule.default;
     } catch (importError) {
@@ -210,7 +210,7 @@ export async function exportContractsToPDF(contracts, currentTime = new Date()) 
     }
 
     const doc = new jsPDF();
-    
+
     // Add title
     doc.setFontSize(16);
     doc.text('Employee Contracts', 14, 15);
@@ -220,8 +220,8 @@ export async function exportContractsToPDF(contracts, currentTime = new Date()) 
     // Prepare table data
     const tableData = contracts.map((contract) => {
       const expirationDate = calculateExpirationDate(contract.assessmentDate, contract.termMonths);
-      const expirationDateStr = expirationDate 
-        ? formatDate(expirationDate) 
+      const expirationDateStr = expirationDate
+        ? formatDate(expirationDate)
         : (contract.expirationDate ? formatDate(contract.expirationDate) : 'N/A');
 
       return [
@@ -259,13 +259,13 @@ export async function exportContractsToPDF(contracts, currentTime = new Date()) 
  */
 function escapeCSV(value) {
   if (value === null || value === undefined) return '';
-  
+
   const stringValue = String(value);
-  
+
   // If value contains comma, quote, or newline, wrap in quotes and escape quotes
   if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
     return `"${stringValue.replace(/"/g, '""')}"`;
   }
-  
+
   return stringValue;
 }

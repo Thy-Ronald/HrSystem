@@ -611,8 +611,8 @@ export async function getCacheJobStatus() {
 }
 
 // --- Notifications ---
-export const getNotifications = async () => {
-  const res = await fetch(`${API_BASE}/api/notifications`, {
+export const getNotifications = async (page = 1, limit = 4) => {
+  const res = await fetch(`${API_BASE}/api/notifications?page=${page}&limit=${limit}`, {
     headers: getAuthHeaders(),
   });
   return handleResponse(res);
