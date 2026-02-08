@@ -14,10 +14,11 @@ import {
 } from '@mui/material';
 import { getGithubTimeline, fetchRepositories } from '../services/api';
 import TimelineChart from '../components/TimelineChart';
-import { AccessTime, Assignment } from '@mui/icons-material';
+import { AccessTime } from '@mui/icons-material';
 import useSocket from '../hooks/useSocket';
 import { STATUS_COLORS } from '../constants/github';
 import TimerDisplay from '../components/TimerDisplay';
+import { Github } from 'lucide-react';
 
 
 
@@ -148,7 +149,7 @@ const GithubAnalytics = () => {
                 />
             </Box>
 
-            <Paper sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
+            <Paper sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #e0e0e0', position: 'relative' }}>
                 <Box ref={scrollRef} sx={{ flexGrow: 1, overflowX: 'auto', overflowY: 'auto' }}>
                     <Box sx={{ minWidth: 2900, display: 'flex', flexDirection: 'column' }}>
                         {/* Header Row */}
@@ -171,11 +172,7 @@ const GithubAnalytics = () => {
                         </Box>
 
                         <Box sx={{ flexGrow: 1 }}>
-                            {loading ? (
-                                <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
-                                    <CircularProgress />
-                                </Box>
-                            ) : timelineData.map(userData => (
+                            {timelineData.map(userData => (
                                 <Box key={userData.user.login} sx={{ mb: 0 }}>
                                     <Box sx={{
                                         display: 'flex',
@@ -293,15 +290,57 @@ const GithubAnalytics = () => {
                                     ))}
                                 </Box>
                             ))}
-
-                            {!loading && timelineData.length === 0 && (
-                                <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
-                                    No activity found for this period.
-                                </Box>
-                            )}
                         </Box>
                     </Box>
                 </Box>
+
+                {/* Loading Overlay */}
+                {
+                    loading && (
+                        <Box sx={{
+                            position: 'absolute',
+                            top: 32, // Below header
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            bgcolor: 'rgba(255, 255, 255, 0.8)',
+                            zIndex: 200
+                        }}>
+                            <CircularProgress />
+                        </Box>
+                    )
+                }
+
+                {/* Empty State Overlay - Shadcn Style */}
+                {
+                    !loading && timelineData.length === 0 && (
+                        <Box sx={{
+                            position: 'absolute',
+                            top: 32,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 10,
+                            bgcolor: '#fff'
+                        }}>
+                            <div className="flex flex-col items-center justify-center p-8 bg-white rounded-3xl border-2 border-dashed border-slate-200">
+                                <div className="bg-slate-50 p-6 rounded-full mb-4">
+                                    <Github className="h-12 w-12 text-slate-300" />
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-900 mb-2">No activity found</h3>
+                                <p className="text-slate-500 max-w-xs text-center">
+                                    No commits or issues found for this repository on the selected date.
+                                </p>
+                            </div>
+                        </Box>
+                    )
+                }
             </Paper>
         </Box>
     );
