@@ -1,5 +1,8 @@
 
+
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { queryClient } from '../lib/queryClient';
 import {
     Box,
     Typography,
@@ -23,13 +26,25 @@ import { Github } from 'lucide-react';
 
 
 const GithubAnalytics = () => {
-    const [loading, setLoading] = useState(false);
-    const [timelineData, setTimelineData] = useState([]);
     const [selectedRepo, setSelectedRepo] = useState('');
-    const [repos, setRepos] = useState([]);
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
     const [currentTime, setCurrentTime] = useState(Date.now());
     const scrollRef = useRef(null);
+
+    // Fetch repositories with React Query
+    const { data: repos = [] } = useQuery({
+        queryKey: ['repositories'],
+        queryFn: fetchRepositories,
+        staleTime: 10 * 60 * 1000, // 10 minutes (repos don't change often)
+    });
+
+    // Fetch timeline data with React Query
+    const { data: timelineData = [], isLoading: loading } = useQuery({
+        queryKey: ['timeline', selectedRepo, selectedDate],
+        queryFn: () => getGithubTimeline(selectedRepo, null, { date: selectedDate }),
+        enabled: !!selectedRepo, // Only fetch when repo is selected
+        staleTime: 5 * 60 * 1000, // 5 minutes
+    });
 
     // Default scroll to 10:00 AM
     useEffect(() => {
@@ -47,40 +62,13 @@ const GithubAnalytics = () => {
         return () => clearInterval(interval);
     }, []);
 
-    // Fetch repositories on mount
+    // Set default repo when repos are loaded
     useEffect(() => {
-        async function loadRepos() {
-            try {
-                const repoList = await fetchRepositories();
-                setRepos(repoList);
-                if (repoList.length > 0) {
-                    const defaultRepo = repoList.find(r => r.name === 'sacsys009') || repoList[0];
-                    setSelectedRepo(defaultRepo.fullName);
-                }
-            } catch (err) {
-                console.error("Failed to load repos", err);
-            }
+        if (repos.length > 0 && !selectedRepo) {
+            const defaultRepo = repos.find(r => r.name === 'sacsys009') || repos[0];
+            setSelectedRepo(defaultRepo.fullName);
         }
-        loadRepos();
-    }, []);
-
-    // Fetch timeline data when repo or date changes
-    const fetchData = React.useCallback(async () => {
-        if (!selectedRepo) return;
-        setLoading(true);
-        try {
-            const data = await getGithubTimeline(selectedRepo, null, { date: selectedDate });
-            setTimelineData(data || []);
-        } catch (err) {
-            console.error("Failed to fetch timeline", err);
-        } finally {
-            setLoading(false);
-        }
-    }, [selectedRepo, selectedDate]);
-
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+    }, [repos, selectedRepo]);
 
     // Setup Socket.IO for real-time updates
     const { subscribe, unsubscribe } = useSocket();
@@ -90,10 +78,11 @@ const GithubAnalytics = () => {
         console.log("[Socket] Received GitHub update event:", payload);
         // Refresh if the updated repo matches current selection
         if (payload.repo === selectedRepo) {
-            console.log("[Socket] Refreshing data for", selectedRepo);
-            fetchData();
+            console.log("[Socket] Invalidating cache for", selectedRepo);
+            // Invalidate React Query cache to trigger refetch
+            queryClient.invalidateQueries({ queryKey: ['timeline', selectedRepo] });
         }
-    }, [selectedRepo, fetchData]);
+    }, [selectedRepo]);
 
     useEffect(() => {
         subscribe('github:repo-updated', handleGithubUpdate);
