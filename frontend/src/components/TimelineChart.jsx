@@ -66,10 +66,11 @@ const TimelineChart = ({ issues, startDate, endDate }) => {
                     <Box
                         key={issue.id}
                         sx={{
-                            height: 32,
+                            minHeight: 50,
                             position: 'relative',
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: 'flex-start',
+                            paddingTop: '6px',
                             '&:hover': { bgcolor: 'rgba(0,0,0,0.01)' }
                         }}
                     >
@@ -99,35 +100,60 @@ const TimelineChart = ({ issues, startDate, endDate }) => {
 
                                 const color = STATUS_COLORS[status.status] || STATUS_COLORS['Unknown'];
 
+                                // Format timestamp
+                                const startTime = new Date(status.startDate).toLocaleTimeString('en-US', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    hour12: false
+                                });
+
                                 return (
-                                    <Tooltip
+                                    <Box
                                         key={idx}
-                                        title={`${status.status}: ${new Date(status.startDate).toLocaleTimeString()}`}
+                                        sx={{
+                                            position: 'absolute',
+                                            left: `${left}%`,
+                                            width: `${finalWidth}%`,
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            zIndex: idx // Higher index for later statuses
+                                        }}
                                     >
-                                        <Box
+                                        <Tooltip title={`${status.status}: ${startTime}`}>
+                                            <Box
+                                                sx={{
+                                                    width: '100%',
+                                                    height: 18,
+                                                    bgcolor: color,
+                                                    borderRadius: 0.5,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    overflow: 'hidden',
+                                                    px: 0.5,
+                                                    fontSize: '0.6rem',
+                                                    color: '#424242',
+                                                    fontWeight: 'bold',
+                                                    whiteSpace: 'nowrap',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                {status.status}
+                                            </Box>
+                                        </Tooltip>
+                                        <Typography
+                                            variant="caption"
                                             sx={{
-                                                position: 'absolute',
-                                                left: `${left}%`,
-                                                width: `${finalWidth}%`,
-                                                height: 18,
-                                                bgcolor: color,
-                                                borderRadius: 0.5,
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                overflow: 'hidden',
-                                                px: 0.5,
-                                                fontSize: '0.6rem',
-                                                color: '#424242',
-                                                fontWeight: 'bold',
-                                                whiteSpace: 'nowrap',
-                                                cursor: 'pointer',
-                                                zIndex: idx // Higher index for later statuses
+                                                fontSize: '0.55rem',
+                                                color: '#666',
+                                                marginTop: '2px',
+                                                whiteSpace: 'nowrap'
                                             }}
                                         >
-                                            {status.status}
-                                        </Box>
-                                    </Tooltip>
+                                            {startTime}
+                                        </Typography>
+                                    </Box>
                                 );
                             });
                         })()}

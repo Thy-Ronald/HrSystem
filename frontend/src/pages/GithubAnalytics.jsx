@@ -158,13 +158,7 @@ const GithubAnalytics = () => {
                                 Name & Task
                             </Box>
                             <Box sx={{ width: 2400, minWidth: 2400, px: 2, display: 'flex', alignItems: 'center', position: 'relative' }}>
-                                <Box sx={{ display: 'flex', width: '100%', justifyContent: 'space-between', color: '#999', fontSize: '0.75rem' }}>
-                                    {Array.from({ length: 25 }, (_, i) => `${i.toString().padStart(2, '0')}:00`).map(time => (
-                                        <Typography key={time} variant="caption" sx={{ width: 0, overflow: 'visible', whiteSpace: 'nowrap', textAlign: 'center', fontSize: '0.7rem' }}>
-                                            {time}
-                                        </Typography>
-                                    ))}
-                                </Box>
+                                {/* Timeline column - no time markers */}
                             </Box>
                             <Box sx={{ width: 150, minWidth: 150, px: 1, display: 'flex', alignItems: 'center', borderLeft: '1px solid #e0e0e0', fontWeight: 'bold', color: '#666', bgcolor: '#f9fafb', position: 'sticky', right: 0, zIndex: 101, fontSize: '0.75rem' }}>
                                 Details
