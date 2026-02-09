@@ -27,10 +27,13 @@ export function useRepositories() {
     ALLOWED_REPOS.includes(repo.fullName)
   );
 
+
+
   // Auto-select first repo if none selected
   useEffect(() => {
     if (repositories.length > 0 && !selectedRepo) {
       const firstRepo = repositories[0].fullName;
+
       setSelectedRepo(firstRepo);
     }
   }, [repositories, selectedRepo]);

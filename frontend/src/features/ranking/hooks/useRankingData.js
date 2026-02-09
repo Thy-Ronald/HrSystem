@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchCachedIssues } from '../../../services/api';
 import { transformRankingData } from '../utils/dataTransform';
@@ -20,13 +20,25 @@ export function useRankingData() {
       if (!selectedRepo) return [];
 
       try {
-        const data = await fetchCachedIssues(selectedRepo, selectedFilter, {
+        console.log('[useRankingData] Fetching data for:', { selectedRepo, selectedFilter });
+
+        const response = await fetchCachedIssues(selectedRepo, selectedFilter, {
           user: null,
           forceRefresh: false,
           includeEtag: true
         });
 
-        return transformRankingData(data);
+        console.log('[useRankingData] Raw API response:', response);
+
+        // Extract data array from response object {data: [...], etag: null}
+        const data = response?.data || response;
+        console.log('[useRankingData] Extracted data:', data, 'isArray:', Array.isArray(data));
+
+        const transformed = transformRankingData(data);
+        console.log('[useRankingData] Transformed data:', transformed);
+        console.log('[useRankingData] Transformed length:', transformed?.length);
+
+        return transformed;
       } catch (err) {
         console.error('[useRankingData] Error:', err);
         setError(err.message || 'Failed to load data');
@@ -41,12 +53,13 @@ export function useRankingData() {
   /**
    * Load data for a specific repo and filter
    * This is now just a setter function - React Query handles the fetching
+   * Wrapped in useCallback to prevent unnecessary re-renders
    */
-  const loadData = (repo, filter) => {
+  const loadData = useCallback((repo, filter) => {
     setSelectedRepo(repo);
     setSelectedFilter(filter);
     setError('');
-  };
+  }, []); // No dependencies - setters are stable
 
   return {
     rankingData,
