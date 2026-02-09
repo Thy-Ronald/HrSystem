@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
     Box,
     Typography,
@@ -85,29 +85,29 @@ const GithubAnalytics = () => {
     // Setup Socket.IO for real-time updates
     const { subscribe, unsubscribe } = useSocket();
 
-    useEffect(() => {
-        const handleGithubUpdate = (payload) => {
-            console.log("[Socket] Received GitHub update event:", payload);
-            // Refresh if the updated repo matches current selection
-            if (payload.repo === selectedRepo) {
-                console.log("[Socket] Refreshing data for", selectedRepo);
-                fetchData();
-            }
-        };
+    // Memoize socket event handler to prevent re-creating on every render
+    const handleGithubUpdate = useCallback((payload) => {
+        console.log("[Socket] Received GitHub update event:", payload);
+        // Refresh if the updated repo matches current selection
+        if (payload.repo === selectedRepo) {
+            console.log("[Socket] Refreshing data for", selectedRepo);
+            fetchData();
+        }
+    }, [selectedRepo, fetchData]);
 
+    useEffect(() => {
         subscribe('github:repo-updated', handleGithubUpdate);
         return () => unsubscribe('github:repo-updated', handleGithubUpdate);
-    }, [selectedRepo, subscribe, unsubscribe, fetchData]);
+    }, [subscribe, unsubscribe, handleGithubUpdate]);
 
-    const getChartRange = () => {
+    // Memoize chart range calculation to avoid recalculating on every render
+    const { chartStart, chartEnd } = useMemo(() => {
         const start = new Date(selectedDate);
         start.setHours(0, 0, 0, 0);
         const end = new Date(selectedDate);
         end.setHours(23, 59, 59, 999);
-        return { start, end };
-    };
-
-    const { start: chartStart, end: chartEnd } = getChartRange();
+        return { chartStart: start, chartEnd: end };
+    }, [selectedDate]);
 
     return (
         <Box sx={{ p: 2, height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

@@ -42,6 +42,10 @@ const io = new Server(server, {
 });
 const PORT = process.env.PORT || 4000;
 
+// Enable response compression (gzip/deflate)
+const compression = require('compression');
+app.use(compression());
+
 app.use(cors());
 app.use(express.json());
 

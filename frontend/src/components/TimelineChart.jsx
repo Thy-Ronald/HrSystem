@@ -164,4 +164,6 @@ const TimelineChart = ({ issues, startDate, endDate }) => {
     );
 };
 
-export default TimelineChart;
+// Memoize component to prevent unnecessary re-renders
+// Only re-render when issues, startDate, or endDate change
+export default React.memo(TimelineChart);
