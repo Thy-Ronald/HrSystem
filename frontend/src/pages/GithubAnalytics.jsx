@@ -13,7 +13,8 @@ import {
     Avatar,
     Divider,
     FormControl,
-    Tooltip
+    Tooltip,
+    Button
 } from '@mui/material';
 import { getGithubTimeline, fetchRepositories } from '../services/api';
 import TimelineChart from '../components/TimelineChart';
@@ -22,6 +23,7 @@ import useSocket from '../hooks/useSocket';
 import { STATUS_COLORS } from '../constants/github';
 import TimerDisplay from '../components/TimerDisplay';
 import { Github } from 'lucide-react';
+import EvidenceModal from '../components/EvidenceModal';
 
 
 
@@ -30,6 +32,11 @@ const GithubAnalytics = () => {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
     const [currentTime, setCurrentTime] = useState(Date.now());
     const scrollRef = useRef(null);
+
+    // Evidence modal state
+    const [evidenceModalOpen, setEvidenceModalOpen] = useState(false);
+    const [selectedEvidence, setSelectedEvidence] = useState(null);
+    const [selectedIssueTitle, setSelectedIssueTitle] = useState('');
 
     // Fetch repositories with React Query
     const { data: repos = [] } = useQuery({
@@ -140,7 +147,7 @@ const GithubAnalytics = () => {
 
             <Paper sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #e0e0e0', position: 'relative' }}>
                 <Box ref={scrollRef} sx={{ flexGrow: 1, overflowX: 'auto', overflowY: 'auto' }}>
-                    <Box sx={{ minWidth: 2900, display: 'flex', flexDirection: 'column' }}>
+                    <Box sx={{ minWidth: 3000, display: 'flex', flexDirection: 'column' }}>
                         {/* Header Row */}
                         <Box sx={{ display: 'flex', borderBottom: '1px solid #e0e0e0', bgcolor: '#f9fafb', position: 'sticky', top: 0, zIndex: 100, height: 32 }}>
                             <Box sx={{ width: 350, minWidth: 350, px: 1, display: 'flex', alignItems: 'center', borderRight: '1px solid #e0e0e0', fontWeight: 'bold', color: '#666', bgcolor: '#f9fafb', position: 'sticky', left: 0, zIndex: 101, fontSize: '0.75rem' }}>
@@ -149,8 +156,11 @@ const GithubAnalytics = () => {
                             <Box sx={{ width: 2400, minWidth: 2400, px: 2, display: 'flex', alignItems: 'center', position: 'relative' }}>
                                 {/* Timeline column - no time markers */}
                             </Box>
-                            <Box sx={{ width: 150, minWidth: 150, px: 1, display: 'flex', alignItems: 'center', borderLeft: '1px solid #e0e0e0', fontWeight: 'bold', color: '#666', bgcolor: '#f9fafb', position: 'sticky', right: 0, zIndex: 101, fontSize: '0.75rem' }}>
+                            <Box sx={{ width: 150, minWidth: 150, px: 1, display: 'flex', alignItems: 'center', borderLeft: '1px solid #e0e0e0', fontWeight: 'bold', color: '#666', bgcolor: '#f9fafb', position: 'sticky', right: 100, zIndex: 101, fontSize: '0.75rem' }}>
                                 Details
+                            </Box>
+                            <Box sx={{ width: 100, minWidth: 100, px: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderLeft: '1px solid #e0e0e0', fontWeight: 'bold', color: '#666', bgcolor: '#f9fafb', position: 'sticky', right: 0, zIndex: 101, fontSize: '0.75rem' }}>
+                                Evidence
                             </Box>
                         </Box>
 
@@ -242,7 +252,7 @@ const GithubAnalytics = () => {
                                                 />
                                             </Box>
 
-                                            <Box sx={{ width: 150, minWidth: 150, p: 0.5, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', bgcolor: '#fff', borderLeft: '1px solid #f0f0f0', position: 'sticky', right: 0, zIndex: 5 }}>
+                                            <Box sx={{ width: 150, minWidth: 150, p: 0.5, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', bgcolor: '#fff', borderLeft: '1px solid #f0f0f0', position: 'sticky', right: 100, zIndex: 5 }}>
                                                 <Typography
                                                     variant="caption"
                                                     sx={{
@@ -268,6 +278,61 @@ const GithubAnalytics = () => {
                                                     currentTime={currentTime}
                                                     pValue={issue.pValue}
                                                 />
+                                            </Box>
+
+                                            <Box sx={{ width: 100, minWidth: 100, p: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#fff', borderLeft: '1px solid #f0f0f0', position: 'sticky', right: 0, zIndex: 5 }}>
+                                                <Button
+                                                    variant="outlined"
+                                                    size="small"
+                                                    onMouseEnter={() => {
+                                                        if (issue.evidence) {
+                                                            // Senior Engineer Tip: Anticipatory Pre-fetching
+                                                            // Matches the proxy logic in EvidenceModal to warm up the backend cache on hover
+                                                            const mediaRegex = /(!\[(.*?)\]\((.*?)\))|(<img\b[^>]*?>)|(https?:\/\/github\.com\/user-attachments\/assets\/[^\s"<>]+)|(https?:\/\/[^\s"<>]+?\.(?:jpg|jpeg|png|gif|webp|svg|mp4|mov|webm|ogg)(?:\?[^\s"<>]+)?)/gi;
+                                                            let match;
+                                                            const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
+
+                                                            while ((match = mediaRegex.exec(issue.evidence)) !== null) {
+                                                                let url = '';
+                                                                if (match[1]) url = match[3];
+                                                                else if (match[4]) {
+                                                                    const srcMatch = /src\s*=\s*["']([^"']+)["']/i.exec(match[4]);
+                                                                    url = srcMatch ? srcMatch[1] : '';
+                                                                } else if (match[5] || match[6]) url = match[5] || match[6];
+
+                                                                if (url) {
+                                                                    const isGithubUrl = url.includes('github.com') || url.includes('githubusercontent.com');
+                                                                    const proxiedUrl = isGithubUrl
+                                                                        ? `${API_BASE}/api/github/proxy-image?url=${encodeURIComponent(url)}`
+                                                                        : url;
+
+                                                                    // Silent fetch to warm up Redis/Browser cache
+                                                                    fetch(proxiedUrl, { priority: 'low' }).catch(() => { });
+                                                                }
+                                                            }
+                                                        }
+                                                    }}
+                                                    onClick={() => {
+                                                        setSelectedEvidence(issue.evidence);
+                                                        setSelectedIssueTitle(issue.title);
+                                                        setEvidenceModalOpen(true);
+                                                    }}
+                                                    sx={{
+                                                        fontSize: '0.65rem',
+                                                        textTransform: 'none',
+                                                        py: 0.3,
+                                                        px: 1,
+                                                        minWidth: 'auto',
+                                                        borderColor: issue.evidence ? '#1a73e8' : '#ccc',
+                                                        color: issue.evidence ? '#1a73e8' : '#999',
+                                                        '&:hover': {
+                                                            borderColor: issue.evidence ? '#174ea6' : '#999',
+                                                            bgcolor: issue.evidence ? '#e8f0fe' : '#f5f5f5'
+                                                        }
+                                                    }}
+                                                >
+                                                    View
+                                                </Button>
                                             </Box>
                                         </Box>
                                     ))}
@@ -325,6 +390,14 @@ const GithubAnalytics = () => {
                     )
                 }
             </Paper>
+
+            {/* Evidence Modal */}
+            <EvidenceModal
+                open={evidenceModalOpen}
+                onClose={() => setEvidenceModalOpen(false)}
+                evidence={selectedEvidence}
+                issueTitle={selectedIssueTitle}
+            />
         </Box>
     );
 };

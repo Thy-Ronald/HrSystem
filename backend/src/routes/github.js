@@ -1,5 +1,5 @@
 const express = require('express');
-const { handleGithubLookup, handleIssuesByPeriod, handleGetRepositories, handleCacheCheck, handleRepoChanges, handleCommitsByPeriod, handleLanguagesByPeriod, handleGetTimeline } = require('../controllers/githubController');
+const { handleGithubLookup, handleIssuesByPeriod, handleGetRepositories, handleCacheCheck, handleRepoChanges, handleCommitsByPeriod, handleLanguagesByPeriod, handleGetTimeline, handleProxyImage } = require('../controllers/githubController');
 
 const router = express.Router();
 
@@ -23,6 +23,9 @@ router.get('/has-changes', handleRepoChanges);
 
 // GET /api/github/timeline?repo=owner/name&filter=today|yesterday|this-week|last-week|this-month
 router.get('/timeline', handleGetTimeline);
+
+// GET /api/github/proxy-image?url=<url> - Proxy GitHub images with auth
+router.get('/proxy-image', handleProxyImage);
 
 router.get('/:username', handleGithubLookup);
 

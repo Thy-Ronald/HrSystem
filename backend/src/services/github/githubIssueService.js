@@ -8,7 +8,8 @@ const {
     getDateRange,
     extractPValue,
     mapLabelToStatus,
-    STATUS_PRIORITY_ORDER
+    STATUS_PRIORITY_ORDER,
+    extractEvidence
 } = require('./githubUtils');
 
 /**
@@ -204,6 +205,13 @@ async function getIssueTimeline(repoFullName, filter = 'this-month', date = null
                                 author { login, avatarUrl }
                                 assignees(first: 5) { nodes { login, name, avatarUrl } }
                                 labels(first: 20) { nodes { name, color } }
+                                comments(last: 10) {
+                                    nodes {
+                                        body
+                                        author { login }
+                                        createdAt
+                                    }
+                                }
                                 timelineItems(last: 200, itemTypes: [LABELED_EVENT, UNLABELED_EVENT, ASSIGNED_EVENT]) {
                                     nodes {
                                         __typename
@@ -282,7 +290,10 @@ async function getIssueTimeline(repoFullName, filter = 'this-month', date = null
                         const endTime = (issue.state === 'CLOSED' || isTerminal) ? statusStartTime : new Date();
                         statusHistory.push({ status: currentStatus, startDate: statusStartTime, endDate: endTime, durationMs: Math.max(0, endTime - statusStartTime) });
 
-                        allIssues.push({ id: `${issue.id}_${username}`, number: issue.number, title: issue.title, url: issue.url, state: issue.state, pValue: basePValue, createdAt: issue.createdAt, updatedAt: issue.updatedAt, author: issue.author, assignee: assigneeNode, statusHistory, currentStatus });
+                        // Extract evidence from issue body and comments
+                        const evidence = extractEvidence(issue.body, issue.comments?.nodes || []);
+
+                        allIssues.push({ id: `${issue.id}_${username}`, number: issue.number, title: issue.title, url: issue.url, state: issue.state, pValue: basePValue, createdAt: issue.createdAt, updatedAt: issue.updatedAt, author: issue.author, assignee: assigneeNode, statusHistory, currentStatus, evidence });
                     }
                 }
             }

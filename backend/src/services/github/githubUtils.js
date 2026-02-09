@@ -173,6 +173,50 @@ function getLanguageFromFile(filename) {
     return LANGUAGE_MAP[ext] || null;
 }
 
+/**
+ * Extract evidence from issue body or comments
+ * Evidence is identified by the marker "[ EVIDENCE ]" or "[ Evidence ]" (case-insensitive)
+ * Returns all text after the marker, or null if not found
+ * Checks issue body first, then comments (newest first)
+ */
+function extractEvidence(issueBody, comments) {
+    // Case-insensitive regex to match [ EVIDENCE ] or [ Evidence ] or any case variation
+    const evidenceRegex = /\[\s*evidence\s*\]/i;
+
+    // First check the issue body/description
+    if (issueBody) {
+        const match = issueBody.match(evidenceRegex);
+        if (match) {
+            const markerIndex = match.index;
+            const markerLength = match[0].length;
+            const evidence = issueBody.substring(markerIndex + markerLength).trim();
+            if (evidence) {
+                return evidence;
+            }
+        }
+    }
+
+    // Then check comments in reverse order (newest first)
+    if (comments && Array.isArray(comments)) {
+        for (let i = comments.length - 1; i >= 0; i--) {
+            const comment = comments[i];
+            const body = comment?.body || '';
+            const match = body.match(evidenceRegex);
+
+            if (match) {
+                const markerIndex = match.index;
+                const markerLength = match[0].length;
+                const evidence = body.substring(markerIndex + markerLength).trim();
+                if (evidence) {
+                    return evidence;
+                }
+            }
+        }
+    }
+
+    return null;
+}
+
 module.exports = {
     P_VALUE_REGEX,
     STATUS_LABELS,
@@ -181,5 +225,6 @@ module.exports = {
     mapLabelToStatus,
     extractPValue,
     getDateRange,
-    getLanguageFromFile
+    getLanguageFromFile,
+    extractEvidence
 };

@@ -1,3 +1,7 @@
+const crypto = require('crypto');
+const axios = require('axios');
+const cacheService = require('../services/cacheService');
+const { withAuth } = require('../services/github/githubClients');
 const { getGithubProfileWithRepos, getIssuesByUserForPeriod, getAccessibleRepositories, checkCacheStatus, checkRepoChanges, getCommitsByUserForPeriod, getLanguagesByUserForPeriod, getIssueTimeline } = require('../services/githubService');
 
 async function handleGithubLookup(req, res, next) {
@@ -201,6 +205,112 @@ async function handleGetTimeline(req, res, next) {
   }
 }
 
+async function handleProxyImage(req, res, next) {
+  try {
+    const { url } = req.query;
+
+    if (!url) {
+      const error = new Error('URL is required');
+      error.status = 400;
+      throw error;
+    }
+
+    // Generate a secure cache key
+    const urlHash = crypto.createHash('md5').update(url).digest('hex');
+    const cacheKey = `media_proxy:${urlHash}`;
+
+    // 1. Check Shared Cache (Redis)
+    const cached = await cacheService.get(cacheKey);
+
+    if (cached) {
+      // 2. Prevent Stale Data: ETag Revalidation
+      const clientEtag = req.headers['if-none-match'];
+      const serverEtag = cached.etag || `W/"${urlHash}"`;
+
+      if (clientEtag === serverEtag) {
+        console.log('[GithubProxy] 304 Not Modified (Shared Cache):', url);
+        return res.status(304).end();
+      }
+
+      console.log('[GithubProxy] Serving from Shared Redis Cache:', url);
+      res.setHeader('Content-Type', cached.contentType);
+      res.setHeader('ETag', serverEtag);
+      res.setHeader('Cache-Control', 'public, no-cache'); // Force revalidation
+
+      if (cached.headers) {
+        Object.entries(cached.headers).forEach(([k, v]) => {
+          if (k !== 'cache-control' && k !== 'etag') res.setHeader(k, v);
+        });
+      }
+
+      // Buffer conversion if stored as base64
+      const buffer = Buffer.from(cached.data, 'base64');
+      return res.send(buffer);
+    }
+
+    // 3. Fallback: Fetch from GitHub
+    const isAllowed = url.startsWith('https://github.com/') ||
+      url.startsWith('https://raw.githubusercontent.com/') ||
+      url.includes('github-production-user-asset');
+
+    if (!isAllowed) {
+      const error = new Error('Only GitHub URLs and assets are allowed');
+      error.status = 403;
+      throw error;
+    }
+
+    const axios = require('axios');
+    const { withAuth } = require('../services/github/githubClients');
+
+    const response = await axios.get(url, {
+      headers: {
+        ...withAuth(),
+        'User-Agent': 'HR-System-Backend'
+      },
+      responseType: 'arraybuffer',
+      timeout: 30000
+    });
+
+    const contentType = response.headers['content-type'] || 'application/octet-stream';
+    const serverEtag = `W/"${urlHash}"`;
+
+    // Forward important headers
+    const resHeaders = {};
+    const headersToForward = ['content-type', 'content-length', 'accept-ranges', 'content-range'];
+    headersToForward.forEach(header => {
+      if (response.headers[header]) {
+        res.setHeader(header, response.headers[header]);
+        resHeaders[header] = response.headers[header];
+      }
+    });
+
+    res.setHeader('ETag', serverEtag);
+    res.setHeader('Cache-Control', 'public, no-cache');
+
+    // 4. Store in Shared Cache
+    // We store as base64 because JSON based cache (Upstash/Redis) handles it better
+    const base64Data = Buffer.from(response.data).toString('base64');
+
+    // Use a very long TTL for shared storage, stale status is handled by ETag revalidation
+    await cacheService.set(cacheKey, {
+      data: base64Data,
+      contentType,
+      headers: resHeaders,
+      etag: serverEtag
+    }, 604800, serverEtag); // 7 days TTL
+
+    res.send(response.data);
+
+  } catch (error) {
+    console.error('[GithubProxy] Error proxying content:', error.message);
+    if (error.response) {
+      res.status(error.response.status).send(`Failed to fetch from GitHub: ${error.message}`);
+    } else {
+      next(error);
+    }
+  }
+}
+
 module.exports = {
   handleGithubLookup,
   handleIssuesByPeriod,
@@ -209,5 +319,6 @@ module.exports = {
   handleRepoChanges,
   handleCommitsByPeriod,
   handleLanguagesByPeriod,
-  handleGetTimeline
+  handleGetTimeline,
+  handleProxyImage
 };
