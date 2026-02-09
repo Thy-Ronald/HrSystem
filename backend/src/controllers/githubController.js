@@ -15,7 +15,7 @@ async function handleGetRepositories(req, res, next) {
     const allRepos = await getAccessibleRepositories();
 
     // Filter to only return the two specific repositories to reduce API calls
-    const allowedRepos = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
+    const allowedRepos = ['timeriver/cnd_chat', 'timeriver/sacsys009', 'timeriver/learnings'];
     const filteredRepos = allRepos.filter(repo =>
       allowedRepos.includes(repo.fullName)
     );

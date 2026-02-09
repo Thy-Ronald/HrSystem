@@ -11,7 +11,7 @@ const {
     getLanguageFromFile
 } = require('./githubUtils');
 
-const ALLOWED_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
+const ALLOWED_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009', 'timeriver/learnings'];
 
 /**
  * Fetch commits from a repository grouped by user for a given period

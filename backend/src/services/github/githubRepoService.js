@@ -38,6 +38,7 @@ async function getAccessibleRepositories() {
     const allowedRepos = [
         { owner: 'timeriver', name: 'cnd_chat', fullName: 'timeriver/cnd_chat' },
         { owner: 'timeriver', name: 'sacsys009', fullName: 'timeriver/sacsys009' },
+        { owner: 'timeriver', name: 'learnings', fullName: 'timeriver/learnings' },
     ];
 
     try {

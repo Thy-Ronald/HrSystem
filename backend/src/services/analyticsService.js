@@ -95,7 +95,7 @@ function getDateRange(filter) {
   return { startDate, endDate };
 }
 
-const ALLOWED_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
+const ALLOWED_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009', 'timeriver/learnings'];
 
 /**
  * Get analytics overview for all repositories
@@ -186,7 +186,7 @@ async function getDailyActivityTrends(filter = 'this-month') {
   const now = new Date();
   const endDate = new Date(now);
   endDate.setHours(23, 59, 59, 999);
-  
+
   // Start from 9 days ago (to get 10 days total including today)
   const startDate = new Date(now);
   startDate.setDate(startDate.getDate() - 9);
@@ -197,7 +197,7 @@ async function getDailyActivityTrends(filter = 'this-month') {
   // Initialize daily counters
   const dailyData = new Map();
   const currentDate = new Date(startDate);
-  
+
   while (currentDate <= endDate) {
     const dateKey = currentDate.toISOString().split('T')[0];
     dailyData.set(dateKey, { date: dateKey, commits: 0, issues: 0 });
@@ -210,14 +210,14 @@ async function getDailyActivityTrends(filter = 'this-month') {
     try {
       const [owner, repoName] = repo.split('/');
       console.log(`[Analytics] Fetching commits for ${repo} from ${startDate.toISOString()} to ${endDate.toISOString()}`);
-      
+
       // Fetch commits for the 10-day period
       let hasNextPage = true;
       let page = 1;
       const maxPages = 10; // Increased to get more commits
       let repoCommitsFetched = 0;
       let repoCommitsCounted = 0;
-      
+
       while (hasNextPage && page <= maxPages) {
         const response = await githubClient.get(`/repos/${owner}/${repoName}/commits`, {
           headers: withAuth(),
@@ -230,7 +230,7 @@ async function getDailyActivityTrends(filter = 'this-month') {
         });
 
         const commits = response.data;
-        
+
         if (commits.length === 0) {
           hasNextPage = false;
           break;
@@ -245,11 +245,11 @@ async function getDailyActivityTrends(filter = 'this-month') {
           if (commit.commit) {
             commitDate = commit.commit.author?.date || commit.commit.committer?.date;
           }
-          
+
           if (commitDate) {
             const date = new Date(commitDate);
             const dateKey = date.toISOString().split('T')[0];
-            
+
             // Only count if within our date range
             if (dailyData.has(dateKey)) {
               dailyData.get(dateKey).commits += 1;
@@ -263,7 +263,7 @@ async function getDailyActivityTrends(filter = 'this-month') {
         hasNextPage = linkHeader && linkHeader.includes('rel="next"');
         page++;
       }
-      
+
       console.log(`[Analytics] Fetched ${repoCommitsFetched} commits from ${repo}, counted ${repoCommitsCounted} in date range`);
     } catch (error) {
       console.error(`[Analytics] Error fetching commits for ${repo}:`, error.message);
@@ -281,17 +281,17 @@ async function getDailyActivityTrends(filter = 'this-month') {
     try {
       const [owner, repoName] = repo.split('/');
       console.log(`[Analytics] Fetching issues for ${repo}`);
-      
+
       let hasNextPage = true;
       let cursor = null;
       let pageCount = 0;
       const maxPages = 10; // Increased to get more data
       let repoIssuesProcessed = 0;
       let repoIssuesDone = 0;
-      
+
       while (hasNextPage && pageCount < maxPages) {
         pageCount++;
-        
+
         const query = `
           query GetIssues($owner: String!, $repo: String!, $cursor: String) {
             repository(owner: $owner, name: $repo) {
@@ -355,13 +355,13 @@ async function getDailyActivityTrends(filter = 'this-month') {
 
           // Check if issue has "3:Local Done" label
           const hasDoneLabel = issue.labels?.nodes?.some(label => label.name === '3:Local Done');
-          
+
           if (hasDoneLabel) {
             repoIssuesDone++;
             // Find when the "3:Local Done" label was added from timeline
             const timelineItems = issue.timelineItems?.nodes || [];
             let doneDate = null;
-            
+
             // Look for the most recent "3:Local Done" label event within our date range
             for (const event of timelineItems) {
               if (event.label?.name === '3:Local Done' && event.createdAt) {
@@ -374,7 +374,7 @@ async function getDailyActivityTrends(filter = 'this-month') {
                 }
               }
             }
-            
+
             // If we found a done date in timeline, use it; otherwise use updatedAt as fallback
             if (doneDate) {
               const dateKey = doneDate.toISOString().split('T')[0];
@@ -396,7 +396,7 @@ async function getDailyActivityTrends(filter = 'this-month') {
         hasNextPage = pageInfo?.hasNextPage || false;
         cursor = pageInfo?.endCursor || null;
       }
-      
+
       console.log(`[Analytics] Processed ${repoIssuesProcessed} issues from ${repo}, found ${repoIssuesDone} with done label, counted ${totalIssuesFound} total`);
     } catch (error) {
       console.error(`[Analytics] Error fetching issues for ${repo}:`, error.message);

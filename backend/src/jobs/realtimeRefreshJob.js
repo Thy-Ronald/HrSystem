@@ -7,7 +7,7 @@
 
 const { checkRepoChanges } = require('../services/githubService');
 
-const ALLOWED_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
+const ALLOWED_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009', 'timeriver/learnings'];
 const CHECK_INTERVAL_MS = 15000; // Check every 15 seconds
 
 let interval = null;

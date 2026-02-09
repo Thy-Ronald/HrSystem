@@ -6,7 +6,7 @@
  * REFRESH STRATEGY:
  * =================
  * 1. Runs every 30 minutes (configurable via CACHE_REFRESH_INTERVAL_MS)
- * 2. Only refreshes the two allowed repositories: timeriver/cnd_chat and timeriver/sacsys009
+ * 2. Only refreshes the three allowed repositories: timeriver/cnd_chat, timeriver/sacsys009, and timeriver/learnings
  * 3. Uses incremental refresh (fetches only issues updated since last fetch)
  * 4. Full refresh is done once every 24 hours to catch any edge cases
  * 
@@ -22,14 +22,14 @@
  * - This prevents hitting GitHub's rate limit too quickly
  */
 
-const { 
-  refreshRepoCache, 
+const {
+  refreshRepoCache,
   getCacheStatus,
-  CACHE_CONFIG 
+  CACHE_CONFIG
 } = require('../services/issueCacheService');
 
 // Only refresh these two specific repositories
-const ALLOWED_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
+const ALLOWED_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009', 'timeriver/learnings'];
 
 // Configuration
 const DELAY_BETWEEN_REPOS_MS = 2000; // 2 second delay between repo refreshes
@@ -47,7 +47,7 @@ function sleep(ms) {
 /**
  * Refresh only the allowed repositories
  * Called by the scheduled job
- * Only refreshes timeriver/cnd_chat and timeriver/sacsys009
+ * Only refreshes timeriver/cnd_chat, timeriver/sacsys009, and timeriver/learnings
  */
 async function refreshAllTrackedRepos() {
   if (isRunning) {
@@ -57,7 +57,7 @@ async function refreshAllTrackedRepos() {
 
   isRunning = true;
   const startTime = Date.now();
-  
+
   console.log('[CacheJob] ====== Starting scheduled cache refresh ======');
   console.log(`[CacheJob] Only refreshing allowed repositories: ${ALLOWED_REPOS.join(', ')}`);
 
@@ -71,7 +71,7 @@ async function refreshAllTrackedRepos() {
       try {
         // Check if this repo actually needs refresh
         const status = await getCacheStatus(repoFullName);
-        
+
         if (!status.needsRefresh) {
           console.log(`[CacheJob] ${repoFullName} - Cache still valid, skipping`);
           skipped++;
@@ -79,9 +79,9 @@ async function refreshAllTrackedRepos() {
         }
 
         console.log(`[CacheJob] Refreshing ${repoFullName}...`);
-        
+
         const result = await refreshRepoCache(repoFullName);
-        
+
         if (result.status === 'success') {
           refreshed++;
           console.log(`[CacheJob] ${repoFullName} - Refreshed (${result.issuesFetched} issues)`);
