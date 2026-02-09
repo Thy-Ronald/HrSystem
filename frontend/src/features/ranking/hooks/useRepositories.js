@@ -1,75 +1,46 @@
 /**
  * useRepositories Hook
- * Manages repository list loading and selection
+ * Manages repository list loading and selection using React Query
  * 
  * Only displays timeriver/cnd_chat and timeriver/sacsys009 to reduce API calls
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { fetchRepositories } from '../../../services/api';
 
 // Allowed repositories - only these will be displayed
 const ALLOWED_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
 
 export function useRepositories() {
-  const [repositories, setRepositories] = useState([]);
   const [selectedRepo, setSelectedRepo] = useState('');
-  const [reposLoading, setReposLoading] = useState(true);
-  const [error, setError] = useState('');
 
-  /**
-   * Load repositories from API
-   * Filters to only show allowed repositories
-   */
+  // Fetch repositories with React Query
+  const { data: allRepos = [], isLoading: reposLoading, error } = useQuery({
+    queryKey: ['repositories'],
+    queryFn: fetchRepositories,
+    staleTime: 10 * 60 * 1000, // 10 minutes (repos don't change often)
+  });
+
+  // Filter to only show allowed repositories
+  const repositories = allRepos.filter(repo =>
+    ALLOWED_REPOS.includes(repo.fullName)
+  );
+
+  // Auto-select first repo if none selected
   useEffect(() => {
-    let mounted = true;
-
-    const loadRepos = async () => {
-      setReposLoading(true);
-      try {
-        const allRepos = await fetchRepositories();
-        if (mounted) {
-          // Filter to only show allowed repositories
-          const filteredRepos = allRepos.filter(repo => 
-            ALLOWED_REPOS.includes(repo.fullName)
-          );
-          
-          setRepositories(filteredRepos);
-          // Auto-select first repo if none selected
-          if (filteredRepos.length > 0 && !selectedRepo) {
-            const firstRepo = filteredRepos[0].fullName;
-            setSelectedRepo(firstRepo);
-          }
-        }
-      } catch (err) {
-        console.error('Error loading repositories:', err);
-        if (mounted) {
-          setError('Failed to load repositories');
-        }
-      } finally {
-        if (mounted) {
-          setReposLoading(false);
-        }
-      }
-    };
-
-    loadRepos();
-    return () => { mounted = false; };
-  }, []); // Only run once on mount
-
-  /**
-   * Handle repository change
-   * @param {string} repo - New repository full name
-   */
-  const handleRepoChange = useCallback((repo) => {
-    setSelectedRepo(repo);
-  }, []);
+    if (repositories.length > 0 && !selectedRepo) {
+      const firstRepo = repositories[0].fullName;
+      setSelectedRepo(firstRepo);
+    }
+  }, [repositories, selectedRepo]);
 
   return {
     repositories,
     selectedRepo,
-    setSelectedRepo: handleRepoChange,
+    setSelectedRepo,
     reposLoading,
-    error,
+    error: error?.message || '',
   };
 }
+
