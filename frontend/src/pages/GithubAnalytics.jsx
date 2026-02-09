@@ -39,7 +39,7 @@ const GithubAnalytics = () => {
     const [selectedIssueTitle, setSelectedIssueTitle] = useState('');
 
     // Fetch repositories with React Query
-    const { data: repos = [] } = useQuery({
+    const { data: repos = [], isLoading: reposLoading } = useQuery({
         queryKey: ['repositories'],
         queryFn: fetchRepositories,
         staleTime: 10 * 60 * 1000, // 10 minutes (repos don't change often)
@@ -344,7 +344,7 @@ const GithubAnalytics = () => {
 
                 {/* Loading Overlay */}
                 {
-                    loading && (
+                    (loading || reposLoading || (repos.length > 0 && !selectedRepo)) && (
                         <Box sx={{
                             position: 'absolute',
                             top: 32, // Below header
@@ -364,7 +364,7 @@ const GithubAnalytics = () => {
 
                 {/* Empty State Overlay - Shadcn Style */}
                 {
-                    !loading && timelineData.length === 0 && (
+                    !loading && !reposLoading && selectedRepo && timelineData.length === 0 && (
                         <Box sx={{
                             position: 'absolute',
                             top: 32,
