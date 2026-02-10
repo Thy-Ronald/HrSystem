@@ -8,7 +8,6 @@ import {
 } from '../features/ranking/components';
 import {
   useRankingData,
-  useRepositories,
 } from '../features/ranking/hooks';
 import {
   TABLE_COLUMNS,
@@ -32,14 +31,6 @@ export default function StaffRanking() {
     loadData,
   } = useRankingData();
 
-  // Repository Management (Custom Hook)
-  const {
-    repositories,
-    selectedRepo,
-    setSelectedRepo,
-    reposLoading,
-  } = useRepositories();
-
   // Event Handlers
   const handleQuickFilterChange = useCallback((filter) => {
     // If clicking the same filter that's already active, do nothing
@@ -54,21 +45,11 @@ export default function StaffRanking() {
     // loadData will be called by useEffect when activeQuickFilter changes
   }, [activeQuickFilter, setRankingData, setError]);
 
-  const handleRepoChange = useCallback((repo) => {
-    // Clear data immediately to prevent showing stale data from previous repo
-    setRankingData([]);
-    setSelectedRepo(repo);
-    setError('');
-    setActiveQuickFilter(QUICK_FILTERS.TODAY);
-    // loadData will be called by useEffect when selectedRepo/activeQuickFilter changes
-  }, [setRankingData, setSelectedRepo, setError]);
 
-  // Initial data load when repo/filter changes
+  // Initial data load when filter changes
   useEffect(() => {
-    if (selectedRepo) {
-      loadData(selectedRepo, activeQuickFilter);
-    }
-  }, [selectedRepo, activeQuickFilter, loadData]);
+    loadData(null, activeQuickFilter);
+  }, [activeQuickFilter, loadData]);
 
   return (
     <Box sx={{ width: '100%', minHeight: '100%', bgcolor: 'white' }}>
@@ -85,10 +66,6 @@ export default function StaffRanking() {
         <RankingFilters
           activeQuickFilter={activeQuickFilter}
           onQuickFilterChange={handleQuickFilterChange}
-          repositories={repositories}
-          selectedRepo={selectedRepo}
-          onRepoChange={handleRepoChange}
-          reposLoading={reposLoading}
         />
 
         {viewMode === VIEW_MODES.RANK ? (
@@ -107,7 +84,6 @@ export default function StaffRanking() {
         <RankingModal
           open={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          repositories={repositories}
           sharedCacheData={null}
         />
       </Box>

@@ -1,4 +1,5 @@
 const { githubClient, withAuth } = require('./githubClients');
+const { query } = require('../../config/database');
 const {
     getCachedGitHubResponse,
     setCachedGitHubResponse,
@@ -7,13 +8,19 @@ const {
 const REPO_CACHE_TTL = 300000; // 5 minutes for repos
 
 /**
- * Check if repository exists and get basic info
+ * Check if repository exists and get basic info (cached for 5 minutes)
  */
 async function getRepoInfo(repoFullName) {
+    const cacheKey = `repo_info:${repoFullName.replace('/', '_')}`;
+    const cached = await getCachedGitHubResponse(cacheKey);
+    if (cached && cached.data) return cached.data;
+
     try {
         const response = await githubClient.get(`/repos/${repoFullName}`, {
             headers: withAuth(),
         });
+        // Cache for 5 minutes
+        await setCachedGitHubResponse(cacheKey, response.data, null, 300);
         return response.data;
     } catch (error) {
         if (error.response && error.response.status === 404) {
@@ -24,10 +31,10 @@ async function getRepoInfo(repoFullName) {
 }
 
 /**
- * Fetch all repositories accessible via the GitHub token
+ * Fetch all repositories added via the Settings page
  */
 async function getAccessibleRepositories() {
-    const cacheKey = 'accessible_repos_filtered';
+    const cacheKey = 'accessible_repos_db';
     const cached = await getCachedGitHubResponse(cacheKey);
 
     // Check if valid and within TTL (manually for repos)
@@ -35,33 +42,70 @@ async function getAccessibleRepositories() {
         return cached.data;
     }
 
-    const allowedRepos = [
-        { owner: 'timeriver', name: 'cnd_chat', fullName: 'timeriver/cnd_chat' },
-        { owner: 'timeriver', name: 'sacsys009', fullName: 'timeriver/sacsys009' },
-        { owner: 'timeriver', name: 'learnings', fullName: 'timeriver/learnings' },
-    ];
-
     try {
-        const repos = [];
-        for (const repoInfo of allowedRepos) {
-            const repo = await getRepoInfo(repoInfo.fullName);
-            if (repo) {
-                repos.push({
-                    owner: repo.owner.login,
-                    name: repo.name,
-                    fullName: repo.full_name,
-                });
-            }
-        }
+        // Fetch from tracked_repositories table
+        const sql = 'SELECT * FROM tracked_repositories ORDER BY added_at DESC';
+        const trackedRepos = await query(sql);
+
+        const repos = trackedRepos.map(repo => ({
+            owner: repo.owner,
+            name: repo.name,
+            fullName: repo.full_name,
+            description: repo.description,
+            stars: repo.stars,
+            avatarUrl: repo.avatar_url
+        }));
 
         await setCachedGitHubResponse(cacheKey, repos);
         return repos;
     } catch (error) {
-        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-            const err = new Error('GitHub authentication failed. Check your GITHUB_TOKEN.');
-            err.status = 401;
-            throw err;
-        }
+        console.error('[githubRepoService] getAccessibleRepositories DB error:', error.message);
+        throw error;
+    }
+}
+
+/**
+ * Add a repository to tracked repositories
+ */
+const addTrackedRepository = async (repoData) => {
+    try {
+        const { fullName, name, owner, description, stars, avatarUrl } = repoData;
+
+        // Clear existing tracked repositories to enforce single repo mode
+        await query('DELETE FROM tracked_repositories');
+
+        const sql = `
+            INSERT INTO tracked_repositories 
+                (full_name, name, owner, description, stars, avatar_url)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `;
+
+        await query(sql, [
+            fullName,
+            name,
+            owner,
+            description || '',
+            stars || 0,
+            avatarUrl || ''
+        ]);
+
+        return { success: true };
+    } catch (error) {
+        console.error('[githubRepoService] addTrackedRepository error:', error.message);
+        throw error;
+    }
+}
+
+/**
+ * Remove a repository from tracked repositories
+ */
+async function removeTrackedRepository(fullName) {
+    try {
+        const sql = 'DELETE FROM tracked_repositories WHERE full_name = ?';
+        await query(sql, [fullName]);
+        return { success: true };
+    } catch (error) {
+        console.error('[githubRepoService] removeTrackedRepository error:', error.message);
         throw error;
     }
 }
@@ -136,25 +180,38 @@ async function getGithubProfileWithRepos(username) {
 }
 
 /**
- * Search repositories accessible by the token
+ * Search repositories accessible by the token.
+ * Caches the full /user/repos list for 2 minutes so subsequent
+ * search keystrokes filter locally instead of hitting GitHub.
  */
-async function searchRepositories(query) {
-    if (!query || query.length < 2) return [];
+async function searchRepositories(searchQuery) {
+    if (!searchQuery || searchQuery.length < 2) return [];
 
     try {
-        // Fetch repositories accessible to the authenticated user
-        const response = await githubClient.get('/user/repos', {
-            headers: withAuth(),
-            params: {
-                sort: 'updated',
-                per_page: 100 // Fetch a reasonable number of recent repos
-            }
-        });
+        const cacheKey = 'search_repos_list';
+        let allRepos;
+
+        // Try to get cached repo list first
+        const cached = await getCachedGitHubResponse(cacheKey);
+        if (cached && cached.data) {
+            allRepos = cached.data;
+        } else {
+            // Fetch from GitHub and cache for 2 minutes
+            const response = await githubClient.get('/user/repos', {
+                headers: withAuth(),
+                params: {
+                    sort: 'updated',
+                    per_page: 100
+                }
+            });
+            allRepos = response.data;
+            await setCachedGitHubResponse(cacheKey, allRepos, null, 120);
+        }
 
         // Filter locally based on the query
-        const filtered = response.data.filter(repo =>
-            repo.full_name.toLowerCase().includes(query.toLowerCase()) ||
-            (repo.description && repo.description.toLowerCase().includes(query.toLowerCase()))
+        const filtered = allRepos.filter(repo =>
+            repo.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (repo.description && repo.description.toLowerCase().includes(searchQuery.toLowerCase()))
         );
 
         return filtered.slice(0, 10).map(repo => ({
@@ -176,5 +233,7 @@ module.exports = {
     getAccessibleRepositories,
     getGithubProfileWithRepos,
     getRepoInfo,
-    searchRepositories
+    searchRepositories,
+    addTrackedRepository,
+    removeTrackedRepository
 };

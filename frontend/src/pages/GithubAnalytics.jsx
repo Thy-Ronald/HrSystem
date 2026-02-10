@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueries } from '@tanstack/react-query';
 import { queryClient } from '../lib/queryClient';
 import {
     Box,
@@ -28,7 +28,6 @@ import EvidenceModal from '../components/EvidenceModal';
 
 
 const GithubAnalytics = () => {
-    const [selectedRepo, setSelectedRepo] = useState('');
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
     const [currentTime, setCurrentTime] = useState(Date.now());
     const scrollRef = useRef(null);
@@ -42,24 +41,53 @@ const GithubAnalytics = () => {
     const { data: repos = [], isLoading: reposLoading } = useQuery({
         queryKey: ['repositories'],
         queryFn: fetchRepositories,
-        staleTime: 10 * 60 * 1000, // 10 minutes (repos don't change often)
+        staleTime: 10 * 60 * 1000,
     });
 
-    // Fetch timeline data with React Query
-    const { data: timelineData = [], isLoading: loading } = useQuery({
-        queryKey: ['timeline', selectedRepo, selectedDate],
-        queryFn: () => getGithubTimeline(selectedRepo, null, { date: selectedDate }),
-        enabled: !!selectedRepo, // Only fetch when repo is selected
-        staleTime: 5 * 60 * 1000, // 5 minutes
+    // Fetch timeline data for ALL repositories in parallel
+    const timelineQueries = useQueries({
+        queries: repos.map(repo => ({
+            queryKey: ['timeline', repo.fullName, selectedDate],
+            queryFn: () => getGithubTimeline(repo.fullName, null, { date: selectedDate }),
+            staleTime: 5 * 60 * 1000,
+        }))
     });
+
+    const loading = timelineQueries.some(q => q.isLoading);
+    const reposData = timelineQueries.map(q => q.data).filter(Boolean);
+
+    // Merge timeline data from all repositories by user login
+    const timelineData = useMemo(() => {
+        const userMap = new Map();
+
+        reposData.forEach(repoTimeline => {
+            if (!Array.isArray(repoTimeline)) return;
+
+            repoTimeline.forEach(userData => {
+                const login = userData.user.login;
+                if (!userMap.has(login)) {
+                    userMap.set(login, {
+                        ...userData,
+                        issues: [...userData.issues]
+                    });
+                } else {
+                    const existing = userMap.get(login);
+                    // Add issues from this repo if not already present (should be unique across repos)
+                    existing.issues = [...existing.issues, ...userData.issues];
+                    existing.totalP = (existing.totalP || 0) + (userData.totalP || 0);
+                }
+            });
+        });
+
+        return Array.from(userMap.values());
+    }, [reposData]);
 
     // Default scroll to 10:00 AM
     useEffect(() => {
         if (scrollRef.current && !loading && timelineData.length > 0) {
-            // (10 hours / 24 hours) * 2400px = 1000px
             scrollRef.current.scrollLeft = 1000;
         }
-    }, [loading, timelineData]);
+    }, [loading, timelineData.length]);
 
     // Central ticker for all timers
     useEffect(() => {
@@ -69,13 +97,6 @@ const GithubAnalytics = () => {
         return () => clearInterval(interval);
     }, []);
 
-    // Set default repo when repos are loaded
-    useEffect(() => {
-        if (repos.length > 0 && !selectedRepo) {
-            const defaultRepo = repos.find(r => r.name === 'sacsys009') || repos[0];
-            setSelectedRepo(defaultRepo.fullName);
-        }
-    }, [repos, selectedRepo]);
 
     // Setup Socket.IO for real-time updates
     const { subscribe, unsubscribe } = useSocket();
@@ -83,13 +104,9 @@ const GithubAnalytics = () => {
     // Memoize socket event handler to prevent re-creating on every render
     const handleGithubUpdate = useCallback((payload) => {
         console.log("[Socket] Received GitHub update event:", payload);
-        // Refresh if the updated repo matches current selection
-        if (payload.repo === selectedRepo) {
-            console.log("[Socket] Invalidating cache for", selectedRepo);
-            // Invalidate React Query cache to trigger refetch
-            queryClient.invalidateQueries({ queryKey: ['timeline', selectedRepo] });
-        }
-    }, [selectedRepo]);
+        // Refresh the specific repo query
+        queryClient.invalidateQueries({ queryKey: ['timeline', payload.repo] });
+    }, []);
 
     useEffect(() => {
         subscribe('github:repo-updated', handleGithubUpdate);
@@ -111,21 +128,6 @@ const GithubAnalytics = () => {
                 <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mr: 1, color: '#333' }}>
                     GitHub Analytics
                 </Typography>
-
-                <FormControl size="small" sx={{ minWidth: 180 }}>
-                    <Select
-                        value={selectedRepo}
-                        onChange={(e) => setSelectedRepo(e.target.value)}
-                        displayEmpty
-                        sx={{ height: 32, fontSize: '0.85rem' }}
-                    >
-                        {repos.map(repo => (
-                            <MenuItem key={repo.fullName} value={repo.fullName}>
-                                {repo.name}
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
 
                 <input
                     type="date"
@@ -344,7 +346,7 @@ const GithubAnalytics = () => {
 
                 {/* Loading Overlay */}
                 {
-                    (loading || reposLoading || (repos.length > 0 && !selectedRepo)) && (
+                    (loading || reposLoading) && (
                         <Box sx={{
                             position: 'absolute',
                             top: 32, // Below header
@@ -364,7 +366,7 @@ const GithubAnalytics = () => {
 
                 {/* Empty State Overlay - Shadcn Style */}
                 {
-                    !loading && !reposLoading && selectedRepo && timelineData.length === 0 && (
+                    !loading && !reposLoading && timelineData.length === 0 && (
                         <Box sx={{
                             position: 'absolute',
                             top: 32,

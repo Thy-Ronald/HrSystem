@@ -5,8 +5,8 @@
  * 
  * REFRESH STRATEGY:
  * =================
- * 1. Runs every 30 minutes (configurable via CACHE_REFRESH_INTERVAL_MS)
- * 2. Only refreshes the three allowed repositories: timeriver/cnd_chat, timeriver/sacsys009, and timeriver/learnings
+ * 1. Runs every 15 minutes (configurable via CACHE_CONFIG)
+ * 2. Dynamically fetches tracked repositories from DB (Settings screen)
  * 3. Uses incremental refresh (fetches only issues updated since last fetch)
  * 4. Full refresh is done once every 24 hours to catch any edge cases
  * 
@@ -27,12 +27,12 @@ const {
   getCacheStatus,
   CACHE_CONFIG
 } = require('../services/issueCacheService');
-
-// Only refresh these two specific repositories
-const ALLOWED_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009', 'timeriver/learnings'];
+const { getAccessibleRepositories } = require('../services/github/githubRepoService');
+const { getRateLimitStatus } = require('../services/github/githubClients');
 
 // Configuration
 const DELAY_BETWEEN_REPOS_MS = 2000; // 2 second delay between repo refreshes
+const RATE_LIMIT_SKIP_THRESHOLD = 300; // Skip refresh if remaining < this
 
 let refreshInterval = null;
 let isRunning = false;
@@ -45,9 +45,22 @@ function sleep(ms) {
 }
 
 /**
- * Refresh only the allowed repositories
+ * Get the list of tracked repositories dynamically from DB
+ * @returns {Promise<string[]>} Array of repo full names
+ */
+async function getTrackedRepoList() {
+  try {
+    const repos = await getAccessibleRepositories();
+    return repos.map(r => r.fullName).filter(Boolean);
+  } catch (error) {
+    console.error('[CacheJob] Error fetching tracked repos:', error.message);
+    return [];
+  }
+}
+
+/**
+ * Refresh only the tracked repositories
  * Called by the scheduled job
- * Only refreshes timeriver/cnd_chat, timeriver/sacsys009, and timeriver/learnings
  */
 async function refreshAllTrackedRepos() {
   if (isRunning) {
@@ -55,19 +68,34 @@ async function refreshAllTrackedRepos() {
     return;
   }
 
+  // Adaptive backoff: skip if rate limit is low
+  const rateLimit = getRateLimitStatus();
+  if (rateLimit.remaining !== null && rateLimit.remaining < RATE_LIMIT_SKIP_THRESHOLD) {
+    const resetDate = rateLimit.reset ? new Date(rateLimit.reset * 1000).toLocaleTimeString() : 'unknown';
+    console.warn(`[CacheJob] ⚠️ Rate limit low (${rateLimit.remaining}/${rateLimit.limit}), skipping refresh. Resets at ${resetDate}`);
+    return;
+  }
+
   isRunning = true;
   const startTime = Date.now();
 
   console.log('[CacheJob] ====== Starting scheduled cache refresh ======');
-  console.log(`[CacheJob] Only refreshing allowed repositories: ${ALLOWED_REPOS.join(', ')}`);
 
   try {
+    const trackedRepos = await getTrackedRepoList();
+
+    if (trackedRepos.length === 0) {
+      console.log('[CacheJob] No tracked repositories found, skipping refresh');
+      return;
+    }
+
+    console.log(`[CacheJob] Refreshing tracked repositories: ${trackedRepos.join(', ')}`);
+
     let refreshed = 0;
     let skipped = 0;
     let failed = 0;
 
-    // Only refresh the two allowed repositories
-    for (const repoFullName of ALLOWED_REPOS) {
+    for (const repoFullName of trackedRepos) {
       try {
         // Check if this repo actually needs refresh
         const status = await getCacheStatus(repoFullName);
@@ -91,7 +119,9 @@ async function refreshAllTrackedRepos() {
         }
 
         // Add delay between repos to respect rate limits
-        await sleep(DELAY_BETWEEN_REPOS_MS);
+        if (trackedRepos.length > 1) {
+          await sleep(DELAY_BETWEEN_REPOS_MS);
+        }
 
       } catch (error) {
         failed++;

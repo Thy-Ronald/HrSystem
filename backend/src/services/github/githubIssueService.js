@@ -11,18 +11,26 @@ const {
     STATUS_PRIORITY_ORDER,
     extractEvidence
 } = require('./githubUtils');
+const { coalesce } = require('../../utils/requestCoalescing');
 
 /**
  * Fetch issues from a repository assigned within date range
  */
 async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
-    const [owner, repo] = repoFullName.split('/');
     const cacheKey = generateCacheKey('issues', repoFullName, filter);
     const cached = await getCachedGitHubResponse(cacheKey);
 
     if (cached && cached.data) {
         return cached.data;
     }
+
+    // Coalesce: if 10 users request the same data concurrently,
+    // only 1 GitHub API call is made. Others wait for the same promise.
+    return coalesce(cacheKey, () => _fetchIssuesByUserForPeriod(repoFullName, filter, cacheKey));
+}
+
+async function _fetchIssuesByUserForPeriod(repoFullName, filter, cacheKey) {
+    const [owner, repo] = repoFullName.split('/');
 
     const { startDate, endDate } = getDateRange(filter);
     const cutoffDate = new Date(startDate);
@@ -158,7 +166,7 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
             }))
             .sort((a, b) => b.total - a.total || a.username.localeCompare(b.username));
 
-        await setCachedGitHubResponse(cacheKey, result, null, 600);
+        await setCachedGitHubResponse(cacheKey, result, null, 900);
         return result;
     } catch (error) {
         throw error;
@@ -169,10 +177,16 @@ async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
  * Fetch detailed timeline for issues
  */
 async function getIssueTimeline(repoFullName, filter = 'this-month', date = null) {
-    const [owner, repo] = repoFullName.split('/');
     const cacheKey = generateCacheKey('timeline', repoFullName, filter, date);
     const cached = await getCachedGitHubResponse(cacheKey);
     if (cached && cached.data) return cached.data;
+
+    // Coalesce concurrent requests for the same timeline data
+    return coalesce(cacheKey, () => _fetchIssueTimeline(repoFullName, filter, date, cacheKey));
+}
+
+async function _fetchIssueTimeline(repoFullName, filter, date, cacheKey) {
+    const [owner, repo] = repoFullName.split('/');
 
     let startDate, endDate;
     if (date) {
@@ -312,7 +326,7 @@ async function getIssueTimeline(repoFullName, filter = 'this-month', date = null
         });
 
         const result = Object.values(issuesByUser);
-        await setCachedGitHubResponse(cacheKey, result, null, 600);
+        await setCachedGitHubResponse(cacheKey, result, null, 900);
         return result;
     } catch (error) {
         throw error;

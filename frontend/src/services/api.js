@@ -160,6 +160,34 @@ export async function fetchRepositories() {
 }
 
 /**
+ * Add a repository to tracked list
+ * @param {Object} repoData - Repository data
+ * @returns {Promise<Object>}
+ */
+export async function addTrackedRepository(repoData) {
+  const res = await fetch(`${API_BASE}/api/github/tracked`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(repoData),
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Remove a repository from tracked list
+ * @param {string} fullName - Repository full name
+ * @returns {Promise<Object>}
+ */
+export async function removeTrackedRepository(fullName) {
+  const params = new URLSearchParams({ fullName });
+  const res = await fetch(`${API_BASE}/api/github/tracked?${params}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(res);
+}
+
+/**
  * Fetch issues from a repository grouped by user for a given period
  * @param {string} repo - Repository full name (owner/repo)
  * @param {string} filter - Filter: today, yesterday, this-week, last-week, this-month

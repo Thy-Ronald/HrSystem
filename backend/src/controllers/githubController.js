@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const cacheService = require('../services/cacheService');
 const { withAuth } = require('../services/github/githubClients');
-const { getGithubProfileWithRepos, getIssuesByUserForPeriod, getAccessibleRepositories, checkCacheStatus, checkRepoChanges, getCommitsByUserForPeriod, getLanguagesByUserForPeriod, getIssueTimeline } = require('../services/githubService');
+const { getGithubProfileWithRepos, getIssuesByUserForPeriod, getAccessibleRepositories, checkCacheStatus, checkRepoChanges, getCommitsByUserForPeriod, getLanguagesByUserForPeriod, getIssueTimeline, addTrackedRepository, removeTrackedRepository } = require('../services/githubService');
 
 async function handleGithubLookup(req, res, next) {
   try {
@@ -16,17 +16,11 @@ async function handleGithubLookup(req, res, next) {
 
 async function handleGetRepositories(req, res, next) {
   try {
-    const allRepos = await getAccessibleRepositories();
-
-    // Filter to only return the two specific repositories to reduce API calls
-    const allowedRepos = ['timeriver/cnd_chat', 'timeriver/sacsys009', 'timeriver/learnings'];
-    const filteredRepos = allRepos.filter(repo =>
-      allowedRepos.includes(repo.fullName)
-    );
+    const repos = await getAccessibleRepositories();
 
     res.json({
       success: true,
-      data: filteredRepos,
+      data: repos,
     });
   } catch (error) {
     next(error);
@@ -330,6 +324,43 @@ async function handleSearchRepositories(req, res, next) {
   }
 }
 
+/**
+ * Handle adding a repository to tracked list
+ */
+async function handleAddTrackedRepo(req, res, next) {
+  try {
+    const repoData = req.body;
+    if (!repoData || !repoData.fullName) {
+      return res.status(400).json({ success: false, error: 'Repository data required' });
+    }
+
+    const result = await addTrackedRepository(repoData);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Handle removing a repository from tracked list
+ */
+async function handleRemoveTrackedRepo(req, res, next) {
+  try {
+    const { fullName } = req.params;
+    // Handle namespaced params if they come in via query or body
+    const repoToRemove = fullName || req.query.fullName || req.body.fullName;
+
+    if (!repoToRemove) {
+      return res.status(400).json({ success: false, error: 'Repository fullName required' });
+    }
+
+    const result = await removeTrackedRepository(decodeURIComponent(repoToRemove));
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   handleGithubLookup,
   handleIssuesByPeriod,
@@ -340,5 +371,7 @@ module.exports = {
   handleLanguagesByPeriod,
   handleGetTimeline,
   handleProxyImage,
-  handleSearchRepositories
+  handleSearchRepositories,
+  handleAddTrackedRepo,
+  handleRemoveTrackedRepo
 };

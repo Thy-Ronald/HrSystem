@@ -8,13 +8,7 @@ import { RANKING_TYPES } from '../constants';
 const sharedCache = new Map();
 const cacheTimestamps = new Map();
 
-// Configuration
-const BATCH_SIZE = 10;
-// Note: TTL is now handled by cacheUtils.js (2min OR 6PM, whichever comes first)
 const RESET_HOUR = 18; // 6 PM
-const RESET_AT_6PM_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
-// Only these repos are allowed for languages and commits ranking
-const ALLOWED_RANKING_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
 
 /**
  * Check if cache timestamp is past the 6 PM reset time
@@ -52,11 +46,11 @@ function mergeUserData(targetMap, user, rankingType = RANKING_TYPES.ISSUES) {
         const currentCount = existingLangs.get(lang.language) || 0;
         existingLangs.set(lang.language, currentCount + (lang.count || 0));
       });
-      
+
       // Update total files
       existing.totalFiles = (existing.totalFiles || 0) + (user.totalFiles || 0);
       const totalFiles = existing.totalFiles;
-      
+
       // Convert back to sorted array (top 5) with percentages
       existing.topLanguages = Array.from(existingLangs.entries())
         .sort((a, b) => b[1] - a[1])
@@ -112,19 +106,11 @@ export function useAllReposRanking() {
       return;
     }
 
-    // Filter repositories to only allowed ones for commits and languages
-    const allowedRepos = repositories.filter(repo => {
-      if (rankingType === RANKING_TYPES.COMMITS || rankingType === RANKING_TYPES.LANGUAGES) {
-        return ALLOWED_RANKING_REPOS.includes(repo.fullName);
-      }
-      return true; // For issues, allow all repos
-    });
+    const allowedRepos = repositories;
 
     if (allowedRepos.length === 0) {
       setRankingData([]);
-      setError(rankingType === RANKING_TYPES.LANGUAGES || rankingType === RANKING_TYPES.COMMITS
-        ? `Only ${ALLOWED_RANKING_REPOS.join(' and ')} repositories are supported for ${rankingType === RANKING_TYPES.LANGUAGES ? 'languages' : 'commits'} ranking`
-        : 'No repositories available');
+      setError('No repositories available');
       return;
     }
 
@@ -156,8 +142,8 @@ export function useAllReposRanking() {
         const localStorageKey = generateCacheKey(cachePrefix, repo.fullName, filterForCache);
         const cached = getCached(localStorageKey); // Uses 2min OR 6PM TTL automatically
 
-        // Manual check for 6PM reset repositories (only for issues)
-        const shouldReset = rankingType === RANKING_TYPES.ISSUES && RESET_AT_6PM_REPOS.includes(repo.fullName);
+        // Manual check for 6PM reset (uses 6PM logic)
+        const shouldReset = rankingType === RANKING_TYPES.ISSUES;
         const rawString = localStorage.getItem(localStorageKey);
         const raw = rawString ? JSON.parse(rawString) : null;
         const expiredByReset = shouldReset && isPastResetTime(raw?.timestamp);

@@ -1,108 +1,44 @@
-const { getIssuesByUserForPeriod, getCommitsByUserForPeriod, getLanguagesByUserForPeriod } = require('./githubService');
-const axios = require('axios');
+/**
+ * Analytics Service
+ * 
+ * Aggregates GitHub data across tracked repositories for analytics dashboards.
+ * Uses shared GitHub clients, caching, and dynamic repo lookup.
+ */
 
-const githubClient = axios.create({
-  baseURL: 'https://api.github.com',
-  headers: {
-    Accept: 'application/vnd.github+json',
-  },
-});
-
-const githubGraphQLClient = axios.create({
-  baseURL: 'https://api.github.com/graphql',
-  headers: {
-    Accept: 'application/vnd.github+json',
-  },
-});
-
-function withAuth() {
-  const token = process.env.GITHUB_TOKEN;
-  if (!token) {
-    throw new Error('GITHUB_TOKEN is required');
-  }
-  return {
-    Authorization: `Bearer ${token}`,
-  };
-}
-
-// Helper function to get date range (copied from githubService since it's not exported)
-function getDateRange(filter) {
-  const now = new Date();
-  let startDate, endDate;
-
-  // Handle custom month format: month-MM-YYYY (e.g., month-01-2024)
-  if (filter && filter.startsWith('month-')) {
-    const parts = filter.split('-');
-    if (parts.length === 3) {
-      const month = parseInt(parts[1]) - 1; // JavaScript months are 0-indexed
-      const year = parseInt(parts[2]);
-      startDate = new Date(year, month, 1);
-      startDate.setHours(0, 0, 0, 0);
-      // Get last day of the month
-      endDate = new Date(year, month + 1, 0);
-      endDate.setHours(23, 59, 59, 999);
-      return { startDate, endDate };
-    }
-  }
-
-  switch (filter) {
-    case 'yesterday': {
-      startDate = new Date(now);
-      startDate.setDate(startDate.getDate() - 1);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(startDate);
-      endDate.setHours(23, 59, 59, 999);
-      break;
-    }
-    case 'this-week': {
-      startDate = new Date(now);
-      const dayOfWeek = startDate.getDay();
-      const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      startDate.setDate(startDate.getDate() - diff);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(now);
-      endDate.setHours(23, 59, 59, 999);
-      break;
-    }
-    case 'last-week': {
-      startDate = new Date(now);
-      const currentDayOfWeek = startDate.getDay();
-      const diffToMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
-      startDate.setDate(startDate.getDate() - diffToMonday - 7);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + 6);
-      endDate.setHours(23, 59, 59, 999);
-      break;
-    }
-    case 'this-month': {
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(now);
-      endDate.setHours(23, 59, 59, 999);
-      break;
-    }
-    case 'today':
-    default: {
-      startDate = new Date(now);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(now);
-      endDate.setHours(23, 59, 59, 999);
-      break;
-    }
-  }
-
-  return { startDate, endDate };
-}
-
-const ALLOWED_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009', 'timeriver/learnings'];
+const { getIssuesByUserForPeriod, getCommitsByUserForPeriod, getLanguagesByUserForPeriod, getAccessibleRepositories } = require('./githubService');
+const { githubClient, githubGraphQLClient, withAuth } = require('./github/githubClients');
+const { getDateRange } = require('./github/githubUtils');
+const {
+  generateCacheKey,
+  getCachedGitHubResponse,
+  setCachedGitHubResponse,
+} = require('../utils/githubCache');
 
 /**
- * Get analytics overview for all repositories
+ * Get the list of tracked repos dynamically
+ * @returns {Promise<string[]>} Array of repo full names
+ */
+async function getTrackedRepoList() {
+  try {
+    const repos = await getAccessibleRepositories();
+    return repos.map(r => r.fullName).filter(Boolean);
+  } catch (error) {
+    console.error('[Analytics] Error fetching tracked repos:', error.message);
+    return [];
+  }
+}
+
+/**
+ * Get analytics overview for all tracked repositories
  * @param {string} filter - Filter type: today, yesterday, this-week, last-week, this-month
  * @returns {Promise<Object>} Overview statistics
  */
 async function getAnalyticsOverview(filter = 'this-month') {
+  // Check Redis cache first (15-minute TTL)
+  const cacheKey = generateCacheKey('analytics', 'overview', filter);
+  const cached = await getCachedGitHubResponse(cacheKey);
+  if (cached && cached.data) return cached.data;
+
   const overview = {
     activeContributors: 0,
     totalIssuesCompleted: 0,
@@ -116,8 +52,10 @@ async function getAnalyticsOverview(filter = 'this-month') {
   let totalAssigned = 0;
   let totalDone = 0;
 
-  // Fetch data from all allowed repositories
-  for (const repo of ALLOWED_REPOS) {
+  const trackedRepos = await getTrackedRepoList();
+
+  // Fetch data from all tracked repositories
+  for (const repo of trackedRepos) {
     try {
       // Get issues
       const issues = await getIssuesByUserForPeriod(repo, filter);
@@ -174,6 +112,9 @@ async function getAnalyticsOverview(filter = 'this-month') {
   usersArray.sort((a, b) => b.score - a.score);
   overview.topPerformer = usersArray.length > 0 ? usersArray[0].username : null;
 
+  // Cache for 15 minutes
+  await setCachedGitHubResponse(cacheKey, overview, null, 900);
+
   return overview;
 }
 
@@ -183,6 +124,11 @@ async function getAnalyticsOverview(filter = 'this-month') {
  * @returns {Promise<Array>} Array of daily activity data
  */
 async function getDailyActivityTrends(filter = 'this-month') {
+  // Check Redis cache first (30-minute TTL)
+  const cacheKey = generateCacheKey('analytics', 'daily-trends', filter);
+  const cached = await getCachedGitHubResponse(cacheKey);
+  if (cached && cached.data) return cached.data;
+
   const now = new Date();
   const endDate = new Date(now);
   endDate.setHours(23, 59, 59, 999);
@@ -204,9 +150,11 @@ async function getDailyActivityTrends(filter = 'this-month') {
     currentDate.setDate(currentDate.getDate() + 1);
   }
 
-  // Fetch commits for all allowed repositories
+  const trackedRepos = await getTrackedRepoList();
+
+  // Fetch commits for all tracked repositories
   let totalCommitsCounted = 0;
-  for (const repo of ALLOWED_REPOS) {
+  for (const repo of trackedRepos) {
     try {
       const [owner, repoName] = repo.split('/');
       console.log(`[Analytics] Fetching commits for ${repo} from ${startDate.toISOString()} to ${endDate.toISOString()}`);
@@ -214,7 +162,7 @@ async function getDailyActivityTrends(filter = 'this-month') {
       // Fetch commits for the 10-day period
       let hasNextPage = true;
       let page = 1;
-      const maxPages = 10; // Increased to get more commits
+      const maxPages = 10;
       let repoCommitsFetched = 0;
       let repoCommitsCounted = 0;
 
@@ -240,7 +188,6 @@ async function getDailyActivityTrends(filter = 'this-month') {
 
         // Count commits by date
         for (const commit of commits) {
-          // GitHub API returns commit date in commit.commit.author.date or commit.commit.committer.date
           let commitDate = null;
           if (commit.commit) {
             commitDate = commit.commit.author?.date || commit.commit.committer?.date;
@@ -250,7 +197,6 @@ async function getDailyActivityTrends(filter = 'this-month') {
             const date = new Date(commitDate);
             const dateKey = date.toISOString().split('T')[0];
 
-            // Only count if within our date range
             if (dailyData.has(dateKey)) {
               dailyData.get(dateKey).commits += 1;
               repoCommitsCounted++;
@@ -269,15 +215,13 @@ async function getDailyActivityTrends(filter = 'this-month') {
       console.error(`[Analytics] Error fetching commits for ${repo}:`, error.message);
       if (error.response) {
         console.error(`[Analytics] Response status:`, error.response.status);
-        console.error(`[Analytics] Response data:`, error.response.data);
       }
     }
   }
 
-  // Fetch issues completed (done status) for all allowed repositories
-  // Track when "3:Local Done" label was added using timeline events
+  // Fetch issues completed (done status) for all tracked repositories
   let totalIssuesFound = 0;
-  for (const repo of ALLOWED_REPOS) {
+  for (const repo of trackedRepos) {
     try {
       const [owner, repoName] = repo.split('/');
       console.log(`[Analytics] Fetching issues for ${repo}`);
@@ -285,7 +229,7 @@ async function getDailyActivityTrends(filter = 'this-month') {
       let hasNextPage = true;
       let cursor = null;
       let pageCount = 0;
-      const maxPages = 10; // Increased to get more data
+      const maxPages = 10;
       let repoIssuesProcessed = 0;
       let repoIssuesDone = 0;
 
@@ -358,16 +302,13 @@ async function getDailyActivityTrends(filter = 'this-month') {
 
           if (hasDoneLabel) {
             repoIssuesDone++;
-            // Find when the "3:Local Done" label was added from timeline
             const timelineItems = issue.timelineItems?.nodes || [];
             let doneDate = null;
 
-            // Look for the most recent "3:Local Done" label event within our date range
             for (const event of timelineItems) {
               if (event.label?.name === '3:Local Done' && event.createdAt) {
                 const eventDate = new Date(event.createdAt);
                 if (eventDate >= startDate && eventDate <= endDate) {
-                  // Use the most recent one if multiple exist
                   if (!doneDate || eventDate > doneDate) {
                     doneDate = eventDate;
                   }
@@ -375,7 +316,6 @@ async function getDailyActivityTrends(filter = 'this-month') {
               }
             }
 
-            // If we found a done date in timeline, use it; otherwise use updatedAt as fallback
             if (doneDate) {
               const dateKey = doneDate.toISOString().split('T')[0];
               if (dailyData.has(dateKey)) {
@@ -383,7 +323,6 @@ async function getDailyActivityTrends(filter = 'this-month') {
                 totalIssuesFound++;
               }
             } else if (updatedAt >= startDate && updatedAt <= endDate) {
-              // Fallback: use updatedAt if no timeline event found but issue is in range
               const dateKey = updatedAt.toISOString().split('T')[0];
               if (dailyData.has(dateKey)) {
                 dailyData.get(dateKey).issues += 1;
@@ -402,7 +341,6 @@ async function getDailyActivityTrends(filter = 'this-month') {
       console.error(`[Analytics] Error fetching issues for ${repo}:`, error.message);
       if (error.response) {
         console.error(`[Analytics] Response status:`, error.response.status);
-        console.error(`[Analytics] Response data:`, error.response.data);
       }
     }
   }
@@ -414,6 +352,9 @@ async function getDailyActivityTrends(filter = 'this-month') {
   console.log(`[Analytics] Daily trends result:`, result);
   console.log(`[Analytics] Total commits counted: ${totalCommitsCounted}, Total issues counted: ${totalIssuesFound}`);
 
+  // Cache for 30 minutes
+  await setCachedGitHubResponse(cacheKey, result, null, 1800);
+
   return result;
 }
 
@@ -424,10 +365,16 @@ async function getDailyActivityTrends(filter = 'this-month') {
  * @returns {Promise<Array>} Array of top contributors
  */
 async function getTopContributors(limit = 10, filter = 'this-month') {
-  const allUsers = new Map();
+  // Check Redis cache first (15-minute TTL)
+  const cacheKey = generateCacheKey('analytics', 'top-contributors', filter);
+  const cached = await getCachedGitHubResponse(cacheKey);
+  if (cached && cached.data) return cached.data;
 
-  // Fetch data from all allowed repositories
-  for (const repo of ALLOWED_REPOS) {
+  const allUsers = new Map();
+  const trackedRepos = await getTrackedRepoList();
+
+  // Fetch data from all tracked repositories
+  for (const repo of trackedRepos) {
     try {
       // Get issues
       const issues = await getIssuesByUserForPeriod(repo, filter);
@@ -483,12 +430,17 @@ async function getTopContributors(limit = 10, filter = 'this-month') {
   // Calculate scores and sort
   const contributors = Array.from(allUsers.values()).map(user => ({
     ...user,
-    totalScore: user.done * 2 + user.commits, // Weight completed issues more
+    totalScore: user.done * 2 + user.commits,
   }));
 
   contributors.sort((a, b) => b.totalScore - a.totalScore);
 
-  return contributors.slice(0, limit);
+  const result = contributors.slice(0, limit);
+
+  // Cache for 15 minutes
+  await setCachedGitHubResponse(cacheKey, result, null, 900);
+
+  return result;
 }
 
 /**
@@ -497,9 +449,15 @@ async function getTopContributors(limit = 10, filter = 'this-month') {
  * @returns {Promise<Array>} Language distribution data
  */
 async function getLanguageDistribution(filter = 'all') {
-  const languageMap = new Map();
+  // Check Redis cache first (15-minute TTL)
+  const cacheKey = generateCacheKey('analytics', 'language-dist', filter);
+  const cached = await getCachedGitHubResponse(cacheKey);
+  if (cached && cached.data) return cached.data;
 
-  for (const repo of ALLOWED_REPOS) {
+  const languageMap = new Map();
+  const trackedRepos = await getTrackedRepoList();
+
+  for (const repo of trackedRepos) {
     try {
       const languages = await getLanguagesByUserForPeriod(repo, filter);
       languages.forEach(user => {
@@ -517,11 +475,14 @@ async function getLanguageDistribution(filter = 'all') {
   }
 
   // Convert to array and sort
-  const distribution = Array.from(languageMap.entries())
+  const result = Array.from(languageMap.entries())
     .map(([language, count]) => ({ language, count }))
     .sort((a, b) => b.count - a.count);
 
-  return distribution;
+  // Cache for 15 minutes
+  await setCachedGitHubResponse(cacheKey, result, null, 900);
+
+  return result;
 }
 
 module.exports = {

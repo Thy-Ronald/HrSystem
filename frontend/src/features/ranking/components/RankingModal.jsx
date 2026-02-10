@@ -6,7 +6,6 @@ import { RepositoryMultiSelect } from './RepositoryMultiSelect';
 import { TABLE_COLUMNS, COMMITS_TABLE_COLUMNS, LANGUAGES_TABLE_COLUMNS, QUICK_FILTERS, FILTER_LABELS, STORAGE_KEYS, RANKING_TYPES, RANKING_TYPE_LABELS } from '../constants';
 import { useAllReposRanking } from '../hooks/useAllReposRanking';
 
-const RANKING_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009'];
 
 export function RankingModal({ open, onClose, repositories, sharedCacheData }) {
   const [activeFilter, setActiveFilter] = useState(QUICK_FILTERS.THIS_MONTH);
@@ -14,8 +13,7 @@ export function RankingModal({ open, onClose, repositories, sharedCacheData }) {
   const [selectedRepos, setSelectedRepos] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.SELECTED_REPOS);
-      const parsed = saved ? JSON.parse(saved) : [];
-      return Array.isArray(parsed) ? parsed.filter(repo => RANKING_REPOS.includes(repo)) : [];
+      return saved ? JSON.parse(saved) : [];
     } catch (e) {
       return [];
     }
@@ -43,21 +41,22 @@ export function RankingModal({ open, onClose, repositories, sharedCacheData }) {
     }
   }, [selectedRepos]);
 
-  // Ensure selected repos are only from RANKING_REPOS
+  // Ensure selected repos are valid
   useEffect(() => {
     if (repositories && repositories.length > 0) {
-      const validRepos = selectedRepos.filter(repo => RANKING_REPOS.includes(repo));
-      if (validRepos.length !== selectedRepos.length) {
-        setSelectedRepos(validRepos);
+      if (selectedRepos.length === 0) {
+        setSelectedRepos(repositories.map(r => r.fullName));
+      } else {
+        const validRepos = selectedRepos.filter(repo => repositories.some(r => r.fullName === repo));
+        if (validRepos.length !== selectedRepos.length) {
+          setSelectedRepos(validRepos);
+        }
       }
     }
   }, [repositories, selectedRepos]);
 
-  // Filter available repositories to only RANKING_REPOS
-  const availableRepositories = useMemo(() => {
-    if (!repositories) return [];
-    return repositories.filter(repo => RANKING_REPOS.includes(repo.fullName));
-  }, [repositories]);
+  // All repositories are available
+  const availableRepositories = repositories || [];
 
   // Get selected repository objects
   const selectedRepositories = useMemo(() => {
@@ -86,10 +85,10 @@ export function RankingModal({ open, onClose, repositories, sharedCacheData }) {
   ];
 
   return (
-    <Modal 
-      open={open} 
-      onClose={onClose} 
-      title="All Repositories Ranking" 
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="All Repositories Ranking"
       subtitle="Ranking data refreshes every 6 PM"
       size="xl"
     >
@@ -140,11 +139,11 @@ export function RankingModal({ open, onClose, repositories, sharedCacheData }) {
             <div className="overflow-y-auto h-full">
               <RankingTable
                 columns={
-                  rankingType === RANKING_TYPES.COMMITS 
-                    ? COMMITS_TABLE_COLUMNS 
+                  rankingType === RANKING_TYPES.COMMITS
+                    ? COMMITS_TABLE_COLUMNS
                     : rankingType === RANKING_TYPES.LANGUAGES
-                    ? LANGUAGES_TABLE_COLUMNS
-                    : TABLE_COLUMNS
+                      ? LANGUAGES_TABLE_COLUMNS
+                      : TABLE_COLUMNS
                 }
                 data={rankingData}
                 loading={loading}

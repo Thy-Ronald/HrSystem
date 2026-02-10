@@ -1,19 +1,8 @@
-/**
- * RankingFilters Component
- * Quick date filter buttons with repository dropdown on the right
- */
-
 import { QuickFilterButton } from './QuickFilterButton';
-import { RepositorySelect } from './RepositorySelect';
 import { QUICK_FILTERS, FILTER_LABELS } from '../constants';
-
 export function RankingFilters({
   activeQuickFilter,
   onQuickFilterChange,
-  repositories,
-  selectedRepo,
-  onRepoChange,
-  reposLoading,
 }) {
   const quickFilters = [
     { value: QUICK_FILTERS.TODAY, label: FILTER_LABELS[QUICK_FILTERS.TODAY] },
@@ -36,14 +25,6 @@ export function RankingFilters({
             />
           ))}
         </nav>
-        <div className="flex items-center flex-shrink-0">
-          <RepositorySelect
-            repositories={repositories}
-            selectedRepo={selectedRepo}
-            onRepoChange={onRepoChange}
-            loading={reposLoading}
-          />
-        </div>
       </div>
     </section>
   );

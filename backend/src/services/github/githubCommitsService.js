@@ -10,26 +10,24 @@ const {
     getDateRange,
     getLanguageFromFile
 } = require('./githubUtils');
-
-const ALLOWED_REPOS = ['timeriver/cnd_chat', 'timeriver/sacsys009', 'timeriver/learnings'];
+const { coalesce } = require('../../utils/requestCoalescing');
 
 /**
  * Fetch commits from a repository grouped by user for a given period
  */
 async function getCommitsByUserForPeriod(repoFullName, filter = 'today') {
-    if (!ALLOWED_REPOS.includes(repoFullName)) {
-        const error = new Error(`Commits can only be fetched for: ${ALLOWED_REPOS.join(', ')}`);
-        error.status = 403;
-        throw error;
-    }
-
-    const [owner, repo] = repoFullName.split('/');
     const cacheKey = generateCacheKey('commits', repoFullName, filter);
     const cached = await getCachedGitHubResponse(cacheKey);
 
     if (cached && cached.data) {
         return cached.data;
     }
+
+    return coalesce(cacheKey, () => _fetchCommitsByUserForPeriod(repoFullName, filter, cacheKey, cached));
+}
+
+async function _fetchCommitsByUserForPeriod(repoFullName, filter, cacheKey, cached) {
+    const [owner, repo] = repoFullName.split('/');
 
     const { startDate, endDate } = getDateRange(filter);
     const cachedETag = await getCachedETag(cacheKey);
@@ -99,19 +97,18 @@ async function getCommitsByUserForPeriod(repoFullName, filter = 'today') {
  * Fetch languages used by each user from commits
  */
 async function getLanguagesByUserForPeriod(repoFullName, filter = 'all') {
-    if (!ALLOWED_REPOS.includes(repoFullName)) {
-        const error = new Error(`Languages can only be fetched for: ${ALLOWED_REPOS.join(', ')}`);
-        error.status = 403;
-        throw error;
-    }
-
-    const [owner, repo] = repoFullName.split('/');
     const cacheKey = generateCacheKey('languages', repoFullName, filter);
     const cached = await getCachedGitHubResponse(cacheKey);
 
     if (cached && cached.data) {
         return cached.data;
     }
+
+    return coalesce(cacheKey, () => _fetchLanguagesByUserForPeriod(repoFullName, filter, cacheKey, cached));
+}
+
+async function _fetchLanguagesByUserForPeriod(repoFullName, filter, cacheKey, cached) {
+    const [owner, repo] = repoFullName.split('/');
 
     const cachedETag = await getCachedETag(cacheKey);
     const headers = withAuth();
@@ -148,25 +145,35 @@ async function getLanguagesByUserForPeriod(repoFullName, filter = 'all') {
             const commits = response.data;
             if (commits.length === 0) break;
 
-            const commitsToProcess = commits.slice(0, 50);
-            for (const commit of commitsToProcess) {
-                const author = commit.author || commit.committer;
-                if (!author || !author.login) continue;
+            const commitsToProcess = commits.slice(0, 15); // Reduced from 50 to save API calls
 
-                const username = author.login.toLowerCase().trim();
-                try {
-                    const commitDetail = await githubClient.get(`/repos/${owner}/${repo}/commits/${commit.sha}`, { headers: withAuth() });
+            // Batch fetch commit details concurrently (max 5 at a time)
+            const BATCH_SIZE = 5;
+            for (let i = 0; i < commitsToProcess.length; i += BATCH_SIZE) {
+                const batch = commitsToProcess.slice(i, i + BATCH_SIZE);
+                const results = await Promise.allSettled(
+                    batch.map(commit =>
+                        githubClient.get(`/repos/${owner}/${repo}/commits/${commit.sha}`, { headers: withAuth() })
+                            .then(res => ({ commit, data: res.data }))
+                    )
+                );
+
+                for (const result of results) {
+                    if (result.status !== 'fulfilled') continue;
+                    const { commit, data } = result.value;
+                    const author = commit.author || commit.committer;
+                    if (!author || !author.login) continue;
+
+                    const username = author.login.toLowerCase().trim();
                     if (!userLanguages.has(username)) userLanguages.set(username, new Map());
                     const userLangMap = userLanguages.get(username);
-                    (commitDetail.data.files || []).forEach(file => {
+                    (data.files || []).forEach(file => {
                         const lang = getLanguageFromFile(file.filename);
                         if (lang) userLangMap.set(lang, (userLangMap.get(lang) || 0) + 1);
                     });
-                    await new Promise(r => setTimeout(r, 50));
-                } catch (e) {
-                    console.warn(`[Languages] Could not fetch commit ${commit.sha}:`, e.message);
                 }
             }
+
             if (commitsToProcess.length < commits.length) hasNextPage = false;
             else {
                 const linkHeader = response.headers.link;
