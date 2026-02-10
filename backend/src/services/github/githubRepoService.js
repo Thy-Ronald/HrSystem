@@ -135,8 +135,46 @@ async function getGithubProfileWithRepos(username) {
     }
 }
 
+/**
+ * Search repositories accessible by the token
+ */
+async function searchRepositories(query) {
+    if (!query || query.length < 2) return [];
+
+    try {
+        // Fetch repositories accessible to the authenticated user
+        const response = await githubClient.get('/user/repos', {
+            headers: withAuth(),
+            params: {
+                sort: 'updated',
+                per_page: 100 // Fetch a reasonable number of recent repos
+            }
+        });
+
+        // Filter locally based on the query
+        const filtered = response.data.filter(repo =>
+            repo.full_name.toLowerCase().includes(query.toLowerCase()) ||
+            (repo.description && repo.description.toLowerCase().includes(query.toLowerCase()))
+        );
+
+        return filtered.slice(0, 10).map(repo => ({
+            id: repo.id,
+            name: repo.name,
+            fullName: repo.full_name,
+            description: repo.description,
+            stars: repo.stargazers_count,
+            owner: repo.owner.login,
+            avatarUrl: repo.owner.avatar_url
+        }));
+    } catch (error) {
+        console.error('[githubRepoService] Search error:', error.message);
+        return [];
+    }
+}
+
 module.exports = {
     getAccessibleRepositories,
     getGithubProfileWithRepos,
-    getRepoInfo
+    getRepoInfo,
+    searchRepositories
 };

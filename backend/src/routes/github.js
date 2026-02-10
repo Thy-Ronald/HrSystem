@@ -1,7 +1,10 @@
 const express = require('express');
-const { handleGithubLookup, handleIssuesByPeriod, handleGetRepositories, handleCacheCheck, handleRepoChanges, handleCommitsByPeriod, handleLanguagesByPeriod, handleGetTimeline, handleProxyImage } = require('../controllers/githubController');
+const { handleGithubLookup, handleIssuesByPeriod, handleGetRepositories, handleCacheCheck, handleRepoChanges, handleCommitsByPeriod, handleLanguagesByPeriod, handleGetTimeline, handleProxyImage, handleSearchRepositories } = require('../controllers/githubController');
 
 const router = express.Router();
+
+// GET /api/github/search?q=<query> - Search repositories
+router.get('/search', handleSearchRepositories);
 
 // GET /api/github/repos - Get all accessible repositories
 router.get('/repos', handleGetRepositories);

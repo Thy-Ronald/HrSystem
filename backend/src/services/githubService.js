@@ -8,7 +8,8 @@
 const {
   getAccessibleRepositories,
   getGithubProfileWithRepos,
-  getRepoInfo
+  getRepoInfo,
+  searchRepositories
 } = require('./github/githubRepoService');
 
 const {
@@ -90,5 +91,6 @@ module.exports = {
   getCommitsByUserForPeriod,
   getLanguagesByUserForPeriod,
   getIssueTimeline,
-  getRepoInfo
+  getRepoInfo,
+  searchRepositories
 };

@@ -311,6 +311,25 @@ async function handleProxyImage(req, res, next) {
   }
 }
 
+async function handleSearchRepositories(req, res, next) {
+  try {
+    const { q } = req.query;
+    if (!q) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const { searchRepositories } = require('../services/githubService');
+    const repos = await searchRepositories(q);
+
+    res.json({
+      success: true,
+      data: repos
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   handleGithubLookup,
   handleIssuesByPeriod,
@@ -320,5 +339,6 @@ module.exports = {
   handleCommitsByPeriod,
   handleLanguagesByPeriod,
   handleGetTimeline,
-  handleProxyImage
+  handleProxyImage,
+  handleSearchRepositories
 };

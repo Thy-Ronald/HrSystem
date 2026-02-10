@@ -52,6 +52,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
     { label: 'Github Analytics', path: 'github-analytics' },
     { label: 'Ranking', path: 'staff-ranking' },
     { label: 'Monitoring', path: 'monitoring' },
+    { label: 'Settings', path: 'settings' },
   ].filter(item => !item.adminOnly || isAdmin);
 
   // Map our currentPath to the tab index
@@ -67,7 +68,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
     const item = navItems[newValue];
 
     // Only navigate to implemented pages
-    if (['dashboard', 'staff-ranking', 'monitoring', 'github-analytics'].includes(item.path)) {
+    if (['dashboard', 'staff-ranking', 'monitoring', 'github-analytics', 'settings'].includes(item.path)) {
       onNavigate(item.path);
     }
   };

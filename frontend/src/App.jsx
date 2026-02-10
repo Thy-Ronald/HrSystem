@@ -15,6 +15,7 @@ import RankingPage from './pages/StaffRanking';
 import Monitoring from './pages/Monitoring';
 import GithubAnalytics from './pages/GithubAnalytics';
 import Auth from './pages/Auth';
+import Settings from './pages/Settings';
 import Layout from './components/Layout';
 import GlobalResumeSharingModal from './components/GlobalResumeSharingModal';
 
@@ -29,6 +30,7 @@ const routeMap = {
   '/monitoring': 'monitoring',
   '/github-analytics': 'github-analytics',
   '/auth': 'auth',
+  '/settings': 'settings',
 };
 
 // Get page from URL
@@ -47,6 +49,7 @@ function setPathFromPage(page, replace = false) {
     'monitoring': '/monitoring',
     'github-analytics': '/github-analytics',
     'auth': '/auth',
+    'settings': '/settings',
   };
   const path = pathMap[page] || '/';
   const fullPath = path + window.location.search;
@@ -149,6 +152,7 @@ function AppContent() {
         {currentPage === 'staff-ranking' && <RankingPage />}
         {currentPage === 'monitoring' && <Monitoring />}
         {currentPage === 'github-analytics' && <GithubAnalytics />}
+        {currentPage === 'settings' && <Settings />}
       </Layout>
     </MonitoringProvider>
   );
