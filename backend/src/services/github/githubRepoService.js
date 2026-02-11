@@ -3,6 +3,7 @@ const { query } = require('../../config/database');
 const {
     getCachedGitHubResponse,
     setCachedGitHubResponse,
+    deleteCachedGitHubResponse
 } = require('../../utils/githubCache');
 
 const REPO_CACHE_TTL = 300000; // 5 minutes for repos
@@ -31,21 +32,28 @@ async function getRepoInfo(repoFullName) {
 }
 
 /**
- * Fetch all repositories added via the Settings page
+ * Fetch all repositories added via the Settings page for a specific user
  */
-async function getAccessibleRepositories() {
-    const cacheKey = 'accessible_repos_db';
+async function getAccessibleRepositories(userId = null) {
+    const cacheKey = userId ? `accessible_repos_db_${userId}` : 'accessible_repos_db_all';
     const cached = await getCachedGitHubResponse(cacheKey);
-
-    // Check if valid and within TTL (manually for repos)
-    if (cached && (Date.now() - new Date(cached.timestamp || 0).getTime() < REPO_CACHE_TTL)) {
+    if (cached) {
         return cached.data;
     }
 
     try {
         // Fetch from tracked_repositories table
-        const sql = 'SELECT * FROM tracked_repositories ORDER BY added_at DESC';
-        const trackedRepos = await query(sql);
+        let sql, params;
+        if (userId) {
+            sql = 'SELECT * FROM tracked_repositories WHERE user_id = ? ORDER BY added_at DESC';
+            params = [userId];
+        } else {
+            // For background jobs, get unique repositories across all users
+            sql = 'SELECT DISTINCT full_name, owner, name, description, stars, avatar_url FROM tracked_repositories ORDER BY added_at DESC';
+            params = [];
+        }
+
+        const trackedRepos = await query(sql, params);
 
         const repos = trackedRepos.map(repo => ({
             owner: repo.owner,
@@ -65,22 +73,24 @@ async function getAccessibleRepositories() {
 }
 
 /**
- * Add a repository to tracked repositories
+ * Add a repository to tracked repositories for a specific user
  */
-const addTrackedRepository = async (repoData) => {
+const addTrackedRepository = async (repoData, userId) => {
     try {
         const { fullName, name, owner, description, stars, avatarUrl } = repoData;
 
-        // Clear existing tracked repositories to enforce single repo mode
-        await query('DELETE FROM tracked_repositories');
+        // Clear previous tracked repositories FOR THIS USER only to enforce single repo mode per user if desired
+        // Or keep multiple. The UI seems to imply one active repo being "changed".
+        await query('DELETE FROM tracked_repositories WHERE user_id = ?', [userId]);
 
         const sql = `
             INSERT INTO tracked_repositories 
-                (full_name, name, owner, description, stars, avatar_url)
-            VALUES (?, ?, ?, ?, ?, ?)
+                (user_id, full_name, name, owner, description, stars, avatar_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         `;
 
         await query(sql, [
+            userId,
             fullName,
             name,
             owner,
@@ -88,6 +98,9 @@ const addTrackedRepository = async (repoData) => {
             stars || 0,
             avatarUrl || ''
         ]);
+
+        // Invalidate cache for this user
+        await deleteCachedGitHubResponse(`accessible_repos_db_${userId}`);
 
         return { success: true };
     } catch (error) {
@@ -97,12 +110,16 @@ const addTrackedRepository = async (repoData) => {
 }
 
 /**
- * Remove a repository from tracked repositories
+ * Remove a repository from tracked repositories for a specific user
  */
-async function removeTrackedRepository(fullName) {
+async function removeTrackedRepository(fullName, userId) {
     try {
-        const sql = 'DELETE FROM tracked_repositories WHERE full_name = ?';
-        await query(sql, [fullName]);
+        const sql = 'DELETE FROM tracked_repositories WHERE full_name = ? AND user_id = ?';
+        await query(sql, [fullName, userId]);
+
+        // Invalidate cache for this user
+        await deleteCachedGitHubResponse(`accessible_repos_db_${userId}`);
+
         return { success: true };
     } catch (error) {
         console.error('[githubRepoService] removeTrackedRepository error:', error.message);

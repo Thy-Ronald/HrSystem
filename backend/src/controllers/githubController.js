@@ -16,7 +16,7 @@ async function handleGithubLookup(req, res, next) {
 
 async function handleGetRepositories(req, res, next) {
   try {
-    const repos = await getAccessibleRepositories();
+    const repos = await getAccessibleRepositories(req.user.userId);
 
     res.json({
       success: true,
@@ -334,7 +334,7 @@ async function handleAddTrackedRepo(req, res, next) {
       return res.status(400).json({ success: false, error: 'Repository data required' });
     }
 
-    const result = await addTrackedRepository(repoData);
+    const result = await addTrackedRepository(repoData, req.user.userId);
     res.json(result);
   } catch (error) {
     next(error);
@@ -354,7 +354,7 @@ async function handleRemoveTrackedRepo(req, res, next) {
       return res.status(400).json({ success: false, error: 'Repository fullName required' });
     }
 
-    const result = await removeTrackedRepository(decodeURIComponent(repoToRemove));
+    const result = await removeTrackedRepository(decodeURIComponent(repoToRemove), req.user.userId);
     res.json(result);
   } catch (error) {
     next(error);

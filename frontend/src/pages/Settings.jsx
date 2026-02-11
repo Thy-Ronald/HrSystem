@@ -27,6 +27,7 @@ const Settings = () => {
     const [repoName, setRepoName] = useState('');
     const [repositories, setRepositories] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [selectedRepo, setSelectedRepo] = useState(null);
 
     // Suggestion states
     const [suggestions, setSuggestions] = useState([]);
@@ -37,8 +38,9 @@ const Settings = () => {
         setIsLoading(true);
         try {
             const data = await fetchRepositories();
-            if (data && data.length > 0) {
-                setRepositories([data[0]]);
+            const repoList = data.data || data; // Handle both wrapped and unwrapped for safety
+            if (repoList && repoList.length > 0) {
+                setRepositories([repoList[0]]);
             } else {
                 setRepositories([]);
             }
@@ -62,19 +64,22 @@ const Settings = () => {
     useEffect(() => {
         const timer = setTimeout(() => {
             if (repoName.trim().length >= 2) {
-                fetchSuggestions(repoName.trim());
+                // Only fetch suggestions if they don't already match the selected repo's full name
+                if (!selectedRepo || repoName.trim() !== selectedRepo.fullName) {
+                    fetchSuggestions(repoName.trim());
+                }
             } else {
                 setSuggestions([]);
             }
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [repoName]);
+    }, [repoName, selectedRepo]);
 
     const fetchSuggestions = async (q) => {
         setIsSearching(true);
         try {
-            const response = await fetch(`http://localhost:4000/api/github/search?q=${q}`);
+            const response = await fetch(`/api/github/search?q=${q}`);
             const data = await response.json();
             if (data.success) {
                 setSuggestions(data.data);
@@ -86,24 +91,31 @@ const Settings = () => {
         }
     };
 
-    const handleAddRepo = async (selectedRepo = null) => {
-        const repoData = selectedRepo || {
+    const handleAddRepo = async (selectedOverride = null) => {
+        const finalRepo = selectedOverride || selectedRepo || {
             fullName: repoName.trim(),
             name: repoName.trim().split('/').pop(),
             owner: repoName.trim().split('/')[0]
         };
 
-        if (repoData.fullName) {
+        if (finalRepo.fullName) {
             try {
-                await addTrackedRepository(repoData);
+                await addTrackedRepository(finalRepo);
                 await fetchTrackedRepositories();
                 setRepoName('');
                 setSuggestions([]);
+                setSelectedRepo(null);
                 setIsModalOpen(false);
             } catch (error) {
                 console.error('Error adding repository:', error);
             }
         }
+    };
+
+    const handleSelectSuggestion = (repo) => {
+        setSelectedRepo(repo);
+        setRepoName(repo.fullName);
+        setSuggestions([]);
     };
 
     const handleDeleteRepo = async (fullName) => {
@@ -266,7 +278,12 @@ const Settings = () => {
                                 <div className="relative">
                                     <Input
                                         value={repoName}
-                                        onChange={(e) => setRepoName(e.target.value)}
+                                        onChange={(e) => {
+                                            setRepoName(e.target.value);
+                                            if (selectedRepo && e.target.value !== selectedRepo.fullName) {
+                                                setSelectedRepo(null);
+                                            }
+                                        }}
                                         autoFocus
                                         placeholder="e.g. owner/repo"
                                         className="h-12 border-[#dadce0] focus-visible:ring-offset-0 focus-visible:ring-1 focus-visible:ring-[#1a73e8] rounded-lg pr-10"
@@ -285,7 +302,7 @@ const Settings = () => {
                                             key={repo.id}
                                             type="button"
                                             onMouseDown={(e) => e.preventDefault()}
-                                            onClick={() => handleAddRepo(repo)}
+                                            onClick={() => handleSelectSuggestion(repo)}
                                             className="w-full text-left px-5 py-4 hover:bg-[#f8f9fa] transition-colors flex items-center justify-between group cursor-pointer"
                                         >
                                             <div className="flex items-center gap-4">
@@ -335,6 +352,7 @@ const Settings = () => {
                                     setIsModalOpen(false);
                                     setRepoName('');
                                     setSuggestions([]);
+                                    setSelectedRepo(null);
                                 }}
                                 className="h-11 px-6 text-[#5f6368] font-medium rounded-lg hover:bg-[#f1f3f4]"
                             >

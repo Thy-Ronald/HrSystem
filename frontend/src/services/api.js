@@ -155,7 +155,9 @@ export async function fetchGithubProfile(username) {
  * @returns {Promise<Array>} Array of { owner, name, fullName }
  */
 export async function fetchRepositories() {
-  const res = await fetch(`${API_BASE}/api/github/repos`);
+  const res = await fetch(`${API_BASE}/api/github/repos`, {
+    headers: getAuthHeaders(),
+  });
   return handleResponse(res);
 }
 

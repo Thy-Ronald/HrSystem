@@ -1,10 +1,14 @@
 const express = require('express');
 const { handleGithubLookup, handleIssuesByPeriod, handleGetRepositories, handleCacheCheck, handleRepoChanges, handleCommitsByPeriod, handleLanguagesByPeriod, handleGetTimeline, handleProxyImage, handleSearchRepositories, handleAddTrackedRepo, handleRemoveTrackedRepo } = require('../controllers/githubController');
+const { httpAuth } = require('../middlewares/monitoringAuth');
 
 const router = express.Router();
 
 // GET /api/github/search?q=<query> - Search repositories
 router.get('/search', handleSearchRepositories);
+
+// Use auth for all tracking operations
+router.use('/tracked', httpAuth);
 
 // POST /api/github/tracked - Add a tracked repository
 router.post('/tracked', handleAddTrackedRepo);
@@ -13,7 +17,7 @@ router.post('/tracked', handleAddTrackedRepo);
 router.delete('/tracked', handleRemoveTrackedRepo);
 
 // GET /api/github/repos - Get all accessible repositories
-router.get('/repos', handleGetRepositories);
+router.get('/repos', httpAuth, handleGetRepositories);
 
 // GET /api/github/issues?repo=owner/name&filter=today|yesterday|this-week|last-week|this-month
 router.get('/issues', handleIssuesByPeriod);
