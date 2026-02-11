@@ -101,10 +101,18 @@ const GithubAnalytics = () => {
     // Setup Socket.IO for real-time updates
     const { subscribe, unsubscribe } = useSocket();
 
-    // Memoize socket event handler to prevent re-creating on every render
+    // Memoize socket event handler with 5-minute cooldown
+    // Prevents re-fetching 15 pages of GraphQL every time the backend detects a change
+    const lastRefreshRef = useRef(0);
     const handleGithubUpdate = useCallback((payload) => {
+        const now = Date.now();
+        const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+        if (now - lastRefreshRef.current < COOLDOWN_MS) {
+            console.log("[Socket] GitHub update received but cooldown active, skipping refresh");
+            return;
+        }
+        lastRefreshRef.current = now;
         console.log("[Socket] Received GitHub update event:", payload);
-        // Refresh the specific repo query
         queryClient.invalidateQueries({ queryKey: ['timeline', payload.repo] });
     }, []);
 

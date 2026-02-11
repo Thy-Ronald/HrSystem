@@ -175,16 +175,13 @@ class MonitoringService {
       .map(([sessionId, session]) => ({
         sessionId,
         employeeName: session.employeeName,
-        employeeId: session.employeeId, // Expose Employee ID
-        avatarUrl: session.avatarUrl, // Expose Avatar URL
-        streamActive: session.streamActive,
+        employeeId: session.employeeId,
+        avatarUrl: session.avatarUrl,
         streamActive: session.streamActive,
         adminCount: session.adminSocketIds.size,
         createdAt: session.createdAt,
         expiresAt: session.expiresAt,
-        expiresAt: session.expiresAt,
         timeRemaining: this.getTimeRemaining(sessionId),
-        // If no socket ID, they are offline
         disconnectReason: !session.employeeSocketId ? 'offline' : null
       }));
   }

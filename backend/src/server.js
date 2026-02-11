@@ -6,7 +6,7 @@ const { Server } = require('socket.io');
 const githubRouter = require('./routes/github');
 const contractRouter = require('./routes/contracts');
 const issuesRouter = require('./routes/issues');
-const analyticsRouter = require('./routes/analytics');
+
 const monitoringRouter = require('./routes/monitoring');
 const notificationRoutes = require('./routes/notificationRoutes');
 const Notification = require('./models/notificationModel');
@@ -61,7 +61,7 @@ app.get('/api/health', async (_req, res) => {
 app.use('/api/github', githubRouter);
 app.use('/api/contracts', contractRouter);
 app.use('/api/issues', issuesRouter);
-app.use('/api/analytics', analyticsRouter);
+
 app.use('/api/auth', authRouter);
 app.use('/api/monitoring/requests', require('./routes/monitoringRequestRoutes'));
 app.use('/api/monitoring', monitoringRouter);

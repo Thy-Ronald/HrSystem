@@ -19,31 +19,38 @@ export function useRankingData() {
     staleTime: 10 * 60 * 1000,
   });
 
-  // Fetch ranking data for ALL repositories in parallel
-  const issuesQueries = useQueries({
-    queries: repos.map(repo => ({
-      queryKey: ['ranking', repo.fullName, selectedFilter],
-      queryFn: async () => {
-        const response = await fetchCachedIssues(repo.fullName, selectedFilter, {
-          user: null,
-          forceRefresh: false,
-          includeEtag: true
-        });
-        return response?.data || response;
-      },
-      staleTime: 2 * 60 * 1000,
-    }))
+  // Fetch ranking data for ALL repositories in ONE batch request
+  const repoNames = repos.map(r => r.fullName);
+  const { data: batchData = {}, isLoading: issuesLoading } = useQuery({
+    queryKey: ['ranking', repoNames.join(','), selectedFilter],
+    queryFn: async () => {
+      const response = await fetchCachedIssues(repoNames, selectedFilter);
+      // fetchCachedIssues already calls handleResponse which returns .data if success: true
+      return response || {};
+    },
+    enabled: repos.length > 0,
+    staleTime: 2 * 60 * 1000,
   });
 
-  const loading = reposLoading || issuesQueries.some(q => q.isLoading);
-  const reposIssuesData = issuesQueries.map(q => q.data).filter(Boolean);
+  const loading = reposLoading || issuesLoading;
+
+  // Convert batch mapping { "repo/a": [...], "repo/b": [...] } back to array for aggregation logic
+  const reposIssuesData = useMemo(() => {
+    if (!batchData) return [];
+    if (repos.length === 1 && Array.isArray(batchData)) return [batchData];
+    if (typeof batchData === 'object' && !Array.isArray(batchData)) return Object.values(batchData);
+    return [];
+  }, [batchData, repos.length]);
 
   // Aggregate ranking data across all repositories
   const rankingData = useMemo(() => {
     const userMap = new Map();
 
     reposIssuesData.forEach(repoData => {
-      if (!Array.isArray(repoData)) return;
+      if (!Array.isArray(repoData)) {
+        console.warn('[useRankingData] repoData is not an array:', repoData);
+        return;
+      }
 
       repoData.forEach(item => {
         const username = item.username || 'Unknown';
@@ -64,7 +71,11 @@ export function useRankingData() {
     });
 
     const aggregated = Array.from(userMap.values());
-    return transformRankingData(aggregated);
+    console.log('[useRankingData] Aggregated data count:', aggregated.length);
+    if (aggregated.length > 0) console.log('[useRankingData] First item:', aggregated[0]);
+    const transformed = transformRankingData(aggregated);
+    console.log('[useRankingData] Transformed data count:', transformed.length);
+    return transformed;
   }, [reposIssuesData]);
 
   /**

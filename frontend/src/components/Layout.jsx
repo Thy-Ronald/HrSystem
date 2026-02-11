@@ -47,7 +47,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
   const isAdmin = user?.role === 'admin';
 
   const navItems = [
-    { label: 'Dashboard', path: 'dashboard' },
+
     { label: 'Employees', path: 'employee-dropdown', adminOnly: true },
     { label: 'Github Analytics', path: 'github-analytics' },
     { label: 'Ranking', path: 'staff-ranking' },
@@ -68,7 +68,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
     const item = navItems[newValue];
 
     // Only navigate to implemented pages
-    if (['dashboard', 'staff-ranking', 'monitoring', 'github-analytics', 'settings'].includes(item.path)) {
+    if (['staff-ranking', 'monitoring', 'github-analytics', 'settings'].includes(item.path)) {
       onNavigate(item.path);
     }
   };
@@ -89,7 +89,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
           {/* Logo */}
           <Box
             sx={{ display: 'flex', alignItems: 'center', mr: 2, cursor: 'pointer' }}
-            onClick={() => onNavigate('dashboard')}
+            onClick={() => onNavigate('staff-ranking')}
           >
             <Typography
               variant="h6"

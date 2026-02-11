@@ -14,14 +14,29 @@ const {
 const { coalesce } = require('../../utils/requestCoalescing');
 
 /**
+ * Get cache TTL based on filter — past dates never change so cache for 24hr.
+ * Today's data changes, so cache for 30 min.
+ */
+function getCacheTtl(filter) {
+    if (filter === 'today') return 1800;      // 30 min
+    if (filter === 'yesterday') return 86400; // 24hr (yesterday is done)
+    if (filter === 'this-week') return 1800;  // 30 min (includes today)
+    return 86400; // last-week, this-month, etc. — historical, cache 24hr
+}
+
+/**
  * Fetch issues from a repository assigned within date range
  */
-async function getIssuesByUserForPeriod(repoFullName, filter = 'today') {
+async function getIssuesByUserForPeriod(repoFullName, filter = 'today', forceRefresh = false) {
     const cacheKey = generateCacheKey('issues', repoFullName, filter);
-    const cached = await getCachedGitHubResponse(cacheKey);
 
-    if (cached && cached.data) {
-        return cached.data;
+    if (!forceRefresh) {
+        const cached = await getCachedGitHubResponse(cacheKey);
+        if (cached && cached.data) {
+            return cached.data;
+        }
+    } else {
+        console.log(`[IssueCache] Force refresh requested for ${repoFullName} (${filter})`);
     }
 
     // Coalesce: if 10 users request the same data concurrently,
@@ -57,7 +72,11 @@ async function _fetchIssuesByUserForPeriod(repoFullName, filter, cacheKey) {
     };
 
     const getStatusFromLabels = (labels) => {
-        const labelNames = labels.map((l) => l.name.toLowerCase());
+        if (!labels || !Array.isArray(labels)) return 'Assigned';
+        const labelNames = labels
+            .filter(l => l && l.name)
+            .map((l) => l.name.toLowerCase());
+
         for (const name of labelNames) {
             if (statusLabelsMap.devChecked.includes(name)) return 'Dev Checked';
             if (statusLabelsMap.devDeployed.includes(name)) return 'Dev Deployed';
@@ -128,15 +147,24 @@ async function _fetchIssuesByUserForPeriod(repoFullName, filter, cacheKey) {
                     }
 
                     for (const [username, assignmentDate] of userLastAssignment.entries()) {
-                        if (assignmentDate >= startDate && assignmentDate <= endDate && currentAssignees.has(username)) {
+                        const isInRange = assignmentDate >= startDate && assignmentDate <= endDate;
+                        const isAssignee = currentAssignees.has(username);
+
+                        if (!isInRange && isAssignee) {
+                            // console.log(`[IssueCache] Issue #${issue.number} for ${username} outside range (${assignmentDate.toISOString()} vs ${startDate.toISOString()})`);
+                        }
+
+                        if (isInRange && isAssignee) {
                             if (!userStats.has(username)) userStats.set(username, initUserStats());
                             const stats = userStats.get(username);
-                            const statusKey = status.charAt(0).toLowerCase() + status.slice(1).replace(' ', '');
-                            if (stats[statusKey] !== undefined) stats[statusKey]++;
-                            else if (status === 'Assigned') stats.assigned++;
-                            else if (status === 'In Progress') stats.inProgress++;
+
+                            // Map canonical status to property names
+                            if (status === 'Dev Checked') stats.devChecked++;
+                            else if (status === 'Dev Deployed') stats.devDeployed++;
                             else if (status === 'Local Done') stats.done++;
                             else if (status === 'Review') stats.reviewed++;
+                            else if (status === 'In Progress') stats.inProgress++;
+                            else stats.assigned++;
 
                             let pVal = extractPValue(issue.title) + extractPValue(issue.body);
                             (issue.labels?.nodes || []).forEach(l => pVal += extractPValue(l.name));
@@ -166,7 +194,7 @@ async function _fetchIssuesByUserForPeriod(repoFullName, filter, cacheKey) {
             }))
             .sort((a, b) => b.total - a.total || a.username.localeCompare(b.username));
 
-        await setCachedGitHubResponse(cacheKey, result, null, 900);
+        await setCachedGitHubResponse(cacheKey, result, null, getCacheTtl(filter));
         return result;
     } catch (error) {
         throw error;
@@ -326,7 +354,7 @@ async function _fetchIssueTimeline(repoFullName, filter, date, cacheKey) {
         });
 
         const result = Object.values(issuesByUser);
-        await setCachedGitHubResponse(cacheKey, result, null, 900);
+        await setCachedGitHubResponse(cacheKey, result, null, getCacheTtl(filter || 'today'));
         return result;
     } catch (error) {
         throw error;

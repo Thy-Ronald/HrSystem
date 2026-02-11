@@ -17,7 +17,7 @@ const getUnifiedNotifications = async (req, res) => {
         // we'll fetch with a reasonable maximum if not specified, 
         // or specifically for this request.
         console.log(`[NotificationController] Fetching DB notifications (page ${page}, limit ${limit})...`);
-        const dbNotifications = await Notification.getAllForUser(userId, 100, 0); // Get recent 100 for merging
+        const dbNotifications = await Notification.getAllForUser(userId, 50, 0); // Get recent 50 for merging
 
         // 2. Fetch expiring contracts (Virtual notifications)
         console.log('[NotificationController] Fetching expiring contracts...');
@@ -43,6 +43,7 @@ const getUnifiedNotifications = async (req, res) => {
         const hasMore = allNotifications.length > offset + limit;
 
         console.log('[NotificationController] Returning', paginatedNotifications.length, 'notifications. hasMore:', hasMore);
+        res.set('Cache-Control', 'private, max-age=30');
         res.json({
             notifications: paginatedNotifications,
             hasMore,

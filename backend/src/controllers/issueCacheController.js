@@ -50,22 +50,28 @@ function generateETag(data) {
 /**
  * GET /api/issues
  * 
- * Fetch issues from cache for a specific repo and filter.
- * Uses Redis caching and ETag support for efficient updates.
+ * Fetch issues for a specific repo and filter.
+ * Uses Redis-cached GraphQL (getIssuesByUserForPeriod) instead of MySQL cache.
+ * Data format: [{ username, assigned, inProgress, done, reviewed, devDeployed, devChecked, assignedP }]
  */
 async function handleGetIssues(req, res, next) {
   try {
     const { repo, filter = 'today', user, forceRefresh } = req.query;
 
-    // Validate params... (keep existing validation)
     if (!repo) {
-      const error = new Error('Repository is required. Use ?repo=owner/name');
+      const error = new Error('Repository is required. Use ?repo=owner/name or ?repo=repo1,repo2');
+      error.status = 400;
+      throw error;
+    }
+
+    const repoList = repo.split(',').map(r => r.trim()).filter(Boolean);
+    if (repoList.length === 0) {
+      const error = new Error('No valid repositories provided');
       error.status = 400;
       throw error;
     }
 
     const validFilters = ['today', 'yesterday', 'this-week', 'last-week', 'this-month'];
-    // Allow standard filters or custom month format (month-MM-YYYY)
     const isValidFilter = validFilters.includes(filter) || (filter && filter.startsWith('month-') && filter.match(/^month-\d{2}-\d{4}$/));
     if (!isValidFilter) {
       const error = new Error(`Invalid filter. Must be one of: ${validFilters.join(', ')}, or a custom month format (month-MM-YYYY)`);
@@ -73,70 +79,59 @@ async function handleGetIssues(req, res, next) {
       throw error;
     }
 
-    // Build Redis cache key
-    const cacheKey = `issues:${repo}:${filter}:${user || 'all'}`;
-    let responseData = null;
-    let fromRedis = false;
+    // Use the Redis-cached GraphQL service
+    const { getIssuesByUserForPeriod } = require('../services/githubService');
 
-    // 1. Try to get from Redis
-    if (forceRefresh !== 'true') {
-      const cached = await cacheService.get(cacheKey);
-      if (cached) {
-        responseData = cached.data;
-        fromRedis = true;
-        console.log(`[Redis] ✅ Cache hit for ${cacheKey}`);
+    // Fetch all repos in parallel on the server
+    const results = await Promise.all(repoList.map(async (repoName) => {
+      try {
+        let data = await getIssuesByUserForPeriod(repoName, filter, forceRefresh === 'true');
+        if (user && Array.isArray(data)) {
+          data = data.filter(item =>
+            item.username && item.username.toLowerCase() === user.toLowerCase()
+          );
+        }
+        return { repo: repoName, data: data || [] };
+      } catch (err) {
+        console.error(`[IssueCache API] Error fetching ${repoName}:`, err.message);
+        return { repo: repoName, data: [], error: err.message };
       }
+    }));
+
+    // If only one repo requested, maintain backward compatibility with previous format
+    // Otherwise return mapping
+    let responseData;
+    if (repoList.length === 1) {
+      responseData = results[0].data;
+    } else {
+      responseData = results.reduce((acc, curr) => {
+        acc[curr.repo] = curr.data;
+        return acc;
+      }, {});
     }
 
-    // 2. If not in Redis, fetch from MySQL (incremental logic)
-    if (!responseData) {
-      // Clear cache if forcing refresh
-      if (forceRefresh === 'true') {
-        await cacheService.delete(cacheKey);
-      }
-
-      const result = await getIssuesWithCache(
-        repo,
-        filter,
-        user || null,
-        forceRefresh === 'true'
-      );
-
-      responseData = result.data;
-
-      // Store in Redis
-      await cacheService.set(cacheKey, {
-        data: responseData,
-        timestamp: Date.now(),
-      }, REDIS_CACHE_TTL);
-    }
-
-    // 3. Prepare final response
     const finalResponse = {
       success: true,
-      data: responseData,
+      data: responseData || [],
       repo,
       filter,
       user: user || null,
       cache: {
-        fromRedis,
+        fromRedis: true,
         timestamp: new Date().toISOString(),
       },
     };
 
-    // 4. Handle ETag / 304 Not Modified
+    // ETag / 304 support
     const etag = generateETag(finalResponse);
     const clientETag = req.headers['if-none-match'];
 
     if (clientETag === etag) {
-      console.log(`[IssueCache API] 304 Not Modified (ETag match) for ${repo}`);
       return res.status(304).end();
     }
 
-    // 5. Send Response
     res.set('ETag', etag);
-    res.set('Cache-Control', 'public'); // Let client decide TTL based on ETag
-
+    res.set('Cache-Control', 'public, max-age=120');
     res.json(finalResponse);
 
   } catch (error) {

@@ -144,32 +144,14 @@ async function refreshAllTrackedRepos() {
 
 /**
  * Start the background refresh job
- * Should be called once during server startup
+ * 
+ * DISABLED: The MySQL issue cache is no longer used.
+ * /api/issues now reads from Redis-cached GraphQL (getIssuesByUserForPeriod),
+ * which caches on first request and serves from Redis on subsequent calls.
+ * This eliminates ~40+ REST API calls/hr that were used to maintain the MySQL cache.
  */
 function startCacheRefreshJob() {
-  if (refreshInterval) {
-    console.log('[CacheJob] Job already running');
-    return;
-  }
-
-  console.log(`[CacheJob] Starting background cache refresh job (interval: ${CACHE_CONFIG.REFRESH_INTERVAL_MS / 1000 / 60} minutes)`);
-
-  // Run immediately on startup
-  setTimeout(() => {
-    console.log('[CacheJob] Running initial cache check...');
-    refreshAllTrackedRepos().catch(err => {
-      console.error('[CacheJob] Initial refresh failed:', err.message);
-    });
-  }, 10000); // Wait 10 seconds after startup before first run
-
-  // Schedule periodic refreshes
-  refreshInterval = setInterval(() => {
-    refreshAllTrackedRepos().catch(err => {
-      console.error('[CacheJob] Scheduled refresh failed:', err.message);
-    });
-  }, CACHE_CONFIG.REFRESH_INTERVAL_MS);
-
-  console.log('[CacheJob] Background job scheduled successfully');
+  console.log('[CacheJob] Background refresh job DISABLED — /api/issues now uses Redis-cached GraphQL');
 }
 
 /**

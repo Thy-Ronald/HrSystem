@@ -10,7 +10,7 @@ import { Warning as WarningIcon } from '@mui/icons-material';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ContractForm from './pages/ContractForm';
 import Information from './pages/Information';
-import Dashboard from './pages/Dashboard';
+
 import RankingPage from './pages/StaffRanking';
 import Monitoring from './pages/Monitoring';
 import GithubAnalytics from './pages/GithubAnalytics';
@@ -21,10 +21,9 @@ import GlobalResumeSharingModal from './components/GlobalResumeSharingModal';
 
 // Map URL paths to page keys
 const routeMap = {
-  '/': 'dashboard',
+  '/': 'staff-ranking',
   '/contract-form': 'contract-form',
   '/information': 'information',
-  '/dashboard': 'dashboard',
   '/staff-ranking': 'staff-ranking',
   '/ranking': 'staff-ranking', // Alias
   '/monitoring': 'monitoring',
@@ -36,13 +35,12 @@ const routeMap = {
 // Get page from URL
 function getPageFromPath() {
   const path = window.location.pathname;
-  return routeMap[path] || 'dashboard';
+  return routeMap[path] || 'staff-ranking';
 }
 
 // Set URL from page
 function setPathFromPage(page, replace = false) {
   const pathMap = {
-    'dashboard': '/dashboard',
     'contract-form': '/contract-form',
     'information': '/information',
     'staff-ranking': '/staff-ranking',
@@ -92,8 +90,8 @@ function AppContent() {
   useEffect(() => {
     console.log(`[App] Auth state change. Authenticated: ${isAuthenticated}, Current Page: ${currentPage}`);
     if (isAuthenticated && currentPage === 'auth') {
-      console.log('[App] Redirecting authenticated user to dashboard');
-      handleNavigate('dashboard');
+      console.log('[App] Redirecting authenticated user to staff-ranking');
+      handleNavigate('staff-ranking');
     }
   }, [isAuthenticated, currentPage]);
 
@@ -111,7 +109,7 @@ function AppContent() {
 
   // Show auth page if not authenticated
   if (!isAuthenticated) {
-    return <Auth onLogin={() => setCurrentPage('dashboard')} />;
+    return <Auth onLogin={() => setCurrentPage('staff-ranking')} />;
   }
 
   // Check if user is trying to access admin pages but is not admin
@@ -130,10 +128,10 @@ function AppContent() {
               </Typography>
               <Button
                 variant="contained"
-                onClick={() => handleNavigate('dashboard')}
+                onClick={() => handleNavigate('staff-ranking')}
                 sx={{ borderRadius: 1, textTransform: 'none', px: 4 }}
               >
-                Go to Dashboard
+                Go to Staff Ranking
               </Button>
             </Box>
           </Container>
@@ -148,7 +146,7 @@ function AppContent() {
         <GlobalResumeSharingModal />
         {currentPage === 'contract-form' && <ContractForm />}
         {currentPage === 'information' && <Information />}
-        {currentPage === 'dashboard' && <Dashboard />}
+
         {currentPage === 'staff-ranking' && <RankingPage />}
         {currentPage === 'monitoring' && <Monitoring />}
         {currentPage === 'github-analytics' && <GithubAnalytics />}

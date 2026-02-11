@@ -59,55 +59,33 @@ async function checkCacheStatus(repoFullName, filter) {
 }
 
 /**
- * Check if repository has changed using ETag conditional requests.
- * 304 responses don't count against GitHub's rate limit!
- * Also checks pushed_at and updated_at to detect both code and issue changes.
+ * Check if repository has changed by comparing pushed_at timestamps.
+ * 
+ * Uses cached `getRepoInfo()` (5-min Redis TTL) instead of direct API calls.
+ * This means the polling loop costs 0 API calls when the cache is warm.
+ * Only on cache miss does it make 1 API call, and getRepoInfo uses ETag
+ * so most misses return 304 (free).
  */
 async function checkRepoChanges(repoFullName) {
-  const { githubClient, withAuth } = require('./github/githubClients');
-  const etagCacheKey = `github:repo_etag:${repoFullName.replace('/', '_')}`;
-  const timestampCacheKey = `github:repo_last_state:${repoFullName.replace('/', '_')}`;
+  const pushedAtCacheKey = `github:repo_pushed_at:${repoFullName.replace('/', '_')}`;
 
   try {
-    // Get stored ETag for conditional request
-    const storedETag = await cacheService.get(etagCacheKey);
-    const headers = withAuth();
-    if (storedETag) {
-      headers['If-None-Match'] = storedETag;
-    }
+    // Use cached getRepoInfo — no direct API call needed
+    const repo = await getRepoInfo(repoFullName);
+    if (!repo) return { changed: false };
 
-    const response = await githubClient.get(`/repos/${repoFullName}`, {
-      headers,
-      validateStatus: (status) => status === 200 || status === 304,
-    });
-
-    // 304 = Not Modified (FREE — doesn't count against rate limit)
-    if (response.status === 304) {
+    // Only compare pushed_at — ignore updated_at which changes too often
+    const storedPushedAt = await cacheService.get(pushedAtCacheKey);
+    if (storedPushedAt === repo.pushed_at) {
       return { changed: false };
     }
 
-    // 200 = Data returned, check if anything meaningful changed
-    const repo = response.data;
-    const newETag = response.headers.etag || null;
-    const currentState = `${repo.pushed_at}|${repo.updated_at}`;
-
-    // Store the new ETag for next request
-    if (newETag) {
-      await cacheService.set(etagCacheKey, newETag, 86400 * 7); // 7 days
-    }
-
-    // Compare with stored state
-    const storedState = await cacheService.get(timestampCacheKey);
-    if (storedState === currentState) {
-      return { changed: false };
-    }
-
-    // Store new state
-    await cacheService.set(timestampCacheKey, currentState, 86400 * 7);
+    // Store new pushed_at
+    await cacheService.set(pushedAtCacheKey, repo.pushed_at, 86400 * 7);
     return { changed: true };
   } catch (error) {
     console.error(`[checkRepoChanges] Error for ${repoFullName}:`, error.message);
-    return { changed: true }; // Fallback to 'changed' to be safe
+    return { changed: false }; // Changed to false — don't trigger unnecessary refreshes on error
   }
 }
 

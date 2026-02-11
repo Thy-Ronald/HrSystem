@@ -330,50 +330,7 @@ export async function fetchLanguagesByPeriod(repo, filter = 'all', options = {})
   return data;
 }
 
-/**
- * Get analytics overview
- * @param {string} filter - Filter: today, yesterday, this-week, last-week, this-month
- * @returns {Promise<Object>} Overview statistics
- */
-export async function getAnalyticsOverview(filter = 'this-month') {
-  const res = await fetch(`${API_BASE}/api/analytics/overview?filter=${filter}`);
-  const data = await handleResponse(res);
-  return data.success ? data : { success: true, data };
-}
 
-/**
- * Get daily activity trends
- * @param {string} filter - Filter: today, yesterday, this-week, last-week, this-month
- * @returns {Promise<Array>} Daily activity data
- */
-export async function getDailyActivityTrends(filter = 'this-month') {
-  const res = await fetch(`${API_BASE}/api/analytics/trends?filter=${filter}`);
-  const data = await handleResponse(res);
-  return data.success ? data : { success: true, data: data.data || data };
-}
-
-/**
- * Get top contributors
- * @param {number} limit - Number of contributors to return
- * @param {string} filter - Filter: today, yesterday, this-week, last-week, this-month
- * @returns {Promise<Array>} Top contributors
- */
-export async function getTopContributors(limit = 10, filter = 'this-month') {
-  const res = await fetch(`${API_BASE}/api/analytics/top-contributors?limit=${limit}&filter=${filter}`);
-  const data = await handleResponse(res);
-  return data.success ? data : { success: true, data: data.data || data };
-}
-
-/**
- * Get language distribution
- * @param {string} filter - Filter: all, today, yesterday, this-week, last-week, this-month
- * @returns {Promise<Array>} Language distribution
- */
-export async function getLanguageDistribution(filter = 'all') {
-  const res = await fetch(`${API_BASE}/api/analytics/languages?filter=${filter}`);
-  const data = await handleResponse(res);
-  return data.success ? data : { success: true, data: data.data || data };
-}
 
 /**
  * Lightweight cache status check - does NOT call GitHub API
@@ -399,28 +356,19 @@ export async function checkRepoChanges(repo) {
   return handleResponse(res);
 }
 
-// =============================================================================
-// INCREMENTAL CACHING API - MySQL-backed cache with selective refresh
-// =============================================================================
-
 /**
- * Fetch cached issues for a repo with optional user filtering
+ * Fetch issues for a repo with optional user filtering
+ * Uses Redis-cached GraphQL via /api/issues endpoint
  * 
- * CACHING STRATEGY:
- * - First call for a repo triggers cache population
- * - Subsequent calls return cached data (fast)
- * - Background job refreshes cache every 30 minutes using `updated_since`
- * - forceRefresh=true triggers immediate incremental refresh
- * 
- * @param {string} repo - Repository full name (owner/repo)
+ * @param {string|string[]} repo - Repository full name (owner/repo) or array of names
  * @param {string} filter - Filter: today|yesterday|this-week|last-week|this-month
  * @param {Object} options - Additional options
  * @param {string} options.user - Optional: filter by specific username
- * @param {boolean} options.forceRefresh - Force cache refresh
- * @returns {Promise<Object>} { data, cache: { wasRefreshed, lastFetchedAt } }
+ * @returns {Promise<Object>} { data: [{ username, assigned, inProgress, done, ... }] }
  */
 export async function fetchCachedIssues(repo, filter = 'today', options = {}) {
-  const params = new URLSearchParams({ repo, filter });
+  const repoParam = Array.isArray(repo) ? repo.join(',') : repo;
+  const params = new URLSearchParams({ repo: repoParam, filter });
 
   if (options.user) {
     params.set('user', options.user);
@@ -454,61 +402,6 @@ export async function fetchCachedIssues(repo, filter = 'today', options = {}) {
   return data;
 }
 
-/**
- * Check cache status for a repository (lightweight, no data transfer)
- * 
- * Use this for smart polling: check status frequently, only fetch full data
- * when cache has been refreshed.
- * 
- * @param {string} repo - Repository full name
- * @returns {Promise<Object>} { isCached, lastFetchedAt, needsRefresh, totalIssues }
- */
-export async function getCachedIssuesStatus(repo) {
-  const params = new URLSearchParams({ repo });
-  const res = await fetch(`${API_BASE}/api/issues/cache-status?${params}`);
-  const result = await handleResponse(res);
-  return result.cache || result;
-}
-
-/**
- * Check if issues have changed since a timestamp (for smart polling)
- * 
- * SMART POLLING STRATEGY:
- * 1. Frontend polls this endpoint every 30-60 seconds
- * 2. Returns quickly with hasChanges boolean
- * 3. Only fetch full data when hasChanges=true
- * 
- * @param {string} repo - Repository full name
- * @param {string} since - ISO timestamp from last fetch
- * @returns {Promise<Object>} { hasChanges, lastFetchedAt, needsRefresh }
- */
-export async function checkCachedIssuesChanges(repo, since = null) {
-  const params = new URLSearchParams({ repo });
-  if (since) {
-    params.set('since', since);
-  }
-  const res = await fetch(`${API_BASE}/api/issues/changes?${params}`);
-  return handleResponse(res);
-}
-
-/**
- * Force refresh cache for a repository
- * 
- * Triggers an incremental refresh (fetches only issues updated since last fetch).
- * For a full refresh (re-fetch all issues), set fullRefresh=true.
- * 
- * @param {string} repo - Repository full name
- * @param {boolean} fullRefresh - Force full refresh (default: false for incremental)
- * @returns {Promise<Object>} Refresh result with stats
- */
-export async function refreshCachedIssues(repo, fullRefresh = false) {
-  const res = await fetch(`${API_BASE}/api/issues/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ repo, fullRefresh }),
-  });
-  return handleResponse(res);
-}
 
 /**
  * Submit a new personnel record (PDS)
@@ -671,20 +564,7 @@ export async function fetchPersonnelRecords() {
   return handleResponse(res);
 }
 
-/**
- * Get background job status and tracked repositories
- * 
- * Useful for admin/debugging UI to see:
- * - Is the background job running?
- * - Which repos are being tracked?
- * - When were they last refreshed?
- * 
- * @returns {Promise<Object>} { job, trackedRepos, repos }
- */
-export async function getCacheJobStatus() {
-  const res = await fetch(`${API_BASE}/api/issues/job-status`);
-  return handleResponse(res);
-}
+
 
 // --- Notifications ---
 export const getNotifications = async (page = 1, limit = 4) => {

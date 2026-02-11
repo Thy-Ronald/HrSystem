@@ -58,7 +58,7 @@ async function createContract(data) {
 
   try {
     const result = await query(sql, params);
-    
+
     // Fetch and return the created contract
     return await getContractById(result.insertId);
   } catch (error) {
@@ -239,7 +239,7 @@ async function updateContract(id, data) {
 
   try {
     const result = await query(sql, params);
-    
+
     // Check if any rows were affected
     if (result.affectedRows === 0) {
       return null; // Contract not found
@@ -274,7 +274,7 @@ async function deleteContract(id) {
 
   try {
     const result = await query(sql, [contractId]);
-    
+
     // Return true if a row was deleted, false otherwise
     return result.affectedRows > 0;
   } catch (error) {

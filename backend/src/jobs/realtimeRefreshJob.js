@@ -14,7 +14,7 @@
 const { checkRepoChanges } = require('../services/githubService');
 const { getAccessibleRepositories } = require('../services/github/githubRepoService');
 
-const CHECK_INTERVAL_MS = 120000; // Check every 2 minutes (was 15 seconds)
+const CHECK_INTERVAL_MS = 300000; // Check every 5 minutes (was 2 minutes)
 const REPO_LIST_REFRESH_MS = 300000; // Refresh repo list every 5 minutes
 
 let interval = null;
