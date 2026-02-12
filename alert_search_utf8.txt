@@ -1,6 +1,0 @@
-﻿frontend\src\features\contracts\utils\exportContracts.js:      alert('Excel export requires exceljs library. Please install it:\n\nnpm install exceljs\n\nFalling back to CSV format.');
-frontend\src\features\contracts\utils\exportContracts.js:      alert('PDF export requires jsPDF library. Please install it:\n\nnpm install jspdf jspdf-autotable');
-frontend\src\features\contracts\utils\exportContracts.js:      alert('PDF export requires jsPDF library. Please install it:\n\nnpm install jspdf jspdf-autotable');
-frontend\src\features\contracts\utils\exportContracts.js:    alert('Error generating PDF. Please ensure jsPDF is installed:\n\nnpm install jspdf jspdf-autotable');
-frontend\src\pages\Information.jsx:            alert('Failed to delete record: ' + err.message);
-frontend\src\pages\Information.jsx:            alert('Failed to save data: ' + err.message);

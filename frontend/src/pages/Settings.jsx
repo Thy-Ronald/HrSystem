@@ -558,17 +558,8 @@ const Settings = () => {
 
             {/* Add/Change Repository Modal */}
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden rounded-xl border-none shadow-2xl dark:bg-slate-900">
-                    <div className="p-8 space-y-8">
-                        <div>
-                            <h2 className="text-2xl font-semibold text-[#202124] mb-1 dark:text-slate-100">
-                                {trackedRepo ? 'Change Repository' : 'Add Repository'}
-                            </h2>
-                            <p className="text-sm text-[#5f6368] dark:text-slate-400">
-                                {trackedRepo ? 'Select a new repository to track. Former data will be replaced.' : 'Enter the name of the repository you want to track.'}
-                            </p>
-                        </div>
-
+                <DialogContent className="sm:max-w-[450px] p-0 rounded-xl border-none shadow-2xl dark:bg-slate-900">
+                    <div className="p-6 space-y-6 flex flex-col">
                         <div className="space-y-4 relative">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-[#202124] dark:text-slate-200">Repository name</label>
@@ -625,10 +616,11 @@ const Settings = () => {
                             )}
 
                             {/* Empty State */}
-                            {repoName.trim().length >= 2 && !isSearching && suggestions.length === 0 && (
-                                <div className="mt-2 bg-[#f8f9fa] dark:bg-slate-900/50 border border-[#dadce0] dark:border-slate-800 rounded-xl p-8 text-center space-y-3">
+                            {repoName.trim().length >= 2 && !isSearching && suggestions.length === 0 && (!selectedRepo || repoName.trim() !== selectedRepo.fullName) && (
+
+                                <div className="absolute top-full left-0 right-0 mt-1 bg-[#f8f9fa] dark:bg-slate-950 border border-[#dadce0] dark:border-slate-800 rounded-xl p-8 text-center space-y-3 z-50 shadow-xl">
                                     <div className="flex justify-center">
-                                        <div className="w-14 h-14 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center shadow-sm">
+                                        <div className="w-14 h-14 rounded-full bg-white dark:bg-slate-900 flex items-center justify-center shadow-sm">
                                             <Search className="h-7 w-7 text-[#dadce0] dark:text-slate-600" />
                                         </div>
                                     </div>
@@ -642,7 +634,7 @@ const Settings = () => {
                             )}
                         </div>
 
-                        <div className="flex justify-end gap-3 pt-4 pb-4">
+                        <div className="flex justify-end gap-3 pt-2">
                             <Button
                                 variant="ghost"
                                 onClick={() => {
