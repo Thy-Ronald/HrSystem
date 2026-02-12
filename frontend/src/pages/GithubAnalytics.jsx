@@ -57,9 +57,9 @@ const GithubAnalytics = ({ onNavigate }) => {
     });
 
     const loading = timelineQueries.some(q => q.isLoading);
-    const authError = timelineQueries.find(q => q.error && (q.error.status === 401 || q.error.status === 403))?.error;
+    const apiError = timelineQueries.find(q => q.error)?.error;
+    const isAuthError = apiError && (apiError.status === 401 || apiError.status === 403);
     const reposData = timelineQueries.map(q => q.data).filter(Boolean);
-
     // Merge timeline data from all repositories by user login
     const timelineData = useMemo(() => {
         const userMap = new Map();
@@ -379,9 +379,8 @@ const GithubAnalytics = ({ onNavigate }) => {
                     )
                 }
 
-                {/* Empty State / Error Overlay - Shadcn Style */}
                 {
-                    !loading && !reposLoading && (authError || timelineData.length === 0) && (
+                    !loading && !reposLoading && (apiError || timelineData.length === 0) && (
                         <Box sx={{
                             position: 'absolute',
                             top: 32,
@@ -394,10 +393,14 @@ const GithubAnalytics = ({ onNavigate }) => {
                             zIndex: 10,
                             bgcolor: 'background.paper'
                         }}>
-                            {authError ? (
+                            {apiError ? (
                                 <GithubErrorBanner
                                     onNavigate={onNavigate}
-                                    message={`Your GitHub token returned a ${authError.status} error. This usually means the token is invalid or does not have sufficient permissions for these repositories.`}
+                                    variant={isAuthError ? 'auth' : 'server'}
+                                    message={isAuthError
+                                        ? "Please check if your GitHub Personal Access Token is still valid and not expired."
+                                        : `The server responded with an error (${apiError.status || apiError.message}). Please try again later.`
+                                    }
                                 />
                             ) : (
                                 <div className="flex flex-col items-center justify-center p-8 bg-white dark:bg-slate-900 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800">

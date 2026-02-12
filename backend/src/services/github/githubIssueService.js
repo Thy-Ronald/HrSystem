@@ -299,7 +299,8 @@ async function _fetchIssueTimeline(repoFullName, filter, date, cacheKey) {
                 const currentAssignees = new Set((issue.assignees?.nodes || []).map(a => a.login));
                 for (const [username, assignmentDate] of userLastAssignment.entries()) {
                     if (currentAssignees.has(username) && assignmentDate >= startDate && assignmentDate <= endDate) {
-                        const assigneeNode = issue.assignees?.nodes.find(n => n.login === username);
+                        const assigneeNode = issue.assignees?.nodes?.find(n => n.login === username);
+                        if (!assigneeNode) continue;
                         const statusHistory = [];
                         let currentStatus = 'Assigned';
                         let statusStartTime = new Date(issue.createdAt);
@@ -347,6 +348,7 @@ async function _fetchIssueTimeline(repoFullName, filter, date, cacheKey) {
 
         const issuesByUser = {};
         allIssues.forEach(issue => {
+            if (!issue.assignee || !issue.assignee.login) return;
             const username = issue.assignee.login;
             if (!issuesByUser[username]) issuesByUser[username] = { user: issue.assignee, issues: [], totalP: 0 };
             issuesByUser[username].issues.push(issue);

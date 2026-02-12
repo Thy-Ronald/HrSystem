@@ -45,6 +45,7 @@ const Settings = () => {
     const [isTokenLoading, setIsTokenLoading] = useState(false);
     const [isSavingToken, setIsSavingToken] = useState(false);
     const [tokenStatus, setTokenStatus] = useState(null); // 'success', 'error'
+    const [tokenError, setTokenError] = useState('');
     const [showToken, setShowToken] = useState(false);
 
     // Suggestion states
@@ -94,14 +95,26 @@ const Settings = () => {
     ];
 
     const handleSaveToken = async () => {
-        if (!githubToken.trim()) return;
+        const token = githubToken.trim();
+        if (!token) return;
+
+        // Basic format validation for GitHub Personal Access Tokens
+        // ghp_ for classic, github_pat_ for fine-grained
+        const isValidFormat = token.startsWith('ghp_') || token.startsWith('github_pat_') || token.startsWith('gho_');
+
+        if (!isValidFormat) {
+            setTokenStatus('error');
+            setTokenError('Invalid format. GitHub tokens should start with ghp_, github_pat_, or gho_');
+            return;
+        }
 
         setIsSavingToken(true);
         setTokenStatus(null);
+        setTokenError('');
         try {
             await updateSetting({
                 key: 'github_token',
-                value: githubToken.trim(),
+                value: token,
                 description: 'GitHub Personal Access Token'
             });
             setTokenStatus('success');
@@ -109,6 +122,7 @@ const Settings = () => {
         } catch (error) {
             console.error('Error saving token:', error);
             setTokenStatus('error');
+            setTokenError(error.message || 'Failed to update token');
         } finally {
             setIsSavingToken(false);
         }
@@ -380,7 +394,7 @@ const Settings = () => {
                                     {tokenStatus === 'error' && (
                                         <div className="flex items-center gap-2 text-red-500 animate-in fade-in slide-in-from-left-2 duration-300">
                                             <AlertCircle className="w-5 h-5" />
-                                            <span className="text-sm font-medium">Failed to update token</span>
+                                            <span className="text-sm font-medium">{tokenError || 'Failed to update token'}</span>
                                         </div>
                                     )}
                                 </div>

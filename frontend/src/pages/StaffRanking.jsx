@@ -69,11 +69,15 @@ export default function StaffRanking({ onNavigate }) {
           onQuickFilterChange={handleQuickFilterChange}
         />
 
-        {error && (error.status === 401 || error.status === 403) ? (
+        {error ? (
           <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
             <GithubErrorBanner
               onNavigate={onNavigate}
-              message={`Your GitHub token returned a ${error.status} error. This usually means the token is invalid or does not have sufficient permissions to access the rankings.`}
+              variant={(error.status === 401 || error.status === 403) ? 'auth' : 'server'}
+              message={(error.status === 401 || error.status === 403)
+                ? "Please check if your GitHub Personal Access Token is still valid and not expired."
+                : `The server responded with an error (${error.status || error.message}). Please try again later.`
+              }
             />
           </Box>
         ) : viewMode === VIEW_MODES.RANK ? (
