@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
 import {
     Search,
     Github,
@@ -32,13 +34,22 @@ import { cn } from "@/lib/utils";
 const Settings = () => {
     const { user } = useAuth();
     const { theme, setTheme } = useTheme();
+    const queryClient = useQueryClient();
     const [activeCategory, setActiveCategory] = useState('Repository');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [repoName, setRepoName] = useState('');
-    const [repositories, setRepositories] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [selectedRepo, setSelectedRepo] = useState(null);
+
+    // Fetch tracked repositories with React Query
+    const { data: repos = [], isLoading } = useQuery({
+        queryKey: ['repositories'],
+        queryFn: fetchRepositories,
+        staleTime: 10 * 60 * 1000,
+    });
+
+    const repositories = Array.isArray(repos) ? repos : (repos.data || []);
     const trackedRepo = repositories[0];
+
 
     // GitHub Token states
     const [githubToken, setGithubToken] = useState('');
@@ -52,23 +63,29 @@ const Settings = () => {
     const [suggestions, setSuggestions] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
 
-    // Fetch tracked repositories on mount
-    const fetchTrackedRepositories = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const data = await fetchRepositories();
-            const repoList = data.data || data; // Handle both wrapped and unwrapped for safety
-            if (repoList && repoList.length > 0) {
-                setRepositories([repoList[0]]);
-            } else {
-                setRepositories([]);
-            }
-        } catch (error) {
-            console.error('Error fetching repositories:', error);
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
+    // Mutations for repository management
+    const addRepoMutation = useMutation({
+        mutationFn: addTrackedRepository,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['repositories'] });
+            queryClient.invalidateQueries({ queryKey: ['ranking'] });
+            queryClient.invalidateQueries({ queryKey: ['timeline'] });
+            setRepoName('');
+            setSuggestions([]);
+            setSelectedRepo(null);
+            setIsModalOpen(false);
+        },
+    });
+
+    const deleteRepoMutation = useMutation({
+        mutationFn: removeTrackedRepository,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['repositories'] });
+            queryClient.invalidateQueries({ queryKey: ['ranking'] });
+            queryClient.invalidateQueries({ queryKey: ['timeline'] });
+        },
+    });
+
 
     // Fetch GitHub token
     const fetchGithubTokenStatus = useCallback(async () => {
@@ -84,9 +101,9 @@ const Settings = () => {
     }, []);
 
     useEffect(() => {
-        fetchTrackedRepositories();
         fetchGithubTokenStatus();
-    }, [fetchTrackedRepositories, fetchGithubTokenStatus]);
+    }, [fetchGithubTokenStatus]);
+
 
     const sidebarItems = [
         { label: 'Repository', icon: <Github className="w-4 h-4" />, id: 'Repository' },
@@ -118,7 +135,9 @@ const Settings = () => {
                 description: 'GitHub Personal Access Token'
             });
             setTokenStatus('success');
+            queryClient.invalidateQueries({ queryKey: ['repositories'] });
             setTimeout(() => setTokenStatus(null), 3000);
+
         } catch (error) {
             console.error('Error saving token:', error);
             setTokenStatus('error');
@@ -167,18 +186,10 @@ const Settings = () => {
         };
 
         if (finalRepo.fullName) {
-            try {
-                await addTrackedRepository(finalRepo);
-                await fetchTrackedRepositories();
-                setRepoName('');
-                setSuggestions([]);
-                setSelectedRepo(null);
-                setIsModalOpen(false);
-            } catch (error) {
-                console.error('Error adding repository:', error);
-            }
+            addRepoMutation.mutate(finalRepo);
         }
     };
+
 
     const handleSelectSuggestion = (repo) => {
         setSelectedRepo(repo);
@@ -188,14 +199,10 @@ const Settings = () => {
 
     const handleDeleteRepo = async (fullName) => {
         if (window.confirm(`Are you sure you want to remove ${fullName}?`)) {
-            try {
-                await removeTrackedRepository(fullName);
-                await fetchTrackedRepositories();
-            } catch (error) {
-                console.error('Error deleting repository:', error);
-            }
+            deleteRepoMutation.mutate(fullName);
         }
     };
+
 
     return (
         <div className="flex h-[calc(100vh-140px)] w-full overflow-hidden rounded-lg border bg-white shadow-sm dark:bg-slate-950 dark:border-slate-800">
