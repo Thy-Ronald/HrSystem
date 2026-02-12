@@ -10,9 +10,9 @@ export const UserAvatar = ({ name, avatarUrl, className, size = "md" }) => {
     };
 
     return (
-        <Avatar className={cn(sizeClasses[size] || sizeClasses.md, "border border-slate-200 shadow-sm", className)}>
+        <Avatar className={cn(sizeClasses[size] || sizeClasses.md, "border border-slate-200 dark:border-slate-800 shadow-sm", className)}>
             <AvatarImage src={avatarUrl} alt={name} className="object-cover" />
-            <AvatarFallback className="bg-slate-100 font-bold text-slate-500">
+            <AvatarFallback className="bg-slate-100 dark:bg-slate-800 font-bold text-slate-500 dark:text-slate-400">
                 {name ? name.charAt(0).toUpperCase() : '?'}
             </AvatarFallback>
         </Avatar>

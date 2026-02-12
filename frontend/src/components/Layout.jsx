@@ -74,14 +74,15 @@ const Layout = ({ children, currentPath, onNavigate }) => {
   };
 
   return (
-    <Box sx={{ flexGrow: 1, height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: '#f5f7f9' }}>
+    <Box sx={{ flexGrow: 1, height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: 'background.default' }}>
       <AppBar
         position="static"
         color="default"
         elevation={0}
         sx={{
-          bgcolor: 'white',
-          borderBottom: '1px solid #e0e0e0',
+          bgcolor: 'background.paper',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
           px: 2
         }}
       >
@@ -96,7 +97,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
               component="div"
               sx={{
                 fontWeight: 'bold',
-                color: '#333',
+                color: 'text.primary',
                 letterSpacing: 1,
               }}
             >
@@ -120,9 +121,9 @@ const Layout = ({ children, currentPath, onNavigate }) => {
                   mx: 1,
                   fontSize: '0.85rem',
                   fontWeight: 400,
-                  color: '#666',
+                  color: 'text.secondary',
                   '&.Mui-selected': {
-                    color: '#333',
+                    color: 'text.primary',
                     fontWeight: 500,
                   }
                 },
@@ -155,15 +156,15 @@ const Layout = ({ children, currentPath, onNavigate }) => {
                       <DropdownMenuTrigger asChild>
                         {tabContent}
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-48 bg-white border border-slate-200 shadow-lg p-1">
+                      <DropdownMenuContent align="start" className="w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg p-1">
                         <DropdownMenuItem
-                          className="text-slate-700 focus:bg-slate-100 cursor-pointer py-2 px-3 rounded-md text-sm transition-colors"
+                          className="text-slate-700 dark:text-slate-200 focus:bg-slate-100 dark:focus:bg-slate-800 cursor-pointer py-2 px-3 rounded-md text-sm transition-colors"
                           onClick={() => onNavigate('contract-form')}
                         >
                           Contract
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          className="text-slate-700 focus:bg-slate-100 cursor-pointer py-2 px-3 rounded-md text-sm transition-colors"
+                          className="text-slate-700 dark:text-slate-200 focus:bg-slate-100 dark:focus:bg-slate-800 cursor-pointer py-2 px-3 rounded-md text-sm transition-colors"
                           onClick={() => onNavigate('information')}
                         >
                           Information
@@ -188,7 +189,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
                   variant="ghost"
                   size="icon"
                   onClick={() => setNotificationOpen(!notificationOpen)}
-                  className="h-9 w-9 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full relative"
+                  className="h-9 w-9 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full relative"
                 >
                   <Badge badgeContent={count} color="error" sx={{ '& .MuiBadge-badge': { fontSize: 10, height: 16, minWidth: 16 } }}>
                     <NotificationsIcon fontSize="small" />
@@ -220,21 +221,21 @@ const Layout = ({ children, currentPath, onNavigate }) => {
                   {user?.avatar_url && (
                     <Avatar
                       src={user.avatar_url}
-                      sx={{ width: 28, height: 28, mr: 1, border: '1px solid #e0e0e0' }}
+                      sx={{ width: 28, height: 28, mr: 1, border: '1px solid', borderColor: 'divider' }}
                     />
                   )}
-                  <Typography variant="body2" sx={{ color: '#333', fontWeight: 500, mr: 0.5 }}>
+                  <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 500, mr: 0.5 }}>
                     {user?.name || 'User'}
                   </Typography>
-                  <ArrowDropDownIcon fontSize="small" sx={{ color: '#666' }} />
+                  <ArrowDropDownIcon fontSize="small" sx={{ color: 'text.secondary' }} />
                 </Box>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40 bg-white border border-slate-200 shadow-lg p-1">
-                <DropdownMenuItem className="text-slate-400 focus:bg-transparent cursor-default py-2 px-3 text-sm opacity-50">
+              <DropdownMenuContent align="end" className="w-40 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg p-1">
+                <DropdownMenuItem className="text-slate-400 dark:text-slate-500 focus:bg-transparent cursor-default py-2 px-3 text-sm opacity-50">
                   Profile
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  className="text-rose-600 focus:bg-rose-50 cursor-pointer py-2 px-3 rounded-md text-sm transition-colors"
+                  className="text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/30 cursor-pointer py-2 px-3 rounded-md text-sm transition-colors"
                   onClick={() => setLogoutConfirmOpen(true)}
                 >
                   Logout
@@ -249,9 +250,11 @@ const Layout = ({ children, currentPath, onNavigate }) => {
       <Box sx={{ flexGrow: 1, overflow: 'auto', p: 0 }}>
         <Container maxWidth={false} sx={{ py: 3, height: '100%', px: { xs: 2, sm: 3, md: 4 } }}>
           <Box sx={{
-            bgcolor: 'white',
+            bgcolor: 'background.paper',
             borderRadius: 1,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            boxShadow: 1,
+            border: '1px solid',
+            borderColor: 'divider',
             minHeight: 'calc(100vh - 120px)',
             width: '100%'
           }}>

@@ -68,6 +68,7 @@ app.use('/api/monitoring', monitoringRouter);
 app.use('/api/personnel', personnelRouter);
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/settings', require('./routes/settingsRoutes'));
 
 // Expose io to controllers
 app.set('io', io);

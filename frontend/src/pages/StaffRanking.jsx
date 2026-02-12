@@ -14,8 +14,9 @@ import {
   QUICK_FILTERS,
   VIEW_MODES,
 } from '../features/ranking';
+import GithubErrorBanner from '../components/GithubErrorBanner';
 
-export default function StaffRanking() {
+export default function StaffRanking({ onNavigate }) {
   // UI State
   const [activeQuickFilter, setActiveQuickFilter] = useState(QUICK_FILTERS.TODAY);
   const [viewMode, setViewMode] = useState(VIEW_MODES.RANK);
@@ -52,7 +53,7 @@ export default function StaffRanking() {
   }, [activeQuickFilter, loadData]);
 
   return (
-    <Box sx={{ width: '100%', minHeight: '100%', bgcolor: 'white' }}>
+    <Box sx={{ width: '100%', minHeight: '100%', bgcolor: 'background.paper' }}>
       {/* Page Header */}
 
       {/* Page Content */}
@@ -68,7 +69,14 @@ export default function StaffRanking() {
           onQuickFilterChange={handleQuickFilterChange}
         />
 
-        {viewMode === VIEW_MODES.RANK ? (
+        {error && (error.status === 401 || error.status === 403) ? (
+          <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
+            <GithubErrorBanner
+              onNavigate={onNavigate}
+              message={`Your GitHub token returned a ${error.status} error. This usually means the token is invalid or does not have sufficient permissions to access the rankings.`}
+            />
+          </Box>
+        ) : viewMode === VIEW_MODES.RANK ? (
           <RankingTable
             columns={TABLE_COLUMNS}
             data={rankingData}

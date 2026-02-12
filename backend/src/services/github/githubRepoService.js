@@ -17,8 +17,9 @@ async function getRepoInfo(repoFullName) {
     if (cached && cached.data) return cached.data;
 
     try {
+        const authHeaders = await withAuth();
         const response = await githubClient.get(`/repos/${repoFullName}`, {
-            headers: withAuth(),
+            headers: authHeaders,
         });
         // Cache for 5 minutes
         await setCachedGitHubResponse(cacheKey, response.data, null, 300);
@@ -138,10 +139,11 @@ async function getGithubProfileWithRepos(username) {
     }
 
     try {
+        const authHeaders = await withAuth();
         const [profileRes, reposRes] = await Promise.all([
-            githubClient.get(`/users/${username}`, { headers: withAuth() }),
+            githubClient.get(`/users/${username}`, { headers: authHeaders }),
             githubClient.get(`/users/${username}/repos`, {
-                headers: withAuth(),
+                headers: authHeaders,
                 params: { per_page: 100, sort: 'updated' },
             }),
         ]);
@@ -214,8 +216,9 @@ async function searchRepositories(searchQuery) {
             allRepos = cached.data;
         } else {
             // Fetch from GitHub and cache for 2 minutes
+            const authHeaders = await withAuth();
             const response = await githubClient.get('/user/repos', {
-                headers: withAuth(),
+                headers: authHeaders,
                 params: {
                     sort: 'updated',
                     per_page: 100

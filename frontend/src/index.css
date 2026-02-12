@@ -124,9 +124,17 @@
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: #bcc0c4;
   border-radius: 10px;
-  border: 2px solid white;
+  border: 2px solid transparent;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #4a5568;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #65676b;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #718096;
 }

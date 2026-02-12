@@ -24,10 +24,13 @@ import { STATUS_COLORS } from '../constants/github';
 import TimerDisplay from '../components/TimerDisplay';
 import { Github } from 'lucide-react';
 import EvidenceModal from '../components/EvidenceModal';
+import { useTheme } from '../contexts/ThemeContext';
+import GithubErrorBanner from '../components/GithubErrorBanner';
 
 
 
-const GithubAnalytics = () => {
+const GithubAnalytics = ({ onNavigate }) => {
+    const { activeMode } = useTheme();
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
     const [currentTime, setCurrentTime] = useState(Date.now());
     const scrollRef = useRef(null);
@@ -54,6 +57,7 @@ const GithubAnalytics = () => {
     });
 
     const loading = timelineQueries.some(q => q.isLoading);
+    const authError = timelineQueries.find(q => q.error && (q.error.status === 401 || q.error.status === 403))?.error;
     const reposData = timelineQueries.map(q => q.data).filter(Boolean);
 
     // Merge timeline data from all repositories by user login
@@ -131,9 +135,9 @@ const GithubAnalytics = () => {
     }, [selectedDate]);
 
     return (
-        <Box sx={{ p: 2, height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <Box sx={{ p: 2, height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', bgcolor: 'background.paper' }}>
             <Box sx={{ mb: 1.5, display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mr: 1, color: '#333' }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mr: 1, color: 'text.primary' }}>
                     GitHub Analytics
                 </Typography>
 
@@ -147,7 +151,8 @@ const GithubAnalytics = () => {
                         border: '1px solid #c4c4c4',
                         fontFamily: 'Roboto, Helvetica, Arial, sans-serif',
                         fontSize: '0.85rem',
-                        color: '#333',
+                        color: activeMode === 'dark' ? '#f1f5f9' : '#333',
+                        backgroundColor: activeMode === 'dark' ? '#1e293b' : '#fff',
                         outline: 'none',
                         height: '32px',
                         boxSizing: 'border-box'
@@ -155,21 +160,21 @@ const GithubAnalytics = () => {
                 />
             </Box>
 
-            <Paper sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #e0e0e0', position: 'relative' }}>
+            <Paper sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid', borderColor: 'divider', position: 'relative', bgcolor: 'background.paper' }}>
                 <Box ref={scrollRef} sx={{ flexGrow: 1, overflowX: 'auto', overflowY: 'auto' }}>
                     <Box sx={{ minWidth: 3000, display: 'flex', flexDirection: 'column' }}>
                         {/* Header Row */}
-                        <Box sx={{ display: 'flex', borderBottom: '1px solid #e0e0e0', bgcolor: '#f9fafb', position: 'sticky', top: 0, zIndex: 100, height: 32 }}>
-                            <Box sx={{ width: 350, minWidth: 350, px: 1, display: 'flex', alignItems: 'center', borderRight: '1px solid #e0e0e0', fontWeight: 'bold', color: '#666', bgcolor: '#f9fafb', position: 'sticky', left: 0, zIndex: 101, fontSize: '0.75rem' }}>
+                        <Box sx={{ display: 'flex', borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'background.default', position: 'sticky', top: 0, zIndex: 100, height: 32 }}>
+                            <Box sx={{ width: 350, minWidth: 350, px: 1, display: 'flex', alignItems: 'center', borderRight: '1px solid', borderColor: 'divider', fontWeight: 'bold', color: 'text.secondary', bgcolor: 'background.default', position: 'sticky', left: 0, zIndex: 101, fontSize: '0.75rem' }}>
                                 Name & Task
                             </Box>
                             <Box sx={{ width: 2400, minWidth: 2400, px: 2, display: 'flex', alignItems: 'center', position: 'relative' }}>
                                 {/* Timeline column - no time markers */}
                             </Box>
-                            <Box sx={{ width: 150, minWidth: 150, px: 1, display: 'flex', alignItems: 'center', borderLeft: '1px solid #e0e0e0', fontWeight: 'bold', color: '#666', bgcolor: '#f9fafb', position: 'sticky', right: 100, zIndex: 101, fontSize: '0.75rem' }}>
+                            <Box sx={{ width: 150, minWidth: 150, px: 1, display: 'flex', alignItems: 'center', borderLeft: '1px solid', borderColor: 'divider', fontWeight: 'bold', color: 'text.secondary', bgcolor: 'background.default', position: 'sticky', right: 100, zIndex: 101, fontSize: '0.75rem' }}>
                                 Details
                             </Box>
-                            <Box sx={{ width: 100, minWidth: 100, px: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderLeft: '1px solid #e0e0e0', fontWeight: 'bold', color: '#666', bgcolor: '#f9fafb', position: 'sticky', right: 0, zIndex: 101, fontSize: '0.75rem' }}>
+                            <Box sx={{ width: 100, minWidth: 100, px: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderLeft: '1px solid', borderColor: 'divider', fontWeight: 'bold', color: 'text.secondary', bgcolor: 'background.default', position: 'sticky', right: 0, zIndex: 101, fontSize: '0.75rem' }}>
                                 Evidence
                             </Box>
                         </Box>
@@ -179,8 +184,9 @@ const GithubAnalytics = () => {
                                 <Box key={userData.user.login} sx={{ mb: 0 }}>
                                     <Box sx={{
                                         display: 'flex',
-                                        bgcolor: '#f5f5f5',
-                                        borderBottom: '1px solid #e0e0e0',
+                                        bgcolor: 'background.default',
+                                        borderBottom: '1px solid',
+                                        borderColor: 'divider',
                                         height: 32, alignItems: 'center',
                                         position: 'relative'
                                     }}>
@@ -191,7 +197,7 @@ const GithubAnalytics = () => {
                                             display: 'flex',
                                             alignItems: 'center',
                                             gap: 2,
-                                            bgcolor: '#f5f5f5',
+                                            bgcolor: 'background.default',
                                             py: 0.5, pl: 1, pr: 2,
                                             width: 'fit-content'
                                         }}>
@@ -202,7 +208,7 @@ const GithubAnalytics = () => {
                                                 >
                                                     {userData.user.login[0]}
                                                 </Avatar>
-                                                <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                                                <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.75rem', whiteSpace: 'nowrap', color: 'text.primary' }}>
                                                     {userData.user.login} | Today 0/0 min | Today total p: {userData.totalP || 0}
                                                 </Typography>
                                             </Box>
@@ -210,18 +216,19 @@ const GithubAnalytics = () => {
                                     </Box>
 
                                     {userData.issues.map(issue => (
-                                        <Box key={issue.id} sx={{ display: 'flex', borderBottom: '1px solid #f0f0f0', minHeight: 40 }}>
+                                        <Box key={issue.id} sx={{ display: 'flex', borderBottom: '1px solid', borderColor: 'divider', minHeight: 40 }}>
                                             <Box sx={{
                                                 width: 350,
                                                 minWidth: 350,
                                                 px: 1,
                                                 py: 0.5,
-                                                borderRight: '1px solid #e0e0e0',
+                                                borderRight: '1px solid',
+                                                borderColor: 'divider',
                                                 display: 'flex',
                                                 flexDirection: 'column',
                                                 justifyContent: 'center',
                                                 overflow: 'hidden',
-                                                bgcolor: '#fff',
+                                                bgcolor: 'background.paper',
                                                 position: 'sticky', left: 0, zIndex: 5
                                             }}>
                                                 <Tooltip title={issue.title} arrow placement="top-start">
@@ -247,14 +254,14 @@ const GithubAnalytics = () => {
                                                         <Box component="span" sx={{ color: '#1a73e8', opacity: 0.7, mr: 0.5 }}>
                                                             #{issue.number}
                                                         </Box>
-                                                        <Box component="span" sx={{ color: '#333', fontSize: '0.72rem' }}>
+                                                        <Box component="span" sx={{ color: 'text.primary', fontSize: '0.72rem' }}>
                                                             {issue.title.split(' ').slice(1).join(' ')}
                                                         </Box>
                                                     </Typography>
                                                 </Tooltip>
                                             </Box>
 
-                                            <Box sx={{ width: 2400, minWidth: 2400, position: 'relative', borderRight: '1px solid #e0e0e0' }}>
+                                            <Box sx={{ width: 2400, minWidth: 2400, position: 'relative', borderRight: '1px solid', borderColor: 'divider' }}>
                                                 <TimelineChart
                                                     issues={[issue]}
                                                     startDate={chartStart}
@@ -262,7 +269,7 @@ const GithubAnalytics = () => {
                                                 />
                                             </Box>
 
-                                            <Box sx={{ width: 150, minWidth: 150, p: 0.5, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', bgcolor: '#fff', borderLeft: '1px solid #f0f0f0', position: 'sticky', right: 100, zIndex: 5 }}>
+                                            <Box sx={{ width: 150, minWidth: 150, p: 0.5, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.paper', borderLeft: '1px solid', borderColor: 'divider', position: 'sticky', right: 100, zIndex: 5 }}>
                                                 <Typography
                                                     variant="caption"
                                                     sx={{
@@ -290,7 +297,7 @@ const GithubAnalytics = () => {
                                                 />
                                             </Box>
 
-                                            <Box sx={{ width: 100, minWidth: 100, p: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#fff', borderLeft: '1px solid #f0f0f0', position: 'sticky', right: 0, zIndex: 5 }}>
+                                            <Box sx={{ width: 100, minWidth: 100, p: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.paper', borderLeft: '1px solid', borderColor: 'divider', position: 'sticky', right: 0, zIndex: 5 }}>
                                                 <Button
                                                     variant="outlined"
                                                     size="small"
@@ -364,7 +371,7 @@ const GithubAnalytics = () => {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            bgcolor: 'rgba(255, 255, 255, 0.8)',
+                            bgcolor: activeMode === 'dark' ? 'rgba(0,0,0,0.7)' : 'rgba(255, 255, 255, 0.8)',
                             zIndex: 200
                         }}>
                             <CircularProgress />
@@ -372,9 +379,9 @@ const GithubAnalytics = () => {
                     )
                 }
 
-                {/* Empty State Overlay - Shadcn Style */}
+                {/* Empty State / Error Overlay - Shadcn Style */}
                 {
-                    !loading && !reposLoading && timelineData.length === 0 && (
+                    !loading && !reposLoading && (authError || timelineData.length === 0) && (
                         <Box sx={{
                             position: 'absolute',
                             top: 32,
@@ -385,17 +392,24 @@ const GithubAnalytics = () => {
                             alignItems: 'center',
                             justifyContent: 'center',
                             zIndex: 10,
-                            bgcolor: '#fff'
+                            bgcolor: 'background.paper'
                         }}>
-                            <div className="flex flex-col items-center justify-center p-8 bg-white rounded-3xl border-2 border-dashed border-slate-200">
-                                <div className="bg-slate-50 p-6 rounded-full mb-4">
-                                    <Github className="h-12 w-12 text-slate-300" />
+                            {authError ? (
+                                <GithubErrorBanner
+                                    onNavigate={onNavigate}
+                                    message={`Your GitHub token returned a ${authError.status} error. This usually means the token is invalid or does not have sufficient permissions for these repositories.`}
+                                />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center p-8 bg-white dark:bg-slate-900 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800">
+                                    <div className="bg-slate-50 dark:bg-slate-800 p-6 rounded-full mb-4">
+                                        <Github className="h-12 w-12 text-slate-300" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">No activity found</h3>
+                                    <p className="text-slate-500 max-w-xs text-center">
+                                        No commits or issues found for this repository on the selected date.
+                                    </p>
                                 </div>
-                                <h3 className="text-xl font-bold text-slate-900 mb-2">No activity found</h3>
-                                <p className="text-slate-500 max-w-xs text-center">
-                                    No commits or issues found for this repository on the selected date.
-                                </p>
-                            </div>
+                            )}
                         </Box>
                     )
                 }

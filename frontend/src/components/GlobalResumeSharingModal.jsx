@@ -108,13 +108,13 @@ const GlobalResumeSharingModal = () => {
             }
             setIsOpen(open);
         }}>
-            <DialogContent className="sm:max-w-md bg-white">
+            <DialogContent className="sm:max-w-md bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800">
                 <DialogHeader>
-                    <DialogTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <DialogTitle className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                         <Signal className="h-5 w-5 text-emerald-500" />
                         Resume Monitoring?
                     </DialogTitle>
-                    <div className="text-slate-500 pt-2 text-sm">
+                    <div className="text-slate-500 dark:text-slate-400 pt-2 text-sm">
                         {triggerType === 'refresh'
                             ? <span>Your screen sharing session with <strong>{resumeData?.adminName || 'Admin'}</strong> was interrupted by a page refresh.<br />Click below to resume sharing.</span>
                             : <span>You have an active monitoring session with <strong>{resumeData?.adminName || 'Admin'}</strong>.<br />Click below to resume screen sharing immediately.</span>

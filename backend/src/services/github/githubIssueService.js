@@ -119,7 +119,8 @@ async function _fetchIssuesByUserForPeriod(repoFullName, filter, cacheKey) {
                 }
             `;
 
-            const response = await githubGraphQLClient.post('', { query, variables: { owner, repo, cursor } }, { headers: withAuth() });
+            const authHeaders = await withAuth();
+            const response = await githubGraphQLClient.post('', { query, variables: { owner, repo, cursor } }, { headers: authHeaders });
             if (response.data.errors) throw new Error(response.data.errors[0]?.message || 'GraphQL query failed');
 
             const issues = response.data.data?.repository?.issues?.nodes || [];
@@ -267,7 +268,8 @@ async function _fetchIssueTimeline(repoFullName, filter, date, cacheKey) {
                     }
                 }
             `;
-            const response = await githubGraphQLClient.post('', { query, variables: { owner, repo, cursor } }, { headers: withAuth() });
+            const authHeaders = await withAuth();
+            const response = await githubGraphQLClient.post('', { query, variables: { owner, repo, cursor } }, { headers: authHeaders });
             if (response.data.errors) throw new Error(response.data.errors[0]?.message || 'GraphQL query failed');
 
             const issues = response.data.data?.repository?.issues?.nodes || [];

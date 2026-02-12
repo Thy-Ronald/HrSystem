@@ -67,7 +67,7 @@ export function RepositoryMultiSelect({
 
   return (
     <div className="flex flex-col gap-1 relative w-full" ref={dropdownRef}>
-      <label htmlFor="repo-multi-select" className="text-sm font-medium text-[#5f6368]">
+      <label htmlFor="repo-multi-select" className="text-sm font-medium text-[#5f6368] dark:text-slate-400">
         Repositories
       </label>
       <div className="relative">
@@ -81,7 +81,7 @@ export function RepositoryMultiSelect({
           placeholder={loading ? 'Loading...' : displayValue}
           disabled={loading}
           readOnly={!isOpen}
-          className="w-full px-3 py-1.5 pr-8 text-sm border border-[#dadce0] rounded-lg bg-white text-[#202124] focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:border-[#1a73e8] disabled:opacity-50 cursor-pointer"
+          className="w-full px-3 py-1.5 pr-8 text-sm border border-[#dadce0] dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900 text-[#202124] dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:border-[#1a73e8] disabled:opacity-50 cursor-pointer"
         />
         <Button
           variant="ghost"
@@ -89,7 +89,7 @@ export function RepositoryMultiSelect({
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           disabled={loading}
-          className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded transition-colors"
+          className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
         >
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -100,9 +100,9 @@ export function RepositoryMultiSelect({
       </div>
 
       {isOpen && !loading && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#dadce0] rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-[#dadce0] dark:border-slate-800 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
           {filteredRepos.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-[#70757a]">
+            <div className="px-3 py-2 text-sm text-[#70757a] dark:text-slate-500">
               {repositories.length === 0 ? 'No repositories found' : 'No matching repositories'}
             </div>
           ) : (
@@ -111,15 +111,15 @@ export function RepositoryMultiSelect({
               return (
                 <label
                   key={repo.fullName}
-                  className="flex items-center px-3 py-2 hover:bg-[#f1f3f4] cursor-pointer"
+                  className="flex items-center px-3 py-2 hover:bg-[#f1f3f4] dark:hover:bg-slate-800 cursor-pointer"
                 >
                   <input
                     type="checkbox"
                     checked={isSelected}
                     onChange={() => handleToggle(repo.fullName)}
-                    className="mr-2 h-4 w-4 text-[#1a73e8] focus:ring-[#1a73e8] border-[#dadce0] rounded"
+                    className="mr-2 h-4 w-4 text-[#1a73e8] dark:text-blue-500 focus:ring-[#1a73e8] dark:focus:ring-blue-500 border-[#dadce0] dark:border-slate-700 rounded"
                   />
-                  <span className={`text-sm ${isSelected ? 'text-[#1967d2] font-medium' : 'text-[#202124]'}`}>
+                  <span className={`text-sm ${isSelected ? 'text-[#1967d2] dark:text-blue-400 font-medium' : 'text-[#202124] dark:text-slate-300'}`}>
                     {repo.fullName}
                   </span>
                 </label>

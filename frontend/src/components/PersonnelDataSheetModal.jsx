@@ -225,7 +225,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
 
     const SectionTitle = ({ title }) => (
         <div className="mt-8 mb-4">
-            <h3 className="text-sm font-bold text-[#1a3e62] uppercase tracking-wider bg-slate-50 p-2 rounded-md border-l-4 border-[#1a3e62]">
+            <h3 className="text-sm font-bold text-[#1a3e62] dark:text-blue-400 uppercase tracking-wider bg-slate-50 dark:bg-slate-900 p-2 rounded-md border-l-4 border-[#1a3e62] dark:border-blue-600">
                 {title}
             </h3>
         </div>
@@ -241,7 +241,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
 
     return (
         <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
-            <DialogContent className="max-w-3xl p-0 overflow-hidden border-none shadow-2xl [&>button]:text-white">
+            <DialogContent className="max-w-3xl p-0 overflow-hidden border-none shadow-2xl [&>button]:text-white bg-white dark:bg-slate-950">
                 <DialogHeader className="bg-[#1a3e62] text-white p-6 flex flex-row items-center justify-between space-y-0">
                     <DialogTitle className="text-xl font-bold tracking-tight uppercase">
                         {getTitle()}
@@ -255,7 +255,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                 <SectionTitle title="Section 1: Personal Information" />
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="dateStarted" className="font-semibold text-slate-700">Date Started <span className="text-destructive">*</span></Label>
+                                        <Label htmlFor="dateStarted" className="font-semibold text-slate-700 dark:text-slate-300">Date Started <span className="text-destructive">*</span></Label>
                                         <Input
                                             id="dateStarted"
                                             type="date"
@@ -266,7 +266,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="surname" className="font-semibold text-slate-700">Surname <span className="text-destructive">*</span></Label>
+                                        <Label htmlFor="surname" className="font-semibold text-slate-700 dark:text-slate-300">Surname <span className="text-destructive">*</span></Label>
                                         <Input
                                             id="surname"
                                             name="surname"
@@ -277,7 +277,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="firstName" className="font-semibold text-slate-700">First Name <span className="text-destructive">*</span></Label>
+                                        <Label htmlFor="firstName" className="font-semibold text-slate-700 dark:text-slate-300">First Name <span className="text-destructive">*</span></Label>
                                         <Input
                                             id="firstName"
                                             name="firstName"
@@ -288,7 +288,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="middleName" className="font-semibold text-slate-700">Middle Name</Label>
+                                        <Label htmlFor="middleName" className="font-semibold text-slate-700 dark:text-slate-300">Middle Name</Label>
                                         <Input
                                             id="middleName"
                                             name="middleName"
@@ -303,7 +303,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                 <SectionTitle title="Section 2: Basic Details" />
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="dateOfBirth" className="font-semibold text-slate-700">Date of Birth</Label>
+                                        <Label htmlFor="dateOfBirth" className="font-semibold text-slate-700 dark:text-slate-300">Date of Birth</Label>
                                         <Input
                                             id="dateOfBirth"
                                             type="date"
@@ -313,7 +313,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="placeOfBirth" className="font-semibold text-slate-700">Place of Birth</Label>
+                                        <Label htmlFor="placeOfBirth" className="font-semibold text-slate-700 dark:text-slate-300">Place of Birth</Label>
                                         <Input
                                             id="placeOfBirth"
                                             name="placeOfBirth"
@@ -323,7 +323,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-3">
-                                        <Label className="font-semibold text-slate-700">Sex</Label>
+                                        <Label className="font-semibold text-slate-700 dark:text-slate-300">Sex</Label>
                                         <RadioGroup
                                             name="sex"
                                             value={formData.sex}
@@ -332,20 +332,20 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         >
                                             <div className="flex items-center space-x-2">
                                                 <RadioGroupItem value="Male" id="sex-male" />
-                                                <Label htmlFor="sex-male" className="font-normal">Male</Label>
+                                                <Label htmlFor="sex-male" className="font-normal dark:text-slate-300">Male</Label>
                                             </div>
                                             <div className="flex items-center space-x-2">
                                                 <RadioGroupItem value="Female" id="sex-female" />
-                                                <Label htmlFor="sex-female" className="font-normal">Female</Label>
+                                                <Label htmlFor="sex-female" className="font-normal dark:text-slate-300">Female</Label>
                                             </div>
                                             <div className="flex items-center space-x-2">
                                                 <RadioGroupItem value="Other" id="sex-other" />
-                                                <Label htmlFor="sex-other" className="font-normal">Other</Label>
+                                                <Label htmlFor="sex-other" className="font-normal dark:text-slate-300">Other</Label>
                                             </div>
                                         </RadioGroup>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="civilStatus" className="font-semibold text-slate-700">Civil Status</Label>
+                                        <Label htmlFor="civilStatus" className="font-semibold text-slate-700 dark:text-slate-300">Civil Status</Label>
                                         <Select
                                             name="civilStatus"
                                             value={formData.civilStatus}
@@ -363,7 +363,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         </Select>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="citizenship" className="font-semibold text-slate-700">Citizenship</Label>
+                                        <Label htmlFor="citizenship" className="font-semibold text-slate-700 dark:text-slate-300">Citizenship</Label>
                                         <Input
                                             id="citizenship"
                                             name="citizenship"
@@ -373,7 +373,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="bloodType" className="font-semibold text-slate-700">Blood Type</Label>
+                                        <Label htmlFor="bloodType" className="font-semibold text-slate-700 dark:text-slate-300">Blood Type</Label>
                                         <Select
                                             name="bloodType"
                                             value={formData.bloodType}
@@ -390,7 +390,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         </Select>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="height" className="font-semibold text-slate-700">Height (cm)</Label>
+                                        <Label htmlFor="height" className="font-semibold text-slate-700 dark:text-slate-300">Height (cm)</Label>
                                         <Input
                                             id="height"
                                             name="height"
@@ -401,7 +401,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="weight" className="font-semibold text-slate-700">Weight (kg)</Label>
+                                        <Label htmlFor="weight" className="font-semibold text-slate-700 dark:text-slate-300">Weight (kg)</Label>
                                         <Input
                                             id="weight"
                                             name="weight"
@@ -417,7 +417,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                 <SectionTitle title="Section 3: Government Identification" />
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="sssNumber" className="font-semibold text-slate-700">SSS Number</Label>
+                                        <Label htmlFor="sssNumber" className="font-semibold text-slate-700 dark:text-slate-300">SSS Number</Label>
                                         <Input
                                             id="sssNumber"
                                             name="sssNumber"
@@ -429,7 +429,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         {errors.sssNumber && <span className="text-[10px] text-destructive font-medium">{errors.sssNumber}</span>}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="pagIbigNumber" className="font-semibold text-slate-700">PAG-IBIG Number</Label>
+                                        <Label htmlFor="pagIbigNumber" className="font-semibold text-slate-700 dark:text-slate-300">PAG-IBIG Number</Label>
                                         <Input
                                             id="pagIbigNumber"
                                             name="pagIbigNumber"
@@ -441,7 +441,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         {errors.pagIbigNumber && <span className="text-[10px] text-destructive font-medium">{errors.pagIbigNumber}</span>}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="philHealthNumber" className="font-semibold text-slate-700">PhilHealth Number</Label>
+                                        <Label htmlFor="philHealthNumber" className="font-semibold text-slate-700 dark:text-slate-300">PhilHealth Number</Label>
                                         <Input
                                             id="philHealthNumber"
                                             name="philHealthNumber"
@@ -453,7 +453,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         {errors.philHealthNumber && <span className="text-[10px] text-destructive font-medium">{errors.philHealthNumber}</span>}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="tin" className="font-semibold text-slate-700">TIN</Label>
+                                        <Label htmlFor="tin" className="font-semibold text-slate-700 dark:text-slate-300">TIN</Label>
                                         <Input
                                             id="tin"
                                             name="tin"
@@ -465,7 +465,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         {errors.tin && <span className="text-[10px] text-destructive font-medium">{errors.tin}</span>}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="employeeNumber" className="font-semibold text-slate-700">Employee Number</Label>
+                                        <Label htmlFor="employeeNumber" className="font-semibold text-slate-700 dark:text-slate-300">Employee Number</Label>
                                         <Input
                                             id="employeeNumber"
                                             name="employeeNumber"
@@ -480,7 +480,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                 <SectionTitle title="Section 4: Contact Information" />
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="residentialAddress" className="font-semibold text-slate-700">Residential Address</Label>
+                                        <Label htmlFor="residentialAddress" className="font-semibold text-slate-700 dark:text-slate-300">Residential Address</Label>
                                         <Input
                                             id="residentialAddress"
                                             name="residentialAddress"
@@ -490,7 +490,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="permanentAddress" className="font-semibold text-slate-700">Permanent Address</Label>
+                                        <Label htmlFor="permanentAddress" className="font-semibold text-slate-700 dark:text-slate-300">Permanent Address</Label>
                                         <Input
                                             id="permanentAddress"
                                             name="permanentAddress"
@@ -500,7 +500,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="zipCode" className="font-semibold text-slate-700">ZIP Code</Label>
+                                        <Label htmlFor="zipCode" className="font-semibold text-slate-700 dark:text-slate-300">ZIP Code</Label>
                                         <Input
                                             id="zipCode"
                                             name="zipCode"
@@ -510,7 +510,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="emailAddress" className="font-semibold text-slate-700">Email Address <span className="text-destructive">*</span></Label>
+                                        <Label htmlFor="emailAddress" className="font-semibold text-slate-700 dark:text-slate-300">Email Address <span className="text-destructive">*</span></Label>
                                         <Input
                                             id="emailAddress"
                                             name="emailAddress"
@@ -522,7 +522,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="telephoneNumber" className="font-semibold text-slate-700">Telephone Number</Label>
+                                        <Label htmlFor="telephoneNumber" className="font-semibold text-slate-700 dark:text-slate-300">Telephone Number</Label>
                                         <Input
                                             id="telephoneNumber"
                                             name="telephoneNumber"
@@ -532,7 +532,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="cellphoneNumber" className="font-semibold text-slate-700">Cellphone Number <span className="text-destructive">*</span></Label>
+                                        <Label htmlFor="cellphoneNumber" className="font-semibold text-slate-700 dark:text-slate-300">Cellphone Number <span className="text-destructive">*</span></Label>
                                         <Input
                                             id="cellphoneNumber"
                                             name="cellphoneNumber"
@@ -548,7 +548,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                 <SectionTitle title="Section 5: In Case of Emergency" />
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="emergencyName" className="font-semibold text-slate-700">Name <span className="text-destructive">*</span></Label>
+                                        <Label htmlFor="emergencyName" className="font-semibold text-slate-700 dark:text-slate-300">Name <span className="text-destructive">*</span></Label>
                                         <Input
                                             id="emergencyName"
                                             name="emergencyName"
@@ -559,7 +559,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="emergencyRelationship" className="font-semibold text-slate-700">Relationship</Label>
+                                        <Label htmlFor="emergencyRelationship" className="font-semibold text-slate-700 dark:text-slate-300">Relationship</Label>
                                         <Input
                                             id="emergencyRelationship"
                                             name="emergencyRelationship"
@@ -569,7 +569,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="emergencyAddress" className="font-semibold text-slate-700">Emergency Address</Label>
+                                        <Label htmlFor="emergencyAddress" className="font-semibold text-slate-700 dark:text-slate-300">Emergency Address</Label>
                                         <Input
                                             id="emergencyAddress"
                                             name="emergencyAddress"
@@ -579,7 +579,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="emergencyOccupation" className="font-semibold text-slate-700">Occupation</Label>
+                                        <Label htmlFor="emergencyOccupation" className="font-semibold text-slate-700 dark:text-slate-300">Occupation</Label>
                                         <Input
                                             id="emergencyOccupation"
                                             name="emergencyOccupation"
@@ -589,7 +589,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="emergencyContactNumber" className="font-semibold text-slate-700">Contact Number <span className="text-destructive">*</span></Label>
+                                        <Label htmlFor="emergencyContactNumber" className="font-semibold text-slate-700 dark:text-slate-300">Contact Number <span className="text-destructive">*</span></Label>
                                         <Input
                                             id="emergencyContactNumber"
                                             name="emergencyContactNumber"
@@ -605,7 +605,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                 <SectionTitle title="Section 6: Parent Information" />
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="fatherName" className="font-semibold text-slate-700">Name of Father</Label>
+                                        <Label htmlFor="fatherName" className="font-semibold text-slate-700 dark:text-slate-300">Name of Father</Label>
                                         <Input
                                             id="fatherName"
                                             name="fatherName"
@@ -615,7 +615,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="motherMaidenName" className="font-semibold text-slate-700">Maiden Name of Mother</Label>
+                                        <Label htmlFor="motherMaidenName" className="font-semibold text-slate-700 dark:text-slate-300">Maiden Name of Mother</Label>
                                         <Input
                                             id="motherMaidenName"
                                             name="motherMaidenName"
@@ -625,7 +625,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                         />
                                     </div>
                                     <div className="space-y-2 md:col-span-2">
-                                        <Label htmlFor="parentsAddress" className="font-semibold text-slate-700">Parents' Address</Label>
+                                        <Label htmlFor="parentsAddress" className="font-semibold text-slate-700 dark:text-slate-300">Parents' Address</Label>
                                         <Input
                                             id="parentsAddress"
                                             name="parentsAddress"
@@ -638,14 +638,14 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
 
                                 {/* SECTION 7: EDUCATIONAL BACKGROUND */}
                                 <SectionTitle title="Section 7: Educational Background" />
-                                <div className="border rounded-lg overflow-hidden border-slate-200">
+                                <div className="border rounded-lg overflow-hidden border-slate-200 dark:border-slate-800">
                                     <Table>
-                                        <TableHeader className="bg-slate-50">
+                                        <TableHeader className="bg-slate-50 dark:bg-slate-900">
                                             <TableRow>
-                                                <TableHead className="w-[20%] font-bold text-[#1a3e62]">Level</TableHead>
-                                                <TableHead className="font-bold text-[#1a3e62]">School</TableHead>
-                                                <TableHead className="font-bold text-[#1a3e62]">Degree / Course</TableHead>
-                                                <TableHead className="w-[25%] font-bold text-[#1a3e62]">Inclusive Dates</TableHead>
+                                                <TableHead className="w-[20%] font-bold text-[#1a3e62] dark:text-blue-400">Level</TableHead>
+                                                <TableHead className="font-bold text-[#1a3e62] dark:text-blue-400">School</TableHead>
+                                                <TableHead className="font-bold text-[#1a3e62] dark:text-blue-400">Degree / Course</TableHead>
+                                                <TableHead className="w-[25%] font-bold text-[#1a3e62] dark:text-blue-400">Inclusive Dates</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -655,14 +655,14 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                                 { id: 'vocational', label: 'Vocational / Trade' },
                                                 { id: 'tertiary', label: 'Tertiary' }
                                             ].map((level) => (
-                                                <TableRow key={level.id}>
-                                                    <TableCell className="font-semibold text-slate-600">{level.label}</TableCell>
+                                                <TableRow key={level.id} className="border-b border-slate-100 dark:border-slate-800">
+                                                    <TableCell className="font-semibold text-slate-600 dark:text-slate-300">{level.label}</TableCell>
                                                     <TableCell>
                                                         <Input
                                                             variant="ghost"
                                                             value={formData.education[level.id].school}
                                                             onChange={(e) => handleEducationChange(level.id, 'school', e.target.value)}
-                                                            className="border-none bg-transparent focus-visible:ring-0 focus-visible:bg-slate-50 h-8 px-2"
+                                                            className="border-none bg-transparent focus-visible:ring-0 focus-visible:bg-slate-50 dark:focus-visible:bg-slate-800 h-8 px-2"
                                                             placeholder="Enter school name"
                                                         />
                                                     </TableCell>
@@ -671,7 +671,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                                             variant="ghost"
                                                             value={formData.education[level.id].degree}
                                                             onChange={(e) => handleEducationChange(level.id, 'degree', e.target.value)}
-                                                            className="border-none bg-transparent focus-visible:ring-0 focus-visible:bg-slate-50 h-8 px-2"
+                                                            className="border-none bg-transparent focus-visible:ring-0 focus-visible:bg-slate-50 dark:focus-visible:bg-slate-800 h-8 px-2"
                                                             placeholder="Degree earned"
                                                         />
                                                     </TableCell>
@@ -680,7 +680,7 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                                                             variant="ghost"
                                                             value={formData.education[level.id].dates}
                                                             onChange={(e) => handleEducationChange(level.id, 'dates', e.target.value)}
-                                                            className="border-none bg-transparent focus-visible:ring-0 focus-visible:bg-slate-50 h-8 px-2"
+                                                            className="border-none bg-transparent focus-visible:ring-0 focus-visible:bg-slate-50 dark:focus-visible:bg-slate-800 h-8 px-2"
                                                             placeholder="YYYY - YYYY"
                                                         />
                                                     </TableCell>
@@ -694,11 +694,11 @@ const PersonnelDataSheetModal = ({ open, onClose, onSave, initialData, mode = 'a
                     </div>
                 </ScrollArea>
 
-                <DialogFooter className="bg-slate-50 p-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                <DialogFooter className="bg-slate-50 dark:bg-slate-900 p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-3">
                     <Button
                         variant="outline"
                         onClick={onClose}
-                        className="px-6 border-slate-200 text-slate-600 hover:bg-slate-100 font-medium"
+                        className="px-6 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium"
                     >
                         {mode === 'view' ? 'Close' : 'Cancel'}
                     </Button>

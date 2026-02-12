@@ -13,7 +13,7 @@ export function useRankingData() {
   const [error, setError] = useState('');
 
   // Fetch repositories with React Query
-  const { data: repos = [], isLoading: reposLoading } = useQuery({
+  const { data: repos = [], isLoading: reposLoading, error: reposError } = useQuery({
     queryKey: ['repositories'],
     queryFn: fetchRepositories,
     staleTime: 10 * 60 * 1000,
@@ -21,7 +21,7 @@ export function useRankingData() {
 
   // Fetch ranking data for ALL repositories in ONE batch request
   const repoNames = repos.map(r => r.fullName);
-  const { data: batchData = {}, isLoading: issuesLoading } = useQuery({
+  const { data: batchData = {}, isLoading: issuesLoading, error: issuesError } = useQuery({
     queryKey: ['ranking', repoNames.join(','), selectedFilter],
     queryFn: async () => {
       const response = await fetchCachedIssues(repoNames, selectedFilter);
@@ -33,6 +33,7 @@ export function useRankingData() {
   });
 
   const loading = reposLoading || issuesLoading;
+  const queryError = reposError || issuesError;
 
   // Convert batch mapping { "repo/a": [...], "repo/b": [...] } back to array for aggregation logic
   const reposIssuesData = useMemo(() => {
@@ -92,7 +93,7 @@ export function useRankingData() {
     rankingData,
     setRankingData: () => { }, // No-op, React Query manages state
     loading,
-    error,
+    error: error || queryError,
     setError,
     loadData,
     // Legacy methods for backward compatibility (no-ops)

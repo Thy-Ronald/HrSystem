@@ -14,7 +14,16 @@ const githubGraphQLClient = axios.create({
     },
 });
 
-const withAuth = () => {
+const settingsService = require('../settingsService');
+
+const withAuth = async () => {
+    // Try to get token from database first
+    const dbToken = await settingsService.getSetting('github_token');
+    if (dbToken) {
+        return { Authorization: `Bearer ${dbToken}` };
+    }
+
+    // Fallback to environment variable
     const token = process.env.GITHUB_TOKEN;
     return token ? { Authorization: `Bearer ${token}` } : {};
 };

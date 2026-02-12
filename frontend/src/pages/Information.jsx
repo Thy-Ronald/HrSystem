@@ -124,11 +124,11 @@ const Information = () => {
     const paginatedRecords = records.slice(startIndex, endIndex);
 
     return (
-        <div className="w-full min-h-full bg-white flex flex-col">
+        <div className="w-full min-h-full bg-white dark:bg-slate-950 flex flex-col">
             {/* Page Header */}
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900 sticky top-0 z-10">
                 <div>
-                    <h1 className="text-xl font-normal text-[#202124] tracking-tight">
+                    <h1 className="text-xl font-normal text-[#202124] dark:text-slate-100 tracking-tight">
                         Personnel Data Sheets
                     </h1>
                 </div>
@@ -137,7 +137,7 @@ const Information = () => {
                         variant="outline"
                         onClick={loadRecords}
                         disabled={loading}
-                        className="font-medium text-slate-600 border-slate-200"
+                        className="font-medium text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800"
                     >
                         <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                         Refresh
@@ -167,11 +167,11 @@ const Information = () => {
                         <Button onClick={loadRecords} variant="default">Try Again</Button>
                     </div>
                 ) : records.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
-                        <div className="bg-white p-4 rounded-full shadow-sm mb-4">
-                            <FileText className="h-10 w-10 text-slate-400" />
+                    <div className="flex-1 flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-900/50">
+                        <div className="bg-white dark:bg-slate-800 p-4 rounded-full shadow-sm mb-4">
+                            <FileText className="h-10 w-10 text-slate-400 dark:text-slate-500" />
                         </div>
-                        <h3 className="text-lg font-semibold text-slate-900 mb-2">No Personnel Data Records Yet</h3>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">No Personnel Data Records Yet</h3>
                         <p className="text-slate-500 mb-8 max-w-sm">
                             Click the "Add New Record" button to create your first Personnel Data Sheet.
                         </p>
@@ -184,11 +184,11 @@ const Information = () => {
                         </Button>
                     </div>
                 ) : (
-                    <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white flex flex-col flex-1">
+                    <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm bg-white dark:bg-slate-900 flex flex-col flex-1">
                         <div className="flex-1 overflow-auto">
                             <Table>
-                                <TableHeader className="bg-slate-50/80 sticky top-0 z-10">
-                                    <TableRow className="hover:bg-transparent border-b border-slate-200">
+                                <TableHeader className="bg-slate-50/80 dark:bg-slate-800/80 sticky top-0 z-10">
+                                    <TableRow className="hover:bg-transparent border-b border-slate-200 dark:border-slate-700">
                                         <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Employee Name</TableHead>
                                         <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Employee No.</TableHead>
                                         <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Date Started</TableHead>
@@ -199,15 +199,15 @@ const Information = () => {
                                 </TableHeader>
                                 <TableBody>
                                     {paginatedRecords.map((record) => (
-                                        <TableRow key={record.id} className="hover:bg-slate-50/50 transition-colors">
+                                        <TableRow key={record.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800">
                                             <TableCell className="py-4">
                                                 <div className="flex items-center gap-3">
-                                                    <Avatar className="h-9 w-9 border border-slate-100 shadow-sm">
+                                                    <Avatar className="h-9 w-9 border border-slate-100 dark:border-slate-800 shadow-sm">
                                                         <AvatarFallback className="bg-[#1a3e62] text-white font-semibold text-xs">
                                                             {record.firstName.charAt(0)}
                                                         </AvatarFallback>
                                                     </Avatar>
-                                                    <span className="font-semibold text-slate-900">
+                                                    <span className="font-semibold text-slate-900 dark:text-slate-100">
                                                         {`${record.surname}, ${record.firstName}`}
                                                     </span>
                                                 </div>

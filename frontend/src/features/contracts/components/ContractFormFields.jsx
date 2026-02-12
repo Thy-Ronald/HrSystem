@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card"
  */
 const SectionTitle = ({ title }) => (
   <div className="mt-6 mb-3">
-    <h3 className="text-sm font-bold text-[#1a3e62] uppercase tracking-wider bg-slate-50 p-2 rounded-md">
+    <h3 className="text-sm font-bold text-[#1a3e62] dark:text-blue-400 uppercase tracking-wider bg-slate-50 dark:bg-slate-900 p-2 rounded-md">
       {title}
     </h3>
   </div>
@@ -32,7 +32,7 @@ export function ContractFormFields({
       <SectionTitle title="Basic Information" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="employeeName" className="font-semibold text-slate-700">
+          <Label htmlFor="employeeName" className="font-semibold text-slate-700 dark:text-slate-300">
             Employee Name <span className="text-destructive">*</span>
           </Label>
           <Input
@@ -47,7 +47,7 @@ export function ContractFormFields({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="position" className="font-semibold text-slate-700">
+          <Label htmlFor="position" className="font-semibold text-slate-700 dark:text-slate-300">
             Position <span className="text-destructive">*</span>
           </Label>
           <Input
@@ -62,7 +62,7 @@ export function ContractFormFields({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="assessmentDate" className="font-semibold text-slate-700">
+          <Label htmlFor="assessmentDate" className="font-semibold text-slate-700 dark:text-slate-300">
             Assessment Date <span className="text-destructive">*</span>
           </Label>
           <Input
@@ -77,7 +77,7 @@ export function ContractFormFields({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="term" className="font-semibold text-slate-700">
+          <Label htmlFor="term" className="font-semibold text-slate-700 dark:text-slate-300">
             Term (Months) <span className="text-destructive">*</span>
           </Label>
           <Input
@@ -98,9 +98,9 @@ export function ContractFormFields({
       <SectionTitle title="Financial Information" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="basicSalary" className="font-semibold text-slate-700">Basic Salary</Label>
+          <Label htmlFor="basicSalary" className="font-semibold text-slate-700 dark:text-slate-300">Basic Salary</Label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">₱</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 font-medium">₱</span>
             <Input
               id="basicSalary"
               type="number"
@@ -114,9 +114,9 @@ export function ContractFormFields({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="allowance" className="font-semibold text-slate-700">Allowance</Label>
+          <Label htmlFor="allowance" className="font-semibold text-slate-700 dark:text-slate-300">Allowance</Label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">₱</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 font-medium">₱</span>
             <Input
               id="allowance"
               type="number"
@@ -130,9 +130,9 @@ export function ContractFormFields({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="signingBonus" className="font-semibold text-slate-700">Signing Bonus</Label>
+          <Label htmlFor="signingBonus" className="font-semibold text-slate-700 dark:text-slate-300">Signing Bonus</Label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">₱</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 font-medium">₱</span>
             <Input
               id="signingBonus"
               type="number"
@@ -150,7 +150,7 @@ export function ContractFormFields({
       <SectionTitle title="Bonus Information" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="attendanceBonusPercent" className="font-semibold text-slate-700">Attendance Bonus (%)</Label>
+          <Label htmlFor="attendanceBonusPercent" className="font-semibold text-slate-700 dark:text-slate-300">Attendance Bonus (%)</Label>
           <div className="relative">
             <Input
               id="attendanceBonusPercent"
@@ -162,20 +162,20 @@ export function ContractFormFields({
               className={`pr-8 ${errors.attendanceBonusPercent ? "border-destructive focus-visible:ring-destructive" : ""}`}
               placeholder="0"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">%</span>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 font-medium">%</span>
           </div>
           {errors.attendanceBonusPercent && <p className="text-xs text-destructive font-medium">{errors.attendanceBonusPercent}</p>}
         </div>
 
-        <Card className="bg-slate-50 border-slate-200">
+        <Card className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
           <CardContent className="p-4 flex flex-col justify-center h-full">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-tighter">Attendance Bonus Amount</p>
-            <p className="text-xl font-bold text-[#1a3e62]">₱{attendanceBonusAmount.toFixed(2)}</p>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-tighter">Attendance Bonus Amount</p>
+            <p className="text-xl font-bold text-[#1a3e62] dark:text-blue-400">₱{attendanceBonusAmount.toFixed(2)}</p>
           </CardContent>
         </Card>
 
         <div className="space-y-2">
-          <Label htmlFor="perfectAttendancePercent" className="font-semibold text-slate-700">Perfect Attendance (%)</Label>
+          <Label htmlFor="perfectAttendancePercent" className="font-semibold text-slate-700 dark:text-slate-300">Perfect Attendance (%)</Label>
           <div className="relative">
             <Input
               id="perfectAttendancePercent"
@@ -187,15 +187,15 @@ export function ContractFormFields({
               className={`pr-8 ${errors.perfectAttendancePercent ? "border-destructive focus-visible:ring-destructive" : ""}`}
               placeholder="0"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">%</span>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 font-medium">%</span>
           </div>
           {errors.perfectAttendancePercent && <p className="text-xs text-destructive font-medium">{errors.perfectAttendancePercent}</p>}
         </div>
 
-        <Card className="bg-slate-50 border-slate-200">
+        <Card className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
           <CardContent className="p-4 flex flex-col justify-center h-full">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-tighter">Perfect Attendance Amount</p>
-            <p className="text-xl font-bold text-[#1a3e62]">₱{perfectAttendanceAmount.toFixed(2)}</p>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-tighter">Perfect Attendance Amount</p>
+            <p className="text-xl font-bold text-[#1a3e62] dark:text-blue-400">₱{perfectAttendanceAmount.toFixed(2)}</p>
           </CardContent>
         </Card>
       </div>

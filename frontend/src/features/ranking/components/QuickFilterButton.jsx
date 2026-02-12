@@ -12,8 +12,8 @@ export function QuickFilterButton({ label, active, onClick }) {
       className={`
         px-4 h-8 text-xs font-semibold rounded-lg transition-all
         ${active
-          ? 'bg-[#1a3e62] hover:bg-[#122c46] shadow-sm text-white border-transparent'
-          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+          ? 'bg-[#1a3e62] dark:bg-blue-600 hover:bg-[#122c46] dark:hover:bg-blue-700 shadow-sm text-white border-transparent'
+          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
         }
       `}
     >

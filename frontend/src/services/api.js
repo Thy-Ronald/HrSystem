@@ -591,3 +591,30 @@ export const deleteAllNotifications = async () => {
   });
   return handleResponse(res);
 };
+
+// --- System Settings ---
+/**
+ * Get a system setting by key
+ * @param {string} key - Setting key
+ * @returns {Promise<any>} Setting value
+ */
+export async function fetchSetting(key) {
+  const res = await fetch(`${API_BASE}/api/settings/${key}`, {
+    headers: getAuthHeaders(),
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Update or create a system setting
+ * @param {Object} payload - { key, value, description }
+ * @returns {Promise<Object>}
+ */
+export async function updateSetting(payload) {
+  const res = await fetch(`${API_BASE}/api/settings`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res);
+}

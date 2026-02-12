@@ -37,7 +37,7 @@ export function FilterDropdown({ activeFilter, onFilterChange }) {
 
   return (
     <div className="flex flex-col gap-1 relative w-full">
-      <label htmlFor="filter-select" className="text-sm font-medium text-[#5f6368]">
+      <label htmlFor="filter-select" className="text-sm font-medium text-[#5f6368] dark:text-slate-400">
         Period
       </label>
       {!isCustomMonth ? (
@@ -45,7 +45,7 @@ export function FilterDropdown({ activeFilter, onFilterChange }) {
           id="filter-select"
           value={displayFilter}
           onChange={(e) => handleFilterChange(e.target.value)}
-          className="w-full px-3 py-1.5 text-sm border border-[#dadce0] rounded-lg bg-white text-[#202124] focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:border-[#1a73e8]"
+          className="w-full px-3 py-1.5 text-sm border border-[#dadce0] dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900 text-[#202124] dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:border-[#1a73e8]"
         >
           {filters.map((filter) => (
             <option key={filter.value} value={filter.value}>
@@ -59,7 +59,7 @@ export function FilterDropdown({ activeFilter, onFilterChange }) {
             id="filter-select"
             value={QUICK_FILTERS.CUSTOM_MONTH}
             onChange={(e) => handleFilterChange(e.target.value)}
-            className="w-full px-3 py-1.5 text-sm border border-[#dadce0] rounded-lg bg-white text-[#202124] focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:border-[#1a73e8]"
+            className="w-full px-3 py-1.5 text-sm border border-[#dadce0] dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900 text-[#202124] dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#1a73e8] focus:border-[#1a73e8]"
           >
             {filters.map((filter) => (
               <option key={filter.value} value={filter.value}>

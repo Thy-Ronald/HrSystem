@@ -155,26 +155,26 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
 
     return (
         <div ref={containerRef} style={{ height: '100%' }}>
-            <Card className={`h-full overflow-hidden transition-all duration-300 border-2 ${session.streamActive ? 'border-[#1a3e62] shadow-md' : 'border-slate-100 shadow-sm'} flex flex-col bg-white hover:translate-y-[-4px] hover:shadow-xl`}>
-                <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+            <Card className={`h-full overflow-hidden transition-all duration-300 border-2 ${session.streamActive ? 'border-[#1a3e62] dark:border-blue-400 shadow-md' : 'border-slate-100 dark:border-slate-800 shadow-sm'} flex flex-col bg-white dark:bg-slate-950 hover:translate-y-[-4px] hover:shadow-xl`}>
+                <div className="p-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
                     <div className="flex items-center gap-3 min-w-0">
                         <UserAvatar
                             name={session.employeeName}
                             avatarUrl={session.avatarUrl}
                             size="sm"
-                            className="border border-slate-100"
+                            className="border border-slate-100 dark:border-slate-800"
                         />
-                        <h3 className="font-bold text-slate-800 truncate">{session.employeeName}</h3>
+                        <h3 className="font-bold text-slate-800 dark:text-slate-100 truncate">{session.employeeName}</h3>
                         {session.streamActive && (
-                            <div className="flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                            <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-800">
                                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Live</span>
+                                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Live</span>
                             </div>
                         )}
                         {isRecording && (
-                            <div className="flex items-center gap-1.5 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100 animate-pulse">
+                            <div className="flex items-center gap-1.5 bg-rose-50 dark:bg-rose-950/30 px-2 py-0.5 rounded-full border border-rose-100 dark:border-rose-800 animate-pulse">
                                 <div className="w-2 h-2 rounded-full bg-rose-500" />
-                                <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">{formattedTime}</span>
+                                <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider">{formattedTime}</span>
                             </div>
                         )}
                     </div>
@@ -196,20 +196,20 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
                         ) : (
                             <div className="text-center opacity-70">
                                 {session.disconnectReason === 'offline' ? (
-                                    <Signal className="h-10 w-10 text-slate-500 mx-auto mb-2 opacity-50" />
+                                    <Signal className="h-10 w-10 text-slate-500 dark:text-slate-400 mx-auto mb-2 opacity-50" />
                                 ) : (
-                                    <Users className="h-10 w-10 text-slate-500 mx-auto mb-2" />
+                                    <Users className="h-10 w-10 text-slate-500 dark:text-slate-400 mx-auto mb-2" />
                                 )}
 
-                                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">
+                                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">
                                     {session.disconnectReason === 'offline' ? 'Offline' : 'Disconnected'}
                                 </p>
                                 {session.disconnectReason === 'offline' ? (
-                                    <p className="text-[10px] text-slate-400 mt-1 max-w-[150px] mx-auto leading-tight">
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 max-w-[150px] mx-auto leading-tight">
                                         Waiting for user to come online or resume connection
                                     </p>
                                 ) : (
-                                    !session.streamActive && <p className="text-[10px] text-slate-400 mt-1">User ended session</p>
+                                    !session.streamActive && <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">User ended session</p>
                                 )}
                             </div>
                         )}
@@ -218,7 +218,7 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
                         )}
                     </div>
                 </div>
-                <div className="p-3 flex gap-2 bg-slate-50/30">
+                <div className="p-3 flex gap-2 bg-slate-50/30 dark:bg-slate-900/30">
                     {session.streamActive ? (
                         <>
                             <Button
@@ -230,7 +230,7 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
                             </Button>
                             <Button
                                 variant="outline"
-                                className={`flex-1 ${isRecording ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100' : 'text-slate-600 hover:bg-slate-50'} gap-1.5 h-8 text-xs`}
+                                className={`flex-1 ${isRecording ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/20' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 dark:bg-transparent'} gap-1.5 h-8 text-xs`}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     if (isRecording) {
@@ -253,7 +253,7 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
                         </>
                     ) : session.disconnectReason !== 'offline' ? (
                         <Button
-                            className={`flex-1 ${reconnectSent ? 'bg-slate-100 text-slate-500 hover:bg-slate-100' : 'bg-emerald-600 hover:bg-emerald-700 text-white'} font-semibold h-9 rounded-lg shadow-sm transition-all`}
+                            className={`flex-1 ${reconnectSent ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800' : 'bg-emerald-600 hover:bg-emerald-700 text-white'} font-semibold h-9 rounded-lg shadow-sm transition-all`}
                             onClick={async (e) => {
                                 e.stopPropagation();
                                 if (!session.employeeId) {
@@ -303,8 +303,8 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
                     <Button
                         variant="outline"
                         className={session.streamActive
-                            ? "h-8 w-8 p-0 rounded-lg text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 flex-none"
-                            : "flex-1 text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 h-9 rounded-lg"
+                            ? "h-8 w-8 p-0 rounded-lg text-rose-600 border-rose-200 dark:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-700 flex-none"
+                            : "flex-1 text-rose-600 border-rose-200 dark:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-700 h-9 rounded-lg"
                         }
                         onClick={handleRemoveClick}
                         title="Remove Session"
@@ -323,7 +323,7 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
                     <DialogTitle className="sr-only">Screen Share</DialogTitle>
                     <div className="w-full h-full flex flex-col">
                         {/* Header - Relative positioning ensures it doesn't overlap the video content */}
-                        <div className="px-5 py-3 flex justify-between items-center bg-slate-900 border-b border-white/10 shrink-0">
+                        <div className="px-5 py-3 flex justify-between items-center bg-slate-900 dark:bg-black border-b border-white/10 shrink-0">
                             <h3 className="text-lg font-bold text-white tracking-tight">{session.employeeName}</h3>
                             <div className="flex items-center gap-2">
                                 <div className="flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
@@ -347,18 +347,18 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
             </Dialog>
 
             <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
-                <DialogContent className="sm:max-w-md bg-white">
+                <DialogContent className="sm:max-w-md bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-bold text-slate-900 leading-tight">Stop Monitoring?</DialogTitle>
-                        <DialogDescription className="text-slate-500 pt-2">
-                            Are you sure you want to disconnect from <strong className="text-slate-900">{session.employeeName}</strong>?
+                        <DialogTitle className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">Stop Monitoring?</DialogTitle>
+                        <DialogDescription className="text-slate-500 dark:text-slate-400 pt-2">
+                            Are you sure you want to disconnect from <strong className="text-slate-900 dark:text-slate-100">{session.employeeName}</strong>?
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="gap-2 sm:gap-0 pt-4">
                         <Button
                             variant="ghost"
                             onClick={() => setShowConfirm(false)}
-                            className="text-slate-600 hover:bg-slate-100 font-medium"
+                            className="text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium"
                         >
                             Cancel
                         </Button>

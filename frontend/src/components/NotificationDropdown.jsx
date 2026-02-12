@@ -135,7 +135,7 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
       <div
         key={notification.id}
         onClick={() => handleNotificationClick(notification)}
-        className={`px-3 py-3 mx-2 my-1 rounded-lg transition-colors cursor-pointer flex items-center gap-4 hover:bg-slate-100 ${!read ? 'bg-blue-50/50' : ''
+        className={`px-3 py-3 mx-2 my-1 rounded-lg transition-colors cursor-pointer flex items-center gap-4 hover:bg-slate-100 dark:hover:bg-slate-800 ${!read ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''
           }`}
       >
         <div className="flex-shrink-0">
@@ -144,10 +144,10 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
           </div>
         </div>
         <div className="flex-1 min-w-0">
-          <p className={`text-[15px] leading-tight ${!read ? 'font-semibold text-slate-900' : 'text-slate-600'}`}>
-            <span className="text-slate-900 font-bold">{notification.title}</span> {notification.message}
+          <p className={`text-[15px] leading-tight ${!read ? 'font-semibold text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400'}`}>
+            <span className="text-slate-900 dark:text-slate-100 font-bold">{notification.title}</span> {notification.message}
           </p>
-          <p className={`text-xs mt-1 ${!read ? 'text-blue-600 font-semibold' : 'text-slate-500'}`}>
+          <p className={`text-xs mt-1 ${!read ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-slate-500 dark:text-slate-500'}`}>
             {formatTimeAgo(notification.created_at)} • {formatAbsoluteTimestamp(notification.created_at)} {subtext}
           </p>
         </div>
@@ -187,7 +187,7 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
       {open && (
         <div
           ref={dropdownRef}
-          className="absolute top-full right-0 mt-2 w-96 bg-white rounded-xl shadow-2xl border border-[#dadce0] z-[1000] flex flex-col overflow-hidden"
+          className="absolute top-full right-0 mt-2 w-96 bg-white dark:bg-slate-950 rounded-xl shadow-2xl border border-[#dadce0] dark:border-slate-800 z-[1000] flex flex-col overflow-hidden"
           style={{
             boxShadow: '0 12px 28px 0 rgba(0, 0, 0, 0.2), 0 2px 4px 0 rgba(0, 0, 0, 0.1)',
             maxHeight: 'calc(100vh - 80px)',
@@ -197,24 +197,24 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
           {/* Header */}
           <div className="px-4 pt-4 pb-2">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-2xl font-bold text-slate-900">Notifications</h3>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Notifications</h3>
               <div className="flex gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-slate-100" onClick={() => setShowClearConfirm(true)}>
-                  <MoreHorizontal className="h-5 w-5 text-slate-600" />
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => setShowClearConfirm(true)}>
+                  <MoreHorizontal className="h-5 w-5 text-slate-600 dark:text-slate-400" />
                 </Button>
               </div>
             </div>
             <div className="flex gap-2 mb-2">
               <button
                 onClick={() => setFilter('all')}
-                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${filter === 'all' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-100'
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${filter === 'all' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
               >
                 All
               </button>
               <button
                 onClick={() => setFilter('unread')}
-                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${filter === 'unread' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-100'
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${filter === 'unread' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
               >
                 Unread
@@ -229,9 +229,9 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
                 <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
               </div>
             ) : filteredNotifications.length === 0 ? (
-              <div className="p-8 text-center text-slate-500">
+              <div className="p-8 text-center text-slate-500 dark:text-slate-500">
                 <Bell className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                <p className="font-medium text-slate-900 text-lg">No notifications</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100 text-lg">No notifications</p>
                 <p className="text-sm">You're all caught up!</p>
               </div>
             ) : (
@@ -239,7 +239,7 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
                 {today.length > 0 && (
                   <>
                     <div className="px-4 py-2 flex items-center justify-between">
-                      <span className="font-bold text-slate-900">Today</span>
+                      <span className="font-bold text-slate-900 dark:text-slate-100">Today</span>
                     </div>
                     {today.map(renderNotificationItem)}
                   </>
@@ -247,9 +247,9 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
                 {earlier.length > 0 && (
                   <>
                     <div className="px-4 py-2 mt-2 flex items-center justify-between">
-                      <span className="font-bold text-slate-900">Earlier</span>
+                      <span className="font-bold text-slate-900 dark:text-slate-100">Earlier</span>
                       {filter === 'all' && (
-                        <button className="text-blue-600 text-sm font-medium hover:bg-blue-50 px-2 py-1 rounded">See all</button>
+                        <button className="text-blue-600 dark:text-blue-400 text-sm font-medium hover:bg-blue-50 dark:hover:bg-blue-900/20 px-2 py-1 rounded">See all</button>
                       )}
                     </div>
                     {earlier.map(renderNotificationItem)}
@@ -265,7 +265,7 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
                   variant="ghost"
                   onClick={loadMore}
                   disabled={loadingMore}
-                  className="w-full text-blue-600 hover:bg-blue-50 font-semibold py-6 rounded-lg transition-all"
+                  className="w-full text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-semibold py-6 rounded-lg transition-all"
                 >
                   {loadingMore ? (
                     <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
@@ -281,15 +281,15 @@ export function NotificationDropdown({ open, onClose, notifications, loading, on
 
       {/* Clear All Confirmation Dialog */}
       <Dialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
-        <DialogContent className="sm:max-w-md bg-white">
+        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-slate-900">Clear All Notifications?</DialogTitle>
-            <DialogDescription className="text-slate-500 pt-2">
+            <DialogTitle className="text-xl font-bold text-slate-900 dark:text-slate-100">Clear All Notifications?</DialogTitle>
+            <DialogDescription className="text-slate-500 dark:text-slate-400 pt-2">
               Are you sure you want to delete all notifications? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 pt-4">
-            <Button variant="ghost" onClick={() => setShowClearConfirm(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setShowClearConfirm(false)} className="dark:hover:bg-slate-800">Cancel</Button>
             <Button variant="destructive" onClick={handleClearAll}>Yes, Clear All</Button>
           </DialogFooter>
         </DialogContent>

@@ -98,10 +98,10 @@ function AppContent() {
   // Show loading state while checking authentication
   if (loading) {
     return (
-      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f5f7f9' }}>
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default' }}>
         <Box sx={{ textAlign: 'center' }}>
-          <CircularProgress size={40} sx={{ mb: 2 }} />
-          <Typography color="text.secondary">Loading...</Typography>
+          <CircularProgress size={40} sx={{ mb: 2, color: 'primary.main' }} />
+          <Typography sx={{ color: 'text.secondary' }}>Loading...</Typography>
         </Box>
       </Box>
     );
@@ -147,9 +147,9 @@ function AppContent() {
         {currentPage === 'contract-form' && <ContractForm />}
         {currentPage === 'information' && <Information />}
 
-        {currentPage === 'staff-ranking' && <RankingPage />}
+        {currentPage === 'staff-ranking' && <RankingPage onNavigate={handleNavigate} />}
         {currentPage === 'monitoring' && <Monitoring />}
-        {currentPage === 'github-analytics' && <GithubAnalytics />}
+        {currentPage === 'github-analytics' && <GithubAnalytics onNavigate={handleNavigate} />}
         {currentPage === 'settings' && <Settings />}
       </Layout>
     </MonitoringProvider>
@@ -159,13 +159,17 @@ function AppContent() {
 import { MonitoringProvider } from './contexts/MonitoringContext';
 import { ToastProvider } from './components/Toast';
 
+import { ThemeProvider } from './contexts/ThemeContext';
+
 function App() {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <AppContent />
-      </ToastProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

@@ -136,11 +136,11 @@ function ContractForm({ searchQuery = '' }) {
   };
 
   return (
-    <Box sx={{ width: '100%', minHeight: '100%', bgcolor: 'white' }}>
+    <Box sx={{ width: '100%', minHeight: '100%', bgcolor: 'background.paper' }}>
       {/* Page Header */}
-      <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+      <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900 sticky top-0 z-10">
         <div>
-          <h1 className="text-xl font-normal text-[#202124] tracking-tight">
+          <h1 className="text-xl font-normal text-[#202124] dark:text-slate-100 tracking-tight">
             Contracts
           </h1>
         </div>

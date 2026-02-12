@@ -31,8 +31,8 @@ async function _fetchCommitsByUserForPeriod(repoFullName, filter, cacheKey, cach
 
     const { startDate, endDate } = getDateRange(filter);
     const cachedETag = await getCachedETag(cacheKey);
-    const headers = withAuth();
-    if (cachedETag) headers['If-None-Match'] = cachedETag;
+    const authHeaders = await withAuth();
+    if (cachedETag) authHeaders['If-None-Match'] = cachedETag;
 
     const userCommits = new Map();
 
@@ -44,7 +44,7 @@ async function _fetchCommitsByUserForPeriod(repoFullName, filter, cacheKey, cach
 
         while (hasNextPage && page <= maxPages) {
             const response = await githubClient.get(`/repos/${owner}/${repo}/commits`, {
-                headers,
+                headers: authHeaders,
                 params: {
                     since: startDate.toISOString(),
                     until: endDate.toISOString(),
@@ -111,8 +111,8 @@ async function _fetchLanguagesByUserForPeriod(repoFullName, filter, cacheKey, ca
     const [owner, repo] = repoFullName.split('/');
 
     const cachedETag = await getCachedETag(cacheKey);
-    const headers = withAuth();
-    if (cachedETag) headers['If-None-Match'] = cachedETag;
+    const authHeaders = await withAuth();
+    if (cachedETag) authHeaders['If-None-Match'] = cachedETag;
 
     const userLanguages = new Map();
 
@@ -131,7 +131,7 @@ async function _fetchLanguagesByUserForPeriod(repoFullName, filter, cacheKey, ca
             }
 
             const response = await githubClient.get(`/repos/${owner}/${repo}/commits`, {
-                headers,
+                headers: authHeaders,
                 params: commitParams,
                 validateStatus: (status) => status === 200 || status === 304,
             });
@@ -153,7 +153,7 @@ async function _fetchLanguagesByUserForPeriod(repoFullName, filter, cacheKey, ca
                 const batch = commitsToProcess.slice(i, i + BATCH_SIZE);
                 const results = await Promise.allSettled(
                     batch.map(commit =>
-                        githubClient.get(`/repos/${owner}/${repo}/commits/${commit.sha}`, { headers: withAuth() })
+                        githubClient.get(`/repos/${owner}/${repo}/commits/${commit.sha}`, { headers: authHeaders })
                             .then(res => ({ commit, data: res.data }))
                     )
                 );

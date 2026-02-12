@@ -35,17 +35,17 @@ export const RankingTable = memo(function RankingTable({ columns, data, loading,
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
         </div>
-        <p className="text-sm text-slate-500 font-medium">{error}</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">{error}</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="w-full bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
       <div className="overflow-auto">
         <Table>
-          <TableHeader className="bg-slate-50/80 sticky top-0 z-10">
-            <TableRow className="hover:bg-transparent border-b border-slate-200">
+          <TableHeader className="bg-slate-50/80 dark:bg-slate-900/80 sticky top-0 z-10">
+            <TableRow className="hover:bg-transparent border-b border-slate-200 dark:border-slate-800">
               {columns.map((column) => {
                 // Determine alignment based on column type
                 const isLeftAligned = column.key === 'id' || column.key === 'topLanguages';
@@ -55,7 +55,7 @@ export const RankingTable = memo(function RankingTable({ columns, data, loading,
                 return (
                   <TableHead
                     key={column.key}
-                    className={`px-4 py-4 h-auto text-[10px] sm:text-[11px] font-bold text-[#1a3e62] uppercase tracking-wider whitespace-nowrap ${alignmentClass} ${column.key === 'id' ? 'w-3/12' : column.key === 'topLanguages' ? 'w-auto' : 'w-[10%]'
+                    className={`px-4 py-4 h-auto text-[10px] sm:text-[11px] font-bold text-[#1a3e62] dark:text-blue-400 uppercase tracking-wider whitespace-nowrap ${alignmentClass} ${column.key === 'id' ? 'w-3/12' : column.key === 'topLanguages' ? 'w-auto' : 'w-[10%]'
                       }`}
                   >
                     <div className={`flex items-center ${flexJustify} gap-1.5`}>
@@ -78,13 +78,13 @@ export const RankingTable = memo(function RankingTable({ columns, data, loading,
               data.map((row, rowIndex) => (
                 <TableRow
                   key={row.id || rowIndex}
-                  className="hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-0 group"
+                  className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800 last:border-0 group"
                 >
                   {columns.map((column) => (
                     <TableCell
                       key={column.key}
-                      className={`px-4 py-4 text-sm text-slate-600 ${column.key === 'id'
-                        ? 'text-left font-medium text-slate-900 w-3/12 break-all sm:break-normal'
+                      className={`px-4 py-4 text-sm text-slate-600 dark:text-slate-400 ${column.key === 'id'
+                        ? 'text-left font-medium text-slate-900 dark:text-slate-100 w-3/12 break-all sm:break-normal'
                         : column.key === 'topLanguages'
                           ? 'text-left w-auto'
                           : 'text-center tabular-nums w-[10%]'
@@ -99,17 +99,17 @@ export const RankingTable = memo(function RankingTable({ columns, data, loading,
                               <Badge
                                 key={idx}
                                 variant="secondary"
-                                className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-none font-semibold px-2 py-0.5 rounded text-[10px]"
+                                className="bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/40 border-none font-semibold px-2 py-0.5 rounded text-[10px]"
                               >
                                 {lang.language} ({lang.percentage || lang.count}%)
                               </Badge>
                             ))
                           ) : (
-                            <span className="text-slate-400 text-xs">-</span>
+                            <span className="text-slate-400 dark:text-slate-500 text-xs">-</span>
                           )}
                         </div>
                       ) : (
-                        row[column.key] ?? <span className="text-slate-400">-</span>
+                        row[column.key] ?? <span className="text-slate-400 dark:text-slate-500">-</span>
                       )}
                     </TableCell>
                   ))}
