@@ -26,6 +26,7 @@ import { Github } from 'lucide-react';
 import EvidenceModal from '../components/EvidenceModal';
 import { useTheme } from '../contexts/ThemeContext';
 import GithubErrorBanner from '../components/GithubErrorBanner';
+import AnalyticsSkeleton from '../components/AnalyticsSkeleton';
 
 
 
@@ -360,24 +361,7 @@ const GithubAnalytics = ({ onNavigate }) => {
                 </Box>
 
                 {/* Loading Overlay */}
-                {
-                    (loading || reposLoading) && (
-                        <Box sx={{
-                            position: 'absolute',
-                            top: 32, // Below header
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            bgcolor: activeMode === 'dark' ? 'rgba(0,0,0,0.7)' : 'rgba(255, 255, 255, 0.8)',
-                            zIndex: 200
-                        }}>
-                            <CircularProgress />
-                        </Box>
-                    )
-                }
+                {(loading || reposLoading) && <AnalyticsSkeleton />}
 
                 {
                     !loading && !reposLoading && (apiError || timelineData.length === 0) && (
