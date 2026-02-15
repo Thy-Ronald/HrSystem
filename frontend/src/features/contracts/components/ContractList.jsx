@@ -57,14 +57,14 @@ export function ContractList({
         <Table>
           <TableHeader className="bg-slate-50/80 dark:bg-slate-900/80 sticky top-0 z-10">
             <TableRow>
-              <TableHead className="font-bold text-[#1a3e62] dark:text-blue-400 py-4 whitespace-nowrap">Name</TableHead>
-              <TableHead className="font-bold text-[#1a3e62] dark:text-blue-400 py-4 whitespace-nowrap">Position</TableHead>
-              <TableHead className="font-bold text-[#1a3e62] dark:text-blue-400 py-4 text-center whitespace-nowrap">Term</TableHead>
-              <TableHead className="font-bold text-[#1a3e62] dark:text-blue-400 py-4 whitespace-nowrap">Assessment</TableHead>
-              <TableHead className="font-bold text-[#1a3e62] dark:text-blue-400 py-4 whitespace-nowrap">Status</TableHead>
-              <TableHead className="font-bold text-[#1a3e62] dark:text-blue-400 py-4 text-right whitespace-nowrap">Salary</TableHead>
-              <TableHead className="font-bold text-[#1a3e62] dark:text-blue-400 py-4 text-right whitespace-nowrap">Expiration</TableHead>
-              <TableHead className="font-bold text-[#1a3e62] dark:text-blue-400 py-4 text-center whitespace-nowrap">Actions</TableHead>
+              <TableHead className="font-bold text-[#1a73e8] dark:text-blue-400 py-4 whitespace-nowrap">Name</TableHead>
+              <TableHead className="font-bold text-[#1a73e8] dark:text-blue-400 py-4 whitespace-nowrap">Position</TableHead>
+              <TableHead className="font-bold text-[#1a73e8] dark:text-blue-400 py-4 text-center whitespace-nowrap">Term</TableHead>
+              <TableHead className="font-bold text-[#1a73e8] dark:text-blue-400 py-4 whitespace-nowrap">Assessment</TableHead>
+              <TableHead className="font-bold text-[#1a73e8] dark:text-blue-400 py-4 whitespace-nowrap">Status</TableHead>
+              <TableHead className="font-bold text-[#1a73e8] dark:text-blue-400 py-4 text-right whitespace-nowrap">Salary</TableHead>
+              <TableHead className="font-bold text-[#1a73e8] dark:text-blue-400 py-4 text-right whitespace-nowrap">Expiration</TableHead>
+              <TableHead className="font-bold text-[#1a73e8] dark:text-blue-400 py-4 text-center whitespace-nowrap">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -119,7 +119,7 @@ export function ContractList({
                           e.stopPropagation();
                           onEdit(contract.id);
                         }}
-                        className="h-8 bg-[#1a3e62] hover:bg-[#122c46] text-white font-medium px-4 shadow-sm"
+                        className="h-8 bg-[#1a73e8] hover:bg-[#185abc] text-white font-medium px-4 shadow-sm"
                       >
                         Edit
                       </Button>

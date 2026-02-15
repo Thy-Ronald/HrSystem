@@ -144,7 +144,7 @@ const Information = () => {
                     </Button>
                     <Button
                         onClick={handleAddNew}
-                        className="bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold shadow-sm"
+                        className="bg-[#1a73e8] hover:bg-[#185abc] text-white font-semibold shadow-sm"
                     >
                         <Plus className="mr-2 h-4 w-4" />
                         Add New Record
@@ -177,7 +177,7 @@ const Information = () => {
                         </p>
                         <Button
                             onClick={handleAddNew}
-                            className="bg-[#1a3e62] hover:bg-[#122c46] shadow-md"
+                            className="bg-[#1a73e8] hover:bg-[#185abc] shadow-md"
                         >
                             <Plus className="mr-2 h-4 w-4" />
                             Create PDS Record
@@ -189,12 +189,12 @@ const Information = () => {
                             <Table>
                                 <TableHeader className="bg-slate-50/80 dark:bg-slate-800/80 sticky top-0 z-10">
                                     <TableRow className="hover:bg-transparent border-b border-slate-200 dark:border-slate-700">
-                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Employee Name</TableHead>
-                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Employee No.</TableHead>
-                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Date Started</TableHead>
-                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Contact Info</TableHead>
-                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap">Email</TableHead>
-                                        <TableHead className="font-bold text-[#1a3e62] py-4 h-auto whitespace-nowrap text-right pr-6">Action</TableHead>
+                                        <TableHead className="font-bold text-[#1a73e8] py-4 h-auto whitespace-nowrap">Employee Name</TableHead>
+                                        <TableHead className="font-bold text-[#1a73e8] py-4 h-auto whitespace-nowrap">Employee No.</TableHead>
+                                        <TableHead className="font-bold text-[#1a73e8] py-4 h-auto whitespace-nowrap">Date Started</TableHead>
+                                        <TableHead className="font-bold text-[#1a73e8] py-4 h-auto whitespace-nowrap">Contact Info</TableHead>
+                                        <TableHead className="font-bold text-[#1a73e8] py-4 h-auto whitespace-nowrap">Email</TableHead>
+                                        <TableHead className="font-bold text-[#1a73e8] py-4 h-auto whitespace-nowrap text-right pr-6">Action</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -203,7 +203,7 @@ const Information = () => {
                                             <TableCell className="py-4">
                                                 <div className="flex items-center gap-3">
                                                     <Avatar className="h-9 w-9 border border-slate-100 dark:border-slate-800 shadow-sm">
-                                                        <AvatarFallback className="bg-[#1a3e62] text-white font-semibold text-xs">
+                                                        <AvatarFallback className="bg-[#1a73e8] text-white font-semibold text-xs">
                                                             {record.firstName.charAt(0)}
                                                         </AvatarFallback>
                                                     </Avatar>
@@ -237,7 +237,7 @@ const Information = () => {
                                                     <Button
                                                         size="sm"
                                                         onClick={() => handleEdit(record)}
-                                                        className="h-8 bg-[#1a3e62] hover:bg-[#122c46] text-white font-medium px-4 shadow-sm"
+                                                        className="h-8 bg-[#1a73e8] hover:bg-[#185abc] text-white font-medium px-4 shadow-sm"
                                                     >
                                                         Edit
                                                     </Button>

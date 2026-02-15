@@ -167,7 +167,7 @@ const Monitoring = () => {
           </Button>
           <Button
             onClick={() => setShowAddModal(true)}
-            className="bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold h-11 px-6 rounded-xl shadow-md transition-all active:scale-95"
+            className="bg-[#1a73e8] hover:bg-[#185abc] text-white font-semibold h-11 px-6 rounded-xl shadow-md transition-all active:scale-95"
           >
             <Plus className="mr-2 h-5 w-5" />
             New Connection

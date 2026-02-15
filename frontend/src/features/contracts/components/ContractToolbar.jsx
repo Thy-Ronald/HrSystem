@@ -26,7 +26,7 @@ export function ContractToolbar({
       </Button>
       <Button
         onClick={onNewContract}
-        className="bg-[#1a3e62] hover:bg-[#122c46] text-white font-semibold px-6 h-10 rounded-xl shadow-sm"
+        className="bg-[#1a73e8] hover:bg-[#185abc] text-white font-semibold px-6 h-10 rounded-xl shadow-sm"
       >
         <Plus className="mr-2 h-4 w-4" />
         <span>New Contract</span>
