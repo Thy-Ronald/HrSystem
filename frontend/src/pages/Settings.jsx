@@ -12,7 +12,6 @@ import {
     Trash2,
     Sun,
     Moon,
-    Monitor,
     Key,
     CheckCircle2,
     AlertCircle,
@@ -427,7 +426,7 @@ const Settings = () => {
                             <p className="text-slate-500 dark:text-slate-400">Customize how the HR System looks on your device.</p>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-lg">
                             {/* Light Mode Card */}
                             <div
                                 onClick={() => setTheme('light')}
@@ -506,46 +505,6 @@ const Settings = () => {
                                 </div>
                             </div>
 
-                            {/* System Mode Card */}
-                            <div
-                                onClick={() => setTheme('system')}
-                                className={cn(
-                                    "relative cursor-pointer group transition-all duration-300",
-                                    "rounded-2xl border-2 p-1 overflow-hidden",
-                                    theme === 'system' ? "border-blue-500 ring-4 ring-blue-50 shadow-lg dark:ring-blue-900/20" : "border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700"
-                                )}
-                            >
-                                <div className="aspect-[16/10] rounded-xl bg-slate-100 border border-slate-200 overflow-hidden relative dark:border-slate-800">
-                                    {/* Split UI for System */}
-                                    <div className="absolute inset-0 flex">
-                                        <div className="flex-1 bg-slate-50"></div>
-                                        <div className="flex-1 bg-slate-900"></div>
-                                    </div>
-                                    <div className="absolute inset-x-2 top-2 h-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded shadow-sm flex items-center px-1 gap-1">
-                                        <div className="w-1 h-1 rounded-full bg-white/30"></div>
-                                        <div className="w-4 h-1 rounded-full bg-white/20"></div>
-                                    </div>
-                                    <div className="absolute left-2 top-7 bottom-2 w-10 bg-white shadow-sm border border-slate-200 rounded"></div>
-                                    <div className="absolute right-2 top-7 bottom-2 w-10 bg-slate-800 shadow-sm border border-slate-700 rounded"></div>
-
-                                    {theme === 'system' && (
-                                        <div className="absolute top-2 right-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shadow-md animate-in zoom-in">
-                                            <div className="w-2 h-2 bg-white rounded-full"></div>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="p-4 flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className={cn(
-                                            "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
-                                            theme === 'system' ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-                                        )}>
-                                            <Monitor className="w-4 h-4" />
-                                        </div>
-                                        <span className={cn("font-medium", theme === 'system' ? "text-slate-900 dark:text-slate-100" : "text-slate-600 dark:text-slate-400")}>System</span>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
 
                         <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6 flex items-start gap-4 dark:bg-blue-500/10 dark:border-blue-500/20">
@@ -555,7 +514,7 @@ const Settings = () => {
                             <div className="space-y-1">
                                 <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Premium Visual Experience</h4>
                                 <p className="text-sm text-blue-700 leading-relaxed dark:text-blue-300">
-                                    Switching themes will apply changes across the entire dashboard instantly. System mode automatically adjusts based on your OS preferences.
+                                    Switching themes will apply changes across the entire dashboard instantly.
                                 </p>
                             </div>
                         </div>

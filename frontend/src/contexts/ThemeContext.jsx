@@ -6,39 +6,22 @@ const ThemeContext = createContext();
 export const ThemeProvider = ({ children }) => {
     const [theme, setTheme] = useState(() => {
         const savedTheme = localStorage.getItem('theme');
-        return savedTheme || 'system';
+        return (savedTheme && savedTheme !== 'system') ? savedTheme : 'light';
     });
 
-    const [activeMode, setActiveMode] = useState(() => {
-        if (theme === 'system') {
-            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        }
-        return theme;
-    });
+    const [activeMode, setActiveMode] = useState(theme);
 
     useEffect(() => {
         const root = window.document.documentElement;
 
         const updateTheme = () => {
             root.classList.remove('light', 'dark');
-            let mode = theme;
-
-            if (theme === 'system') {
-                mode = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-            }
-
-            root.classList.add(mode);
-            setActiveMode(mode);
+            root.classList.add(theme);
+            setActiveMode(theme);
             localStorage.setItem('theme', theme);
         };
 
         updateTheme();
-
-        if (theme === 'system') {
-            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-            mediaQuery.addEventListener('change', updateTheme);
-            return () => mediaQuery.removeEventListener('change', updateTheme);
-        }
     }, [theme]);
 
     const muiTheme = useMemo(() => {
