@@ -253,12 +253,10 @@ async function handleProxyImage(req, res, next) {
       throw error;
     }
 
-    const axios = require('axios');
-    const { withAuth } = require('../services/github/githubClients');
 
     const response = await axios.get(url, {
       headers: {
-        ...withAuth(),
+        ...(await withAuth()),
         'User-Agent': 'HR-System-Backend'
       },
       responseType: 'arraybuffer',

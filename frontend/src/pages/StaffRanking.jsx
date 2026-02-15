@@ -18,7 +18,9 @@ import GithubErrorBanner from '../components/GithubErrorBanner';
 
 export default function StaffRanking({ onNavigate }) {
   // UI State
-  const [activeQuickFilter, setActiveQuickFilter] = useState(QUICK_FILTERS.TODAY);
+  const [activeQuickFilter, setActiveQuickFilter] = useState(() => {
+    return localStorage.getItem('staff_ranking_active_filter') || QUICK_FILTERS.TODAY;
+  });
   const [viewMode, setViewMode] = useState(VIEW_MODES.RANK);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -50,6 +52,8 @@ export default function StaffRanking({ onNavigate }) {
   // Initial data load when filter changes
   useEffect(() => {
     loadData(null, activeQuickFilter);
+    // Persist filter
+    localStorage.setItem('staff_ranking_active_filter', activeQuickFilter);
   }, [activeQuickFilter, loadData]);
 
   return (

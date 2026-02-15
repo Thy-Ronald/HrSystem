@@ -32,7 +32,9 @@ import AnalyticsSkeleton from '../components/AnalyticsSkeleton';
 
 const GithubAnalytics = ({ onNavigate }) => {
     const { activeMode } = useTheme();
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
+    const [selectedDate, setSelectedDate] = useState(() => {
+        return localStorage.getItem('github_analytics_selected_date') || new Date().toISOString().split('T')[0];
+    }); // YYYY-MM-DD
     const [currentTime, setCurrentTime] = useState(Date.now());
     const scrollRef = useRef(null);
 
@@ -133,6 +135,11 @@ const GithubAnalytics = ({ onNavigate }) => {
         const end = new Date(selectedDate);
         end.setHours(23, 59, 59, 999);
         return { chartStart: start, chartEnd: end };
+    }, [selectedDate]);
+
+    // Persist selected date
+    useEffect(() => {
+        localStorage.setItem('github_analytics_selected_date', selectedDate);
     }, [selectedDate]);
 
     return (
