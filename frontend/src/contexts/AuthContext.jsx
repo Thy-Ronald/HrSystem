@@ -193,6 +193,9 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('monitoring_resume_data');
     localStorage.removeItem('monitoring_sessionId');
     localStorage.removeItem('monitoring_sessions');
+    // Reset filters
+    localStorage.removeItem('github_analytics_selected_date');
+    localStorage.removeItem('staff_ranking_active_filter');
   };
 
   const value = {
