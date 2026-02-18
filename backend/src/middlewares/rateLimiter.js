@@ -115,9 +115,31 @@ setInterval(() => {
   socketRateLimiter.cleanup();
 }, 5 * 60 * 1000);
 
+/**
+ * General API rate limiter
+ * Broad protection for all /api/* routes
+ * Limits: 200 requests per 15 minutes per IP
+ */
+const generalApiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200, // 200 requests per window
+  message: {
+    success: false,
+    error: 'Too many requests',
+    message: 'You are sending too many requests. Please slow down and try again later.',
+  },
+  standardHeaders: true, // Return rate limit info in RateLimit-* headers
+  legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting in development to avoid friction during local development
+    return process.env.NODE_ENV === 'development';
+  },
+});
+
 module.exports = {
   sessionCreationLimiter,
   authLimiter,
   signalingLimiter,
   socketRateLimiter,
+  generalApiLimiter,
 };

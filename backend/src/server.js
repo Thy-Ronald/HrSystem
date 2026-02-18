@@ -15,7 +15,7 @@ const personnelRouter = require('./routes/personnelRoutes');
 const { errorHandler } = require('./middlewares/errorHandler');
 const { socketAuth } = require('./middlewares/monitoringAuth');
 const { validateAuthPayload, validateSessionId, validateSDP, validateICECandidate } = require('./middlewares/monitoringValidation');
-const { socketRateLimiter } = require('./middlewares/rateLimiter');
+const { socketRateLimiter, generalApiLimiter } = require('./middlewares/rateLimiter');
 const { generateToken } = require('./utils/jwt');
 const { initializeEmailJS } = require('./services/emailService');
 const { startContractExpirationJob } = require('./jobs/contractExpirationJob');
@@ -48,6 +48,9 @@ app.use(compression());
 
 app.use(cors());
 app.use(express.json());
+
+// Apply general rate limiting to all /api/* routes (skipped in development)
+app.use('/api', generalApiLimiter);
 
 app.get('/api/health', async (_req, res) => {
   const dbStatus = await testConnection();
