@@ -106,7 +106,15 @@ export function AuthProvider({ children }) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || data.error || 'Login failed');
+        const error = new Error(data.message || data.error || 'Login failed');
+        // If rate limited, extract when the user can retry
+        if (response.status === 429) {
+          const resetHeader = response.headers.get('RateLimit-Reset');
+          // RateLimit-Reset is a Unix timestamp (seconds). Convert to ms.
+          error.retryAfter = resetHeader ? parseInt(resetHeader, 10) * 1000 : Date.now() + 15 * 60 * 1000;
+          error.isRateLimited = true;
+        }
+        throw error;
       }
 
       if (data.success && data.token) {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,11 +19,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Loader2, Mail, Lock, User, ArrowRight, Eye, EyeOff } from "lucide-react"
+import { Loader2, Mail, Lock, User, ArrowRight, Eye, EyeOff, Clock } from "lucide-react"
 import { StarsBackground } from "@/components/animate-ui/components/backgrounds/stars"
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/Toast';
-import { useEffect } from 'react';
+
 import logo from '../assets/logo.png';
 
 const Auth = ({ onLogin }) => {
@@ -37,6 +37,9 @@ const Auth = ({ onLogin }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showTermsDialog, setShowTermsDialog] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [rateLimitUntil, setRateLimitUntil] = useState(null); // ms timestamp when rate limit resets
+  const [countdown, setCountdown] = useState(0); // seconds remaining
+  const countdownRef = useRef(null);
   const toast = useToast();
   const { login, signup, loginWithToken } = useAuth();
 
@@ -47,6 +50,26 @@ const Auth = ({ onLogin }) => {
       toast.error(error);
     }
   }, []);
+
+  // Tick the rate-limit countdown every second
+  useEffect(() => {
+    if (!rateLimitUntil) return;
+
+    const tick = () => {
+      const remaining = Math.ceil((rateLimitUntil - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setCountdown(0);
+        setRateLimitUntil(null);
+        clearInterval(countdownRef.current);
+      } else {
+        setCountdown(remaining);
+      }
+    };
+
+    tick(); // run immediately
+    countdownRef.current = setInterval(tick, 1000);
+    return () => clearInterval(countdownRef.current);
+  }, [rateLimitUntil]);
 
   const handleGithubLogin = () => {
     const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
@@ -74,7 +97,11 @@ const Auth = ({ onLogin }) => {
         }
       } catch (error) {
         console.error('Login error:', error);
-        toast.error(error.message || 'Login failed. Please try again.');
+        if (error.isRateLimited && error.retryAfter) {
+          setRateLimitUntil(error.retryAfter);
+        } else {
+          toast.error(error.message || 'Login failed. Please try again.');
+        }
       } finally {
         setLoading(false);
       }
@@ -242,13 +269,32 @@ const Auth = ({ onLogin }) => {
                   </div>
                 </>
               )}
+              {/* Rate limit countdown banner */}
+              {rateLimitUntil && countdown > 0 && (
+                <div className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2.5 text-sm text-amber-700 dark:text-amber-400">
+                  <Clock className="h-4 w-4 flex-shrink-0" />
+                  <span>
+                    Too many attempts. Try again in{' '}
+                    <span className="font-bold tabular-nums">
+                      {String(Math.floor(countdown / 60)).padStart(2, '0')}:{String(countdown % 60).padStart(2, '0')}
+                    </span>
+                  </span>
+                </div>
+              )}
               <Button
                 type="submit"
-                disabled={loading || (isLogin ? !email.trim() || !password : !email.trim() || !password || !name.trim() || !termsAccepted || password !== confirmPassword)}
-                className="w-full bg-[#1a3e62] hover:bg-[#122c46] text-white h-11 rounded-xl font-bold text-base transition-all shadow-md active:scale-95 group mt-2"
+                disabled={loading || !!rateLimitUntil || (isLogin ? !email.trim() || !password : !email.trim() || !password || !name.trim() || !termsAccepted || password !== confirmPassword)}
+                className="w-full bg-[#1a3e62] hover:bg-[#122c46] text-white h-11 rounded-xl font-bold text-base transition-all shadow-md active:scale-95 group mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
+                ) : rateLimitUntil && countdown > 0 ? (
+                  <>
+                    <Clock className="h-4 w-4 mr-2" />
+                    <span className="tabular-nums">
+                      {String(Math.floor(countdown / 60)).padStart(2, '0')}:{String(countdown % 60).padStart(2, '0')}
+                    </span>
+                  </>
                 ) : (
                   <>
                     <span>{isLogin ? 'Sign In' : 'Create Account'}</span>
