@@ -88,11 +88,12 @@ async function respondToRequest(req, res) {
 
         // Fetch request to get Admin ID and current status
         const request = await monitoringRequestModel.getById(requestId);
-        const oldStatus = request?.status;
 
         if (!request) {
             return res.status(404).json({ error: 'Request not found' });
         }
+
+        const oldStatus = request.status;
 
         await monitoringRequestModel.updateRequestStatus(requestId, status);
 
