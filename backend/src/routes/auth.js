@@ -226,7 +226,7 @@ router.post('/login', authLimiter, async (req, res) => {
  * Headers: Authorization: Bearer <token>
  * Returns: { success: true, user: { role, name, userId } }
  */
-router.post('/verify', authLimiter, async (req, res) => {
+router.post('/verify', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
 
