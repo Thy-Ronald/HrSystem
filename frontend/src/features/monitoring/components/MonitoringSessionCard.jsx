@@ -265,7 +265,6 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
                                 try {
                                     const { createMonitoringRequest } = await import('../../../services/api');
                                     await createMonitoringRequest(session.employeeId);
-                                    toast.success(`Reconnection request sent to ${session.employeeName}`);
                                     setReconnectSent(true);
                                     localStorage.setItem(`reconnect_sent_${session.sessionId}`, 'true');
 
