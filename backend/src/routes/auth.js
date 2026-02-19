@@ -133,20 +133,25 @@ router.post('/login', authLimiter, async (req, res) => {
     // Find user by email
     const user = await userService.findUserByEmail(email);
     if (!user) {
+      // Read remaining attempts from the rate limiter header (set by express-rate-limit)
+      const attemptsLeft = parseInt(res.getHeader('RateLimit-Remaining') ?? '5', 10);
       return res.status(401).json({
         success: false,
         error: 'Authentication failed',
         message: 'Invalid email or password',
+        attemptsLeft,
       });
     }
 
     // Verify password
     const isValidPassword = await userService.verifyPassword(password, user.password_hash);
     if (!isValidPassword) {
+      const attemptsLeft = parseInt(res.getHeader('RateLimit-Remaining') ?? '5', 10);
       return res.status(401).json({
         success: false,
         error: 'Authentication failed',
         message: 'Invalid email or password',
+        attemptsLeft,
       });
     }
 

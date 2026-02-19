@@ -39,6 +39,7 @@ const Auth = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
   const [rateLimitUntil, setRateLimitUntil] = useState(null); // ms timestamp when rate limit resets
   const [countdown, setCountdown] = useState(0); // seconds remaining
+  const [attemptsLeft, setAttemptsLeft] = useState(null); // null = no warning yet
   const countdownRef = useRef(null);
   const toast = useToast();
   const { login, signup, loginWithToken } = useAuth();
@@ -76,6 +77,17 @@ const Auth = ({ onLogin }) => {
     window.location.href = `${API_BASE}/api/auth/github`;
   };
 
+  // Reset attempts warning when toggling between login/signup
+  const handleToggleMode = () => {
+    setIsLogin(!isLogin);
+    setEmail('');
+    setPassword('');
+    setName('');
+    setConfirmPassword('');
+    setTermsAccepted(false);
+    setAttemptsLeft(null);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -99,7 +111,12 @@ const Auth = ({ onLogin }) => {
         console.error('Login error:', error);
         if (error.isRateLimited && error.retryAfter) {
           setRateLimitUntil(error.retryAfter);
+          setAttemptsLeft(0);
         } else {
+          // Show warning when ≤3 attempts are left (i.e. after 2+ failures)
+          if (error.attemptsLeft !== undefined && error.attemptsLeft <= 3) {
+            setAttemptsLeft(error.attemptsLeft);
+          }
           toast.error(error.message || 'Login failed. Please try again.');
         }
       } finally {
@@ -269,7 +286,19 @@ const Auth = ({ onLogin }) => {
                   </div>
                 </>
               )}
-              {/* Rate limit countdown banner */}
+              {/* Attempts remaining warning — shown after 2+ failed logins */}
+              {isLogin && attemptsLeft !== null && attemptsLeft > 0 && !rateLimitUntil && (
+                <div className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm border ${attemptsLeft === 1
+                  ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400'
+                  : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400'
+                  }`}>
+                  <span className="text-base">{attemptsLeft === 1 ? '🚨' : '⚠️'}</span>
+                  <span>
+                    <span className="font-bold">{attemptsLeft} attempt{attemptsLeft !== 1 ? 's' : ''} remaining</span>
+                    {' '}before your account is temporarily locked.
+                  </span>
+                </div>
+              )}
               {rateLimitUntil && countdown > 0 && (
                 <div className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2.5 text-sm text-amber-700 dark:text-amber-400">
                   <Clock className="h-4 w-4 flex-shrink-0" />
@@ -327,14 +356,7 @@ const Auth = ({ onLogin }) => {
             </div>
             <Button
               variant="ghost"
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setEmail('');
-                setPassword('');
-                setName('');
-                setConfirmPassword('');
-                setTermsAccepted(false);
-              }}
+              onClick={handleToggleMode}
               disabled={loading}
               className="w-full text-[#1a3e62] dark:text-blue-400 hover:text-[#122c46] dark:hover:text-blue-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg h-10 font-semibold text-sm"
             >

@@ -114,6 +114,10 @@ export function AuthProvider({ children }) {
           error.retryAfter = resetHeader ? parseInt(resetHeader, 10) * 1000 : Date.now() + 15 * 60 * 1000;
           error.isRateLimited = true;
         }
+        // If invalid credentials, pass remaining attempts for the warning UI
+        if (response.status === 401 && data.attemptsLeft !== undefined) {
+          error.attemptsLeft = data.attemptsLeft;
+        }
         throw error;
       }
 

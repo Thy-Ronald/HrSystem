@@ -31,11 +31,11 @@ const sessionCreationLimiter = rateLimit({
  */
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 requests per window
+  max: 5, // 5 requests per window
   message: {
     success: false,
     error: 'Too many authentication attempts',
-    message: 'Please wait before trying again. Maximum 10 attempts per 15 minutes.',
+    message: 'Too many login attempts. Please wait before trying again.',
   },
   standardHeaders: true,
   legacyHeaders: false,
