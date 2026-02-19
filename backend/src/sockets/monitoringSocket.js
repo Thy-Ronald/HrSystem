@@ -470,6 +470,10 @@ function setupMonitoringSocket(io, userSockets) {
         });
 
         // ── monitoring:answer (WebRTC signaling) ─────────────────────
+        // Employee sends the SDP answer back to the admin that made the offer.
+        // toSocketId is the admin's socket ID received in the offer event — but we
+        // must validate it server-side to prevent a malicious client from relaying
+        // messages to arbitrary sockets.
         socket.on('monitoring:answer', ({ sessionId, answer, toSocketId }) => {
             if (!socket.data.authenticated) {
                 console.warn(`[Monitoring] Unauthorized answer attempt from ${socket.id}`);
@@ -487,12 +491,20 @@ function setupMonitoringSocket(io, userSockets) {
                 return;
             }
 
-            // Forward answer to admin (toSocketId comes from the offer event — server-side trusted)
+            // Security: only forward to a socket that is a registered admin in this session.
+            // If toSocketId is not in the session's admin set, drop the message.
+            if (!toSocketId || !session.adminSocketIds.has(toSocketId)) {
+                console.warn(`[Monitoring] answer: toSocketId '${toSocketId}' is not a registered admin in session ${sessionId}. Dropping.`);
+                return;
+            }
+
             io.to(toSocketId).emit('monitoring:answer', { answer, sessionId });
         });
 
         // ── monitoring:ice-candidate (WebRTC signaling) ───────────────
-        socket.on('monitoring:ice-candidate', ({ sessionId, candidate, toSocketId }) => {
+        // Routing is always derived from the sender's role — the client-supplied
+        // toSocketId is intentionally ignored to prevent relay to arbitrary sockets.
+        socket.on('monitoring:ice-candidate', ({ sessionId, candidate }) => {
             if (!socket.data.authenticated) return;
 
             if (!validateICECandidate(candidate)) {
@@ -502,13 +514,13 @@ function setupMonitoringSocket(io, userSockets) {
             const session = monitoringService.getSession(sessionId);
             if (!session) return;
 
-            if (toSocketId) {
-                io.to(toSocketId).emit('monitoring:ice-candidate', { candidate, sessionId, fromSocketId: socket.id });
-            } else if (socket.data.role === 'employee') {
+            if (socket.data.role === 'employee') {
+                // Employee → broadcast to all admins currently viewing the session
                 session.adminSocketIds.forEach((adminId) => {
                     io.to(adminId).emit('monitoring:ice-candidate', { candidate, sessionId, fromSocketId: socket.id });
                 });
             } else if (socket.data.role === 'admin') {
+                // Admin → send to the employee being monitored
                 io.to(session.employeeSocketId).emit('monitoring:ice-candidate', {
                     candidate,
                     sessionId,
