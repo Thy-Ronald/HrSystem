@@ -3,6 +3,7 @@
  * Handles login, signup and JWT token generation
  */
 
+const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
 const { generateToken } = require('../utils/jwt');
@@ -10,6 +11,14 @@ const { validateName, validateRole } = require('../middlewares/monitoringValidat
 const { authLimiter } = require('../middlewares/rateLimiter');
 const userService = require('../services/userService');
 const axios = require('axios');
+
+/**
+ * One-time OAuth code store.
+ * Stores short-lived codes (60 s) that are exchanged for JWTs after GitHub OAuth.
+ * This prevents the JWT from appearing in the browser URL / history / referrer headers.
+ */
+const oauthCodes = new Map(); // Map<code: string, { token: string, expiresAt: number }>
+const OAUTH_CODE_TTL_MS = 60 * 1000; // 60 seconds
 
 /**
  * GET /api/auth/test
@@ -408,14 +417,45 @@ router.get('/github/callback', async (req, res) => {
       avatar_url: user.avatar_url,
     });
 
-    // 6. Redirect back to frontend with token
-    const finalRedirectUrl = `${frontendUrl}/auth?token=${token}&github_success=true`;
-    console.log(`[GitHub OAuth] SUCCESS: Redirecting to frontend...`);
+    // 6. Generate a short-lived one-time code and redirect (JWT stays server-side)
+    // Note: `oauthToken` is used here to avoid shadowing the `code` variable from req.query above.
+    const oauthToken = crypto.randomUUID();
+    oauthCodes.set(oauthToken, { token, expiresAt: Date.now() + OAUTH_CODE_TTL_MS });
+    const finalRedirectUrl = `${frontendUrl}/auth?code=${oauthToken}`;
+    console.log(`[GitHub OAuth] SUCCESS: Redirecting to frontend with one-time code...`);
     res.redirect(finalRedirectUrl);
   } catch (error) {
     console.error('[GitHub OAuth] EXCEPTION:', error.response?.data || error.message);
     res.redirect(`${frontendUrl}/auth?error=GitHub+authentication+failed`);
   }
+});
+
+/**
+ * GET /api/auth/exchange
+ * Exchanges a short-lived one-time OAuth code for a JWT.
+ * The code is deleted immediately after use (single-use).
+ *
+ * Query: { code: string }
+ * Returns: { token: string }
+ */
+router.get('/exchange', (req, res) => {
+  const { code } = req.query;
+
+  if (!code || typeof code !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid code' });
+  }
+
+  const entry = oauthCodes.get(code);
+
+  if (!entry || Date.now() > entry.expiresAt) {
+    oauthCodes.delete(code); // clean up expired entry if present
+    return res.status(401).json({ error: 'Code expired or invalid' });
+  }
+
+  // One-time use: delete immediately before returning the token
+  oauthCodes.delete(code);
+  console.log(`[GitHub OAuth] Code exchanged for JWT successfully.`);
+  return res.json({ token: entry.token });
 });
 
 module.exports = router;

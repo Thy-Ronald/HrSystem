@@ -10,24 +10,37 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(null);
 
-  // Check for existing token or URL token on mount
+  // Check for OAuth one-time code or existing stored token on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const urlToken = params.get('token');
-    if (urlToken) console.log('[AuthContext] Token found in URL');
+    const oauthCode = params.get('code');
     const storedToken = getToken();
 
-    const tokenToVerify = urlToken || storedToken;
+    if (oauthCode) {
+      // OAuth callback: exchange the short-lived code for a JWT.
+      // Clean the URL immediately so the code never sits in browser history.
+      window.history.replaceState({}, '', window.location.pathname);
+      console.log('[AuthContext] OAuth code found in URL, exchanging for token...');
+      fetch(`${API_BASE}/api/auth/exchange?code=${encodeURIComponent(oauthCode)}`)
+        .then((r) => r.json())
+        .then(({ token }) => {
+          if (token) {
+            verifyToken(token, true /* isNewLogin */);
+          } else {
+            console.error('[AuthContext] Code exchange returned no token');
+            setLoading(false);
+          }
+        })
+        .catch((err) => {
+          console.error('[AuthContext] Code exchange failed:', err);
+          setLoading(false);
+        });
+      return;
+    }
 
-    if (tokenToVerify) {
-      // If urlToken exists, it's a "New Login" (OAuth callback).
-      // If only storedToken exists, it's a "Refresh".
-      verifyToken(tokenToVerify, !!urlToken);
-      // If it was a URL token, clean the URL
-      if (urlToken) {
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, '', newUrl);
-      }
+    // Normal page load: verify stored token (session refresh)
+    if (storedToken) {
+      verifyToken(storedToken, false);
     } else {
       setLoading(false);
     }
