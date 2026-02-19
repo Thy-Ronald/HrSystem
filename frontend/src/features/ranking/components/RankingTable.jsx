@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { TableSkeleton } from './TableSkeleton';
+import TableSkeleton from '../../../components/ui/TableSkeleton.jsx';
 import { EmptyState } from './EmptyState';
 import { UserAvatar } from './UserAvatar';
 import { memo } from 'react';
@@ -22,7 +22,7 @@ export const RankingTable = memo(function RankingTable({ columns, data, loading,
   const isEmpty = !data || data.length === 0;
 
   if (loading) {
-    return <TableSkeleton />;
+    return <TableSkeleton rows={5} columns={columns.length} layout="table" />;
   }
 
   if (error) {
