@@ -20,17 +20,26 @@ router.get('/sessions', httpAuth, requireRole(['admin']), async (req, res) => {
     const adminId = req.user.userId;
     const allSessions = monitoringService.getAllSessions();
 
-    // Filter sessions: Only show those where this admin has an 'approved' request
+    // Fetch all requests for this admin (approved + recently-rejected/disconnected)
     const myRequests = await monitoringRequestModel.getRequestsByAdmin(adminId);
-    const approvedEmployeeIds = new Set(
-      myRequests
-        .filter(r => r.status === 'approved')
-        .map(r => String(r.target_user_id))
-    );
 
-    const filteredSessions = allSessions.filter(s =>
-      approvedEmployeeIds.has(String(s.employeeId))
-    );
+    // Build a map of employeeId -> request status so we can annotate sessions
+    const employeeRequestMap = new Map();
+    myRequests
+      .filter(r => r.status === 'approved' || r.status === 'rejected')
+      .forEach(r => employeeRequestMap.set(String(r.target_user_id), r.status));
+
+    // Show sessions for any employee where this admin has an approved OR rejected request
+    // (rejected = employee disconnected, but session card should remain visible until admin removes it)
+    const filteredSessions = allSessions
+      .filter(s => employeeRequestMap.has(String(s.employeeId)))
+      .map(s => ({
+        ...s,
+        // If DB request is 'rejected' and employee socket is gone, mark as disconnected
+        disconnectReason: employeeRequestMap.get(String(s.employeeId)) === 'rejected'
+          ? (s.disconnectReason || 'offline')
+          : s.disconnectReason,
+      }));
 
     res.json({ success: true, data: filteredSessions });
   } catch (error) {

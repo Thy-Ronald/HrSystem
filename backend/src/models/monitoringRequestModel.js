@@ -109,7 +109,7 @@ async function getRequestsByAdmin(adminId) {
             u.email as employee_email
         FROM monitoring_requests mr
         JOIN users u ON mr.target_user_id = u.id
-        WHERE mr.admin_id = ? AND mr.status IN ('pending', 'approved')
+        WHERE mr.admin_id = ? AND mr.status IN ('pending', 'approved', 'rejected')
         ORDER BY mr.created_at DESC
     `;
     try {
