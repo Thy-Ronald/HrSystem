@@ -17,7 +17,9 @@ import {
     ChevronDown,
     ExternalLink,
     Search,
-    LayoutGrid
+    LayoutGrid,
+    PieChart,
+    List
 } from 'lucide-react';
 import { fetchTimelineUsers, fetchTimelineData } from '../services/api';
 import { Button } from '../components/ui/button';
@@ -76,6 +78,7 @@ const TimelineScreen = () => {
     const [loadingData, setLoadingData] = useState(false);
     const [data, setData] = useState(null);
     const [error, setError] = useState(null);
+    const [showScreenshots, setShowScreenshots] = useState(true);
 
     useEffect(() => {
         const loadUsers = async () => {
@@ -199,9 +202,9 @@ const TimelineScreen = () => {
                 {data ? (
                     <Box className="space-y-8 animate-in fade-in duration-500">
                         {/* Main Timeline Card */}
-                        <Box className="bg-[#111113] border border-[#262629] rounded-2xl p-6 relative overflow-hidden">
+                        <Box className="bg-[#111113] border border-[#262629] rounded-2xl p-4 relative overflow-hidden">
                             {/* Time Header Labels */}
-                            <Box className="flex justify-between mb-8 px-2">
+                            <Box className="flex justify-between mb-4 px-2">
                                 {timeLabels.map((t, i) => (
                                     <Typography
                                         key={i}
@@ -214,7 +217,7 @@ const TimelineScreen = () => {
                             </Box>
 
                             {/* Grid Lines */}
-                            <Box className="absolute inset-0 top-18 bottom-8 pointer-events-none px-6">
+                            <Box className="absolute inset-0 top-10 bottom-6 pointer-events-none px-6">
                                 <Box className="relative h-full w-full">
                                     {timeLabels.map((t, i) => (
                                         <Box
@@ -227,7 +230,7 @@ const TimelineScreen = () => {
                             </Box>
 
                             {/* Activity Bar (Main Blocks) */}
-                            <Box className="relative h-10 w-full bg-[#1c1c1e] rounded-xl mb-4 overflow-hidden border border-[#262629]/50 shadow-inner">
+                            <Box className="relative h-6 w-full bg-[#1c1c1e] rounded-xl mb-4 overflow-hidden border border-[#262629]/50 shadow-inner">
                                 {data.activityLogs?.activities?.map((act, i) => {
                                     const start = getTimePosition(act.start);
                                     const end = getTimePosition(act.end);
@@ -294,7 +297,7 @@ const TimelineScreen = () => {
                             </Box>
 
                             {/* Preview Bar (Screenshots Thumbnail Drop) */}
-                            <Box className="relative h-20 w-full mb-2 flex items-center">
+                            <Box className="relative h-12 w-full mb-2 flex items-center">
                                 {data.screenshots?.images?.map((img, i) => {
                                     const pos = getTimePosition(img.timestamp);
                                     return (
@@ -305,7 +308,7 @@ const TimelineScreen = () => {
                                         >
                                             <img
                                                 src={img.url}
-                                                className="h-16 aspect-video rounded-md border-2 border-white/10 shadow-2xl object-cover"
+                                                className="h-10 aspect-video rounded-md border-2 border-white/10 shadow-2xl object-cover"
                                             />
                                         </Box>
                                     );
@@ -313,7 +316,7 @@ const TimelineScreen = () => {
                             </Box>
 
                             {/* Legend & Count */}
-                            <Box className="flex justify-end gap-2 mt-4">
+                            <Box className="flex justify-end gap-2 mt-2">
                                 <Badge className="bg-blue-600/20 text-blue-400 border-blue-500/30 font-medium">
                                     <Camera className="w-3 h-3 mr-1" />
                                     {data.screenshots?.images?.length || 0}
@@ -322,104 +325,129 @@ const TimelineScreen = () => {
                         </Box>
 
                         {/* Screenshots Section */}
-                        <Box className="bg-[#111113] border border-[#262629] rounded-2xl p-6">
-                            <Box className="flex items-center justify-between mb-6">
+                        <Box className="bg-[#111113] border border-[#262629] rounded-2xl p-4 transition-all duration-300">
+                            <Box
+                                className="flex items-center justify-between cursor-pointer group"
+                                onClick={() => setShowScreenshots(!showScreenshots)}
+                            >
                                 <Box className="flex items-center gap-2 text-white font-bold">
                                     <Camera className="w-4 h-4 text-blue-400" />
                                     SCREENSHOTS ({data.screenshots?.images?.length || 0})
-                                    <ChevronDown className="w-4 h-4 text-slate-500" />
+                                    <ChevronDown className={cn("w-4 h-4 text-slate-500 transition-transform duration-300", !showScreenshots && "-rotate-90")} />
                                 </Box>
-                                <Typography variant="caption" className="text-slate-500">Click to preview</Typography>
+                                <Typography variant="caption" className="text-slate-500 group-hover:text-white transition-colors">
+                                    {showScreenshots ? 'Click to hide' : 'Click to preview'}
+                                </Typography>
                             </Box>
 
-                            <Box className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
-                                {data.screenshots?.images?.map((img, i) => (
-                                    <Dialog key={i}>
-                                        <DialogTrigger asChild>
-                                            <Box className="relative flex-shrink-0 group cursor-pointer transition-all hover:scale-[1.02]">
-                                                <img
-                                                    src={img.url}
-                                                    className="w-48 aspect-video rounded-xl border border-white/5 object-cover"
-                                                />
-                                                <Box className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-center pb-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <Typography variant="caption" className="text-white font-medium">
-                                                        {new Date(img.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    </Typography>
+                            {showScreenshots && (
+                                <Box className="flex gap-4 overflow-x-auto mt-6 pb-2 no-scrollbar animate-in fade-in slide-in-from-top-2 duration-500">
+                                    {data.screenshots?.images?.map((img, i) => (
+                                        <Dialog key={i}>
+                                            <DialogTrigger asChild>
+                                                <Box className="relative flex-shrink-0 group/img cursor-pointer transition-all hover:scale-[1.02]">
+                                                    <img
+                                                        src={img.url}
+                                                        className="w-28 aspect-video rounded-xl border border-white/5 object-cover shadow-lg"
+                                                    />
+                                                    <Box className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-center pb-2 opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                                        <Typography variant="caption" className="text-white font-medium">
+                                                            {new Date(img.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Box className="absolute top-2 right-2 p-1 bg-black/40 backdrop-blur-md rounded-lg opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                                        <Eye className="w-3 h-3 text-white" />
+                                                    </Box>
                                                 </Box>
-                                                <Box className="absolute top-2 right-2 p-1 bg-black/40 backdrop-blur-md rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <Eye className="w-3 h-3 text-white" />
-                                                </Box>
-                                            </Box>
-                                        </DialogTrigger>
-                                        <DialogContent className="max-w-6xl bg-[#0a0a0b] border-white/10 p-2 overflow-hidden rounded-3xl">
-                                            <img src={img.url} className="w-full h-full object-contain rounded-2xl" />
-                                        </DialogContent>
-                                    </Dialog>
-                                ))}
-                            </Box>
+                                            </DialogTrigger>
+                                            <DialogContent className="max-w-6xl bg-[#0a0a0b] border-white/10 p-2 overflow-hidden rounded-3xl">
+                                                <img src={img.url} className="w-full h-full object-contain rounded-2xl" />
+                                            </DialogContent>
+                                        </Dialog>
+                                    ))}
+                                </Box>
+                            )}
                         </Box>
 
                         {/* Bottom Panels (Top Apps & Log) */}
-                        <Grid container spacing={4}>
+                        <Grid container spacing={3} sx={{ mt: 2, width: '100%', ml: 0 }}>
                             {/* Top Apps Panel */}
-                            <Grid item xs={12} lg={5}>
-                                <Box className="bg-[#111113] border border-[#262629] rounded-2xl p-6 h-full shadow-lg">
+                            <Grid item xs={12} lg={6} sx={{ display: 'flex', flex: '1 1 0', minWidth: 0 }}>
+                                <Box className="bg-[#111113] border border-[#262629] rounded-2xl p-6 h-[440px] shadow-lg flex flex-col w-full overflow-hidden">
                                     <Box className="flex justify-between items-center mb-8">
                                         <Typography variant="subtitle2" className="text-white font-bold tracking-wider">TOP APPS IN TIMELINE</Typography>
                                         <Typography variant="caption" className="text-slate-500">Today</Typography>
                                     </Box>
-                                    <Box className="space-y-8">
-                                        {topApps.map((app, i) => (
-                                            <Box key={i} className="group">
-                                                <Box className="flex justify-between items-end mb-3">
-                                                    <Box className="flex gap-3">
-                                                        <Box className="w-[3px] h-8 rounded-full" style={{ backgroundColor: app.color }} />
-                                                        <Box>
-                                                            <Typography variant="body2" className="text-white font-semibold group-hover:text-blue-400 transition-colors uppercase tracking-tight">{app.name}</Typography>
+                                    <Box className="space-y-6 overflow-y-auto pr-2 custom-scrollbar flex-1">
+                                        {topApps.length > 0 ? (
+                                            topApps.map((app, i) => (
+                                                <Box key={i} className="group">
+                                                    <Box className="flex justify-between items-end mb-3">
+                                                        <Box className="flex gap-3">
+                                                            <Box className="w-[3px] h-8 rounded-full" style={{ backgroundColor: app.color }} />
+                                                            <Box>
+                                                                <Typography variant="body2" className="text-white font-semibold group-hover:text-blue-400 transition-colors uppercase tracking-tight truncate">{app.name}</Typography>
+                                                            </Box>
+                                                        </Box>
+                                                        <Box className="text-right">
+                                                            <Typography variant="caption" className="text-white font-bold block">{app.duration}m</Typography>
+                                                            <Typography variant="caption" className="text-slate-500 font-medium">{app.percent}%</Typography>
                                                         </Box>
                                                     </Box>
-                                                    <Box className="text-right">
-                                                        <Typography variant="caption" className="text-white font-bold block">{app.duration}m</Typography>
-                                                        <Typography variant="caption" className="text-slate-500 font-medium">{app.percent}%</Typography>
-                                                    </Box>
+                                                    <Progress value={app.percent} className="h-1.5 bg-[#1c1c1e]" indicatorColor={app.color} />
                                                 </Box>
-                                                <Progress value={app.percent} className="h-1.5 bg-[#1c1c1e]" indicatorColor={app.color} />
+                                            ))
+                                        ) : (
+                                            <Box className="flex flex-col items-center justify-center h-full opacity-40">
+                                                <Box className="p-3 rounded-full bg-slate-500/10 mb-3">
+                                                    <PieChart className="w-8 h-8 text-slate-500" />
+                                                </Box>
+                                                <Typography variant="caption" className="text-slate-500">No application usage recorded</Typography>
                                             </Box>
-                                        ))}
+                                        )}
                                     </Box>
                                 </Box>
                             </Grid>
 
                             {/* Activity Log Panel */}
-                            <Grid item xs={12} lg={7}>
-                                <Box className="bg-[#111113] border border-[#262629] rounded-2xl p-6 h-full shadow-lg">
+                            <Grid item xs={12} lg={6} sx={{ display: 'flex', flex: '1 1 0', minWidth: 0 }}>
+                                <Box className="bg-[#111113] border border-[#262629] rounded-2xl p-6 h-[440px] shadow-lg flex flex-col w-full overflow-hidden">
                                     <Box className="flex justify-between items-center mb-6">
                                         <Typography variant="subtitle2" className="text-white font-bold tracking-wider">ACTIVITY LOG</Typography>
                                         <Typography variant="caption" className="text-slate-500">{data.activityLogs?.activities?.length || 0} entries</Typography>
                                     </Box>
-                                    <Box className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                                        {data.activityLogs?.activities?.slice().reverse().map((act, i) => {
-                                            const { category, color } = getAppData(act.app);
-                                            return (
-                                                <Box key={i} className="flex items-center justify-between p-3 rounded-xl bg-[#161618] border border-[#262629]/50 hover:bg-[#1c1c1e] transition-colors group">
-                                                    <Box className="flex items-center gap-4">
-                                                        <Box className="w-[3px] h-10 rounded-full" style={{ backgroundColor: color }} />
-                                                        <Box>
-                                                            <Box className="flex items-center gap-2 mb-1">
-                                                                <Typography variant="body2" className="text-white font-bold">{act.app}</Typography>
-                                                                <Badge className="bg-slate-800 text-slate-400 text-[9px] h-4 px-1 leading-none uppercase font-bold border-none" variant="outline">{category}</Badge>
+                                    <Box className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1">
+                                        {data.activityLogs?.activities?.length > 0 ? (
+                                            data.activityLogs?.activities?.slice().reverse().map((act, i) => {
+                                                const { category, color } = getAppData(act.app);
+                                                return (
+                                                    <Box key={i} className="flex items-center justify-between p-3 rounded-xl bg-[#161618] border border-[#262629]/50 hover:bg-[#1c1c1e] transition-colors group">
+                                                        <Box className="flex items-center gap-4">
+                                                            <Box className="w-[3px] h-10 rounded-full" style={{ backgroundColor: color }} />
+                                                            <Box className="flex flex-col min-w-0 flex-1">
+                                                                <Box className="flex items-center gap-2 mb-1">
+                                                                    <Typography variant="body2" className="text-white font-bold truncate">{act.app}</Typography>
+                                                                    <Badge className="bg-slate-800 text-slate-400 text-[9px] h-4 px-1 leading-none uppercase font-bold border-none shrink-0" variant="outline">{category}</Badge>
+                                                                </Box>
+                                                                <Typography variant="caption" className="text-slate-400 block text-[10px] italic mb-1 truncate">{act.title || act.details || ''}</Typography>
+                                                                <Typography variant="caption" className="text-slate-500 block text-[10px]">Opened at {new Date(act.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</Typography>
                                                             </Box>
-                                                            <Typography variant="caption" className="text-slate-400 block text-[10px] italic mb-1">{act.title || act.details || ''}</Typography>
-                                                            <Typography variant="caption" className="text-slate-500 block text-[10px]">Opened at {new Date(act.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</Typography>
+                                                        </Box>
+                                                        <Box className="text-right">
+                                                            <Typography variant="caption" className="text-slate-400 font-bold block">{Math.round(act.durationMs / 1000)}s</Typography>
+                                                            <Typography variant="caption" className="text-slate-600 font-medium text-[9px]">{new Date(act.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', ampm: true })}</Typography>
                                                         </Box>
                                                     </Box>
-                                                    <Box className="text-right">
-                                                        <Typography variant="caption" className="text-slate-400 font-bold block">{Math.round(act.durationMs / 1000)}s</Typography>
-                                                        <Typography variant="caption" className="text-slate-600 font-medium text-[9px]">{new Date(act.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', ampm: true })}</Typography>
-                                                    </Box>
+                                                );
+                                            })
+                                        ) : (
+                                            <Box className="flex flex-col items-center justify-center h-full opacity-40">
+                                                <Box className="p-3 rounded-full bg-slate-500/10 mb-3">
+                                                    <List className="w-8 h-8 text-slate-500" />
                                                 </Box>
-                                            );
-                                        })}
+                                                <Typography variant="caption" className="text-slate-500">No activity logs found for this date</Typography>
+                                            </Box>
+                                        )}
                                     </Box>
                                 </Box>
                             </Grid>
