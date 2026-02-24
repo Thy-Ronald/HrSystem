@@ -44,7 +44,7 @@ export const ScreenshotsGallery = ({
                                         src={img.url}
                                         className="w-28 aspect-video rounded-xl border border-border/50 object-cover shadow-lg"
                                     />
-                                    <Box className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-center pb-2 opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                    <Box className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-center pb-2 transition-opacity">
                                         <Typography variant="caption" className="text-white font-medium">
                                             {new Date(img.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </Typography>
