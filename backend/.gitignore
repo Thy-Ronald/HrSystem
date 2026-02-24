@@ -19,3 +19,6 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Firebase service account
+*-firebase-adminsdk-*.json
