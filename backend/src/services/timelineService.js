@@ -28,20 +28,43 @@ class TimelineService {
     }
 
     /**
-       * Fetch activity logs for a specific user and date
-       * @param {string} userId - The user ID
-       * @param {string} dateKey - The date in YYYY-MM-DD format
-       */
+     * Fetch activity logs for a specific user and date
+     * @param {string} userId - The user ID
+     * @param {string} dateKey - The date in YYYY-MM-DD format
+     * @returns {Promise<Object>} Refined activity data { activities, topApps }
+     */
     async getActivityLogs(userId, dateKey) {
         try {
             const docRef = firestoreA.collection('users').doc(userId).collection('activity').doc(dateKey);
             const doc = await docRef.get();
 
             if (!doc.exists) {
-                return { activities: [], apps: {} };
+                return { activities: [], topApps: [] };
             }
 
-            return doc.data();
+            const data = doc.data();
+            const { activities = [], apps = {}, totalActiveMs = 0 } = data;
+
+            // 1. Sort activities by start time
+            const sortedActivities = [...activities].sort((a, b) => {
+                return new Date(a.start) - new Date(b.start);
+            });
+
+            // 2. Process Top Applications (Aggregation)
+            // Calculate percentage based on totalActiveMs
+            const topApps = Object.entries(apps)
+                .map(([name, totalMs]) => ({
+                    name,
+                    totalMs,
+                    percentage: totalActiveMs > 0 ? Number(((totalMs / totalActiveMs) * 100).toFixed(2)) : 0
+                }))
+                .sort((a, b) => b.totalMs - a.totalMs); // Sort by totalMs descending
+
+            return {
+                activities: sortedActivities,
+                topApps,
+                totalActiveMs
+            };
         } catch (error) {
             console.error(`Error fetching activity logs: ${error.message}`);
             throw error;
