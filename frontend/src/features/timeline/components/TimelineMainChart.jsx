@@ -13,14 +13,14 @@ export const TimelineMainChart = ({
     if (!data?.activityLogs) return null;
 
     return (
-        <Box className="bg-[#111113] border border-[#262629] rounded-2xl p-4 relative overflow-hidden">
+        <Box className="bg-card border border-border rounded-2xl p-4 relative overflow-hidden shadow-sm">
             {/* Time Header Labels */}
             <Box className="flex justify-between mb-4 px-2">
                 {timeLabels.map((t, i) => (
                     <Typography
                         key={i}
                         variant="caption"
-                        className="text-[#636366] font-medium text-[10px]"
+                        className="text-muted-foreground font-medium text-[10px]"
                     >
                         {t.label}
                     </Typography>
@@ -33,7 +33,7 @@ export const TimelineMainChart = ({
                     {timeLabels.map((t, i) => (
                         <Box
                             key={i}
-                            className="absolute h-full border-l border-[#1c1c1e]"
+                            className="absolute h-full border-l border-border/50"
                             style={{ left: `${t.pos}%` }}
                         />
                     ))}
@@ -41,7 +41,7 @@ export const TimelineMainChart = ({
             </Box>
 
             {/* Activity Bar (Main Blocks) */}
-            <Box className="relative h-6 w-full bg-[#1c1c1e] rounded-xl mb-4 overflow-hidden border border-[#262629]/50 shadow-inner">
+            <Box className="relative h-6 w-full bg-muted/30 rounded-xl mb-4 overflow-hidden border border-border shadow-inner">
                 {data.activityLogs?.activities?.map((act, i) => {
                     const start = getTimePosition(act.start);
                     const end = getTimePosition(act.end);

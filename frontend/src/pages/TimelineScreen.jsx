@@ -37,7 +37,7 @@ const TimelineScreen = () => {
 
     return (
         <TooltipProvider>
-            <Box className="min-h-screen bg-[#0a0a0b] text-slate-200 p-6 font-sans">
+            <Box className="min-h-screen bg-background text-foreground p-6 font-sans">
                 {/* Header Section */}
                 <TimelineHeader
                     users={users}
@@ -50,7 +50,7 @@ const TimelineScreen = () => {
                 />
 
                 {error && (
-                    <Alert severity="error" className="mb-6 bg-red-900/20 border-red-500/30 text-red-200">
+                    <Alert severity="error" className="mb-6 bg-destructive/10 border-destructive/20 text-destructive">
                         {error}
                     </Alert>
                 )}
@@ -80,12 +80,12 @@ const TimelineScreen = () => {
                         />
                     </Box>
                 ) : (
-                    <Box className="flex flex-col items-center justify-center py-40 bg-[#111113] rounded-3xl border-2 border-dashed border-[#262629]">
+                    <Box className="flex flex-col items-center justify-center py-40 bg-card rounded-3xl border-2 border-dashed border-border shadow-sm">
                         <Box className="p-6 rounded-full bg-blue-500/10 mb-6">
                             <Search className="w-12 h-12 text-blue-500/40" />
                         </Box>
-                        <Typography variant="h6" className="text-white font-bold mb-2">No Data Available</Typography>
-                        <Typography variant="body2" className="text-slate-500 text-center max-w-sm px-6">
+                        <Typography variant="h6" className="text-foreground font-bold mb-2">No Data Available</Typography>
+                        <Typography variant="body2" className="text-muted-foreground text-center max-w-sm px-6">
                             {selectedUser
                                 ? `Click "Apply" to view the productivity timeline for ${selectedUser.name} on the selected date.`
                                 : 'Select a user and date above to begin visualizing their daily work activity.'}
@@ -100,8 +100,8 @@ const TimelineScreen = () => {
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
                 .custom-scrollbar::-webkit-scrollbar { width: 4px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: #262629; border-radius: 10px; }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 10px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
             `}</style>
         </TooltipProvider>
     );

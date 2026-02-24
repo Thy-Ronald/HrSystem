@@ -16,20 +16,20 @@ export const ScreenshotsGallery = ({
     if (!data?.screenshots?.images?.length) return null;
 
     return (
-        <Box className="bg-[#111113] border border-[#262629] rounded-2xl p-4 transition-all duration-300">
+        <Box className="bg-card border border-border rounded-2xl p-4 transition-all duration-300 shadow-sm">
             <Box
                 className="flex items-center justify-between cursor-pointer group"
                 onClick={toggleScreenshots}
             >
-                <Box className="flex items-center gap-2 text-white font-bold">
+                <Box className="flex items-center gap-2 text-foreground font-bold">
                     <Camera className="w-4 h-4 text-blue-400" />
                     SCREENSHOTS ({data.screenshots.images.length})
                     <ChevronDown className={cn(
-                        "w-4 h-4 text-slate-500 transition-transform duration-300",
+                        "w-4 h-4 text-muted-foreground transition-transform duration-300",
                         !showScreenshots && "-rotate-90"
                     )} />
                 </Box>
-                <Typography variant="caption" className="text-slate-500 group-hover:text-white transition-colors">
+                <Typography variant="caption" className="text-muted-foreground group-hover:text-foreground transition-colors">
                     {showScreenshots ? 'Click to hide' : 'Click to preview'}
                 </Typography>
             </Box>
@@ -42,7 +42,7 @@ export const ScreenshotsGallery = ({
                                 <Box className="relative flex-shrink-0 group/img cursor-pointer transition-all hover:scale-[1.02]">
                                     <img
                                         src={img.url}
-                                        className="w-28 aspect-video rounded-xl border border-white/5 object-cover shadow-lg"
+                                        className="w-28 aspect-video rounded-xl border border-border/50 object-cover shadow-lg"
                                     />
                                     <Box className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-center pb-2 opacity-0 group-hover/img:opacity-100 transition-opacity">
                                         <Typography variant="caption" className="text-white font-medium">
@@ -54,7 +54,7 @@ export const ScreenshotsGallery = ({
                                     </Box>
                                 </Box>
                             </DialogTrigger>
-                            <DialogContent className="max-w-6xl bg-[#0a0a0b] border-white/10 p-2 overflow-hidden rounded-3xl">
+                            <DialogContent className="max-w-6xl bg-background border-border p-2 overflow-hidden rounded-3xl">
                                 <img src={img.url} className="w-full h-full object-contain rounded-2xl" />
                             </DialogContent>
                         </Dialog>

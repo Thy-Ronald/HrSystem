@@ -24,7 +24,7 @@ export const TimelineHeader = ({
                 <Box className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center">
                     <LayoutGrid className="text-blue-400 w-6 h-6" />
                 </Box>
-                <Typography variant="h5" className="font-bold tracking-tight text-white">
+                <Typography variant="h5" className="font-bold tracking-tight text-foreground">
                     Timeline
                 </Typography>
             </Box>
@@ -43,10 +43,10 @@ export const TimelineHeader = ({
                             size="small"
                             sx={{
                                 '& .MuiOutlinedInput-root': {
-                                    bgcolor: '#161618',
-                                    color: 'white',
-                                    '& fieldset': { borderColor: '#262629' },
-                                    '&:hover fieldset': { borderColor: '#3f3f46' },
+                                    bgcolor: 'background.paper',
+                                    color: 'text.primary',
+                                    '& fieldset': { borderColor: 'divider' },
+                                    '&:hover fieldset': { borderColor: 'primary.main' },
                                 }
                             }}
                         />
@@ -59,9 +59,9 @@ export const TimelineHeader = ({
                     size="small"
                     sx={{
                         '& .MuiOutlinedInput-root': {
-                            bgcolor: '#161618',
-                            color: 'white',
-                            '& fieldset': { borderColor: '#262629' },
+                            bgcolor: 'background.paper',
+                            color: 'text.primary',
+                            '& fieldset': { borderColor: 'divider' },
                         }
                     }}
                 />
