@@ -14,6 +14,7 @@ import Information from './pages/Information';
 import RankingPage from './pages/StaffRanking';
 import Monitoring from './pages/Monitoring';
 import GithubAnalytics from './pages/GithubAnalytics';
+import TimelineScreen from './pages/TimelineScreen';
 import Auth from './pages/Auth';
 import Settings from './pages/Settings';
 import Layout from './components/Layout';
@@ -28,6 +29,7 @@ const routeMap = {
   '/ranking': 'staff-ranking', // Alias
   '/monitoring': 'monitoring',
   '/github-analytics': 'github-analytics',
+  '/timeline': 'timeline',
   '/auth': 'auth',
   '/settings': 'settings',
 };
@@ -46,6 +48,7 @@ function setPathFromPage(page, replace = false) {
     'staff-ranking': '/staff-ranking',
     'monitoring': '/monitoring',
     'github-analytics': '/github-analytics',
+    'timeline': '/timeline',
     'auth': '/auth',
     'settings': '/settings',
   };
@@ -150,6 +153,7 @@ function AppContent() {
         {currentPage === 'staff-ranking' && <RankingPage onNavigate={handleNavigate} />}
         {currentPage === 'monitoring' && <Monitoring />}
         {currentPage === 'github-analytics' && <GithubAnalytics onNavigate={handleNavigate} />}
+        {currentPage === 'timeline' && <TimelineScreen />}
         {currentPage === 'settings' && <Settings />}
       </Layout>
     </MonitoringProvider>

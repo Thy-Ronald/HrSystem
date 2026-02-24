@@ -13,6 +13,7 @@ const monitoringRouter = require('./routes/monitoring');
 const notificationRoutes = require('./routes/notificationRoutes');
 const authRouter = require('./routes/auth');
 const personnelRouter = require('./routes/personnelRoutes');
+const timelineRouter = require('./routes/timelineRoutes');
 
 // Middleware imports
 const { errorHandler } = require('./middlewares/errorHandler');
@@ -78,6 +79,7 @@ app.use('/api/personnel', personnelRouter);
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/settings', require('./routes/settingsRoutes'));
+app.use('/api/timeline', timelineRouter);
 
 // Expose io to controllers
 app.set('io', io);

@@ -51,6 +51,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
     { label: 'Employees', path: 'employee-dropdown', adminOnly: true },
     { label: 'Github Analytics', path: 'github-analytics' },
     { label: 'Ranking', path: 'staff-ranking' },
+    { label: 'Timeline', path: 'timeline' },
     { label: 'Monitoring', path: 'monitoring' },
     { label: 'Settings', path: 'settings' },
   ].filter(item => !item.adminOnly || isAdmin);
@@ -68,7 +69,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
     const item = navItems[newValue];
 
     // Only navigate to implemented pages
-    if (['staff-ranking', 'monitoring', 'github-analytics', 'settings'].includes(item.path)) {
+    if (['staff-ranking', 'monitoring', 'timeline', 'github-analytics', 'settings'].includes(item.path)) {
       onNavigate(item.path);
     }
   };
