@@ -1,19 +1,26 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { fetchTimelineUsers, fetchTimelineData } from '../services/api';
+import { fetchTimelineUsers } from '../services/api';
 import { getAppData, generateTimeLabels } from '../lib/timeline-helpers';
+import { useTimelineData } from './useTimelineData';
 import { useTimelineRealtime } from './useTimelineRealtime';
 
 /**
- * Custom hook for managing Timeline state and data operations.
- * Implements SRP by separating data orchestration from the UI.
- * Persists state to sessionStorage for resilience across navigation.
- * Integrates real-time updates via Socket.IO.
+ * useTimeline Hook
+ * 
+ * Orchestrator hook that combines:
+ * - useTimelineData: REST API + sessionStorage caching
+ * - useTimelineRealtime: Socket.IO real-time updates
+ * 
+ * Responsibility:
+ * - Manage user list state
+ * - Persist user/date selection to sessionStorage
+ * - Coordinate between data fetching and real-time sync
+ * - Transform data into presentation models
  */
 export const useTimeline = () => {
     const STORAGE_KEY = 'timelineState';
-    const DATA_STORAGE_KEY = 'timelineData';
 
-    // Initialize state from sessionStorage or defaults
+    // Initialize state from sessionStorage
     const getInitialState = () => {
         try {
             const stored = sessionStorage.getItem(STORAGE_KEY);
@@ -21,7 +28,7 @@ export const useTimeline = () => {
                 return JSON.parse(stored);
             }
         } catch (error) {
-            console.warn('Failed to restore timeline state:', error);
+            console.warn('[useTimeline] Failed to restore state:', error);
         }
         return {
             date: new Date().toISOString().split('T')[0],
@@ -35,50 +42,42 @@ export const useTimeline = () => {
     const [users, setUsers] = useState([]);
     const [selectedUser, setSelectedUser] = useState(initialState.selectedUser);
     const [loadingUsers, setLoadingUsers] = useState(true);
-    const [loadingData, setLoadingData] = useState(false);
-    const [data, setData] = useState(null);
-    const [error, setError] = useState(null);
     const [showScreenshots, setShowScreenshots] = useState(initialState.showScreenshots);
 
-    // Handle real-time data updates from Socket.IO
-    const handleRealtimeUpdate = useCallback((update) => {
-        setData(prevData => {
-            if (!prevData) return prevData;
+    // Use specialized data hook
+    const {
+        data,
+        loading: loadingData,
+        error,
+        fetchData: fetchTimelineData,
+        mergeData,
+        setError
+    } = useTimelineData(selectedUser, date);
 
-            const updatedData = { ...prevData };
-
-            if (update.type === 'activity') {
-                updatedData.activityLogs = {
-                    ...updatedData.activityLogs,
-                    activities: update.activities,
-                    topApps: update.topApps,
-                    totalActiveMs: update.totalActiveMs
-                };
-                console.log('[useTimeline] Updated activity logs in real-time');
-            } else if (update.type === 'screenshots') {
-                updatedData.screenshots = {
-                    ...updatedData.screenshots,
-                    images: update.images
-                };
-                console.log('[useTimeline] Updated screenshots in real-time');
+    // Handle real-time activity updates
+    const handleActivityUpdate = useCallback((activityData) => {
+        console.log('[useTimeline] Activity update received, merging...');
+        mergeData({
+            activityLogs: {
+                activities: activityData.activities,
+                topApps: activityData.topApps,
+                totalActiveMs: activityData.totalActiveMs
             }
-
-            // Update sessionStorage with new data
-            try {
-                if (selectedUser && date) {
-                    const dataKey = `${DATA_STORAGE_KEY}:${selectedUser.id}:${date}`;
-                    sessionStorage.setItem(dataKey, JSON.stringify(updatedData));
-                }
-            } catch (err) {
-                console.warn('Failed to save real-time data to storage:', err);
-            }
-
-            return updatedData;
         });
-    }, [selectedUser, date]);
+    }, [mergeData]);
 
-    // Setup real-time socket listener
-    useTimelineRealtime(selectedUser, date, handleRealtimeUpdate);
+    // Handle real-time screenshot updates
+    const handleScreenshotsUpdate = useCallback((screenshotsData) => {
+        console.log('[useTimeline] Screenshots update received, merging...');
+        mergeData({
+            screenshots: {
+                images: screenshotsData.images
+            }
+        });
+    }, [mergeData]);
+
+    // Setup real-time sync with Socket.IO
+    useTimelineRealtime(selectedUser, date, handleActivityUpdate, handleScreenshotsUpdate);
 
     // Persist state to sessionStorage whenever it changes
     useEffect(() => {
@@ -90,40 +89,11 @@ export const useTimeline = () => {
             };
             sessionStorage.setItem(STORAGE_KEY, JSON.stringify(stateToStore));
         } catch (error) {
-            console.warn('Failed to save timeline state:', error);
+            console.warn('[useTimeline] Failed to save state:', error);
         }
     }, [date, selectedUser, showScreenshots]);
 
-    // Persist fetched data to sessionStorage
-    useEffect(() => {
-        if (data && selectedUser && date) {
-            try {
-                const dataKey = `${DATA_STORAGE_KEY}:${selectedUser.id}:${date}`;
-                sessionStorage.setItem(dataKey, JSON.stringify(data));
-            } catch (error) {
-                console.warn('Failed to save timeline data:', error);
-            }
-        }
-    }, [data, selectedUser, date]);
-
-    // Try to restore cached data from sessionStorage
-    const restoreCachedData = useCallback(() => {
-        if (selectedUser && date) {
-            try {
-                const dataKey = `${DATA_STORAGE_KEY}:${selectedUser.id}:${date}`;
-                const cached = sessionStorage.getItem(dataKey);
-                if (cached) {
-                    setData(JSON.parse(cached));
-                    return true;
-                }
-            } catch (error) {
-                console.warn('Failed to restore cached data:', error);
-            }
-        }
-        return false;
-    }, [selectedUser, date]);
-
-    // Initial load of personnel
+    // Load users on mount
     useEffect(() => {
         const loadUsers = async () => {
             try {
@@ -131,7 +101,7 @@ export const useTimeline = () => {
                 const userList = await fetchTimelineUsers();
                 setUsers(userList || []);
 
-                // If we had a selected user before, try to find them in the new list
+                // Try to restore previously selected user
                 if (initialState.selectedUser && userList) {
                     const foundUser = userList.find(u => u.id === initialState.selectedUser.id);
                     if (foundUser) {
@@ -139,7 +109,7 @@ export const useTimeline = () => {
                     }
                 }
             } catch (err) {
-                console.error('Failed to load users:', err);
+                console.error('[useTimeline] Failed to load users:', err);
                 setError('Connection failed. Please check backend status.');
             } finally {
                 setLoadingUsers(false);
@@ -148,32 +118,7 @@ export const useTimeline = () => {
         loadUsers();
     }, []);
 
-    // Restore cached data after user list is loaded
-    useEffect(() => {
-        if (!loadingUsers && selectedUser) {
-            const hasCache = restoreCachedData();
-            if (!hasCache) {
-                setData(null);
-            }
-        }
-    }, [selectedUser, loadingUsers, restoreCachedData]);
-
-    const handleFetchData = useCallback(async () => {
-        if (!selectedUser) return;
-        try {
-            setLoadingData(true);
-            setError(null);
-            const timelineData = await fetchTimelineData(selectedUser.id, date);
-            setData(timelineData);
-        } catch (err) {
-            console.error('Failed to fetch timeline data:', err);
-            setError('Unable to retrieve activity data for this period.');
-        } finally {
-            setLoadingData(false);
-        }
-    }, [selectedUser, date]);
-
-    // Transformation Logic (Domain Models)
+    // Transform data into presentation models
     const topApps = useMemo(() => {
         if (!data?.activityLogs?.topApps) return [];
         return data.activityLogs.topApps.map(app => ({
@@ -203,10 +148,10 @@ export const useTimeline = () => {
         topApps,
         timeLabels,
 
-        // Setters/Actions
+        // Actions
         setDate,
         setSelectedUser,
-        handleFetchData,
+        handleFetchData: fetchTimelineData,
         toggleScreenshots,
         setError
     };

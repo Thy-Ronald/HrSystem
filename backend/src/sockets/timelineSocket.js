@@ -1,17 +1,20 @@
 /**
  * Timeline Real-time Socket Handler
  * 
- * Listens to Firestore changes and broadcasts updates to connected clients via Socket.IO
- * - Activity logs updates
- * - Screenshots updates
- * - Automatically invalidates Redis cache on updates
+ * Manages Socket.IO connections for timeline real-time updates
+ * - Delegates subscription logic to TimelineSubscriptionService
+ * - Handles socket lifecycle events
+ * - Broadcasts updates to connected clients
  */
 
+const TimelineSubscriptionService = require('../services/timelineSubscriptionService');
 const { firestoreA } = require('../config/firebaseProjectA');
-const cacheService = require('../services/cacheService');
 
-// Store active listeners to clean them up on disconnect
-const activeListeners = new Map(); // Map<socketId, Array<unsubscribeFunctions>>
+// Initialize subscription service (singleton)
+const subscriptionService = new TimelineSubscriptionService(firestoreA);
+
+// Store unsubscribe functions per socket for cleanup
+const socketSubscriptions = new Map(); // Map<socketId, Array<unsubscribeFunctions>>
 
 /**
  * Setup timeline socket listeners for real-time updates
@@ -20,6 +23,7 @@ const activeListeners = new Map(); // Map<socketId, Array<unsubscribeFunctions>>
 function setupTimelineSocket(io) {
     io.on('connection', (socket) => {
         console.log(`[TimelineSocket] Client connected: ${socket.id}`);
+        socketSubscriptions.set(socket.id, []);
 
         /**
          * Subscribe to real-time updates for a specific user and date
@@ -34,145 +38,104 @@ function setupTimelineSocket(io) {
                 return;
             }
 
-            console.log(`[TimelineSocket] ${socket.id} subscribed to ${userId}/${dateKey}`);
-
-            const unsubscribeFunctions = [];
+            console.log(`[TimelineSocket] ${socket.id} subscribing to ${userId}/${dateKey}`);
 
             try {
-                // ─── Listen to Activity Logs Changes ──────────────────────────────────
-                const activityDocRef = firestoreA
-                    .collection('users')
-                    .doc(userId)
-                    .collection('activity')
-                    .doc(dateKey);
-
-                const activityUnsubscribe = activityDocRef.onSnapshot(async (doc) => {
-                    if (!doc.exists) return;
-
-                    const data = doc.data();
-                    const { activities = [], apps = {}, totalActiveMs = 0 } = data;
-
-                    // Process and transform data
-                    const sortedActivities = [...activities].sort((a, b) => {
-                        return new Date(a.start) - new Date(b.start);
-                    });
-
-                    const topApps = Object.entries(apps)
-                        .map(([name, totalMs]) => ({
-                            name,
-                            totalMs,
-                            percentage: totalActiveMs > 0 ? Number(((totalMs / totalActiveMs) * 100).toFixed(2)) : 0
-                        }))
-                        .sort((a, b) => b.totalMs - a.totalMs);
-
-                    // Invalidate cache when activity logs change
-                    const cacheKey = `timeline:${userId}:${dateKey}`;
-                    await cacheService.delete(cacheKey);
-                    console.log(`[TimelineSocket] 🗑️ Invalidated cache for ${cacheKey}`);
-
-                    // Emit update to all clients subscribed to this timeline
-                    io.emit('timeline:activity-updated', {
-                        userId,
-                        dateKey,
-                        activities: sortedActivities,
-                        topApps,
-                        totalActiveMs,
-                        timestamp: new Date().toISOString()
-                    });
-
-                    console.log(`[TimelineSocket] 📤 Activity update broadcasted (${sortedActivities.length} activities)`);
-                });
-
-                unsubscribeFunctions.push(activityUnsubscribe);
-
-                // ─── Listen to Screenshots Changes ────────────────────────────────────
-                const screenshotsDocRef = firestoreA
-                    .collection('users')
-                    .doc(userId)
-                    .collection('screenshots')
-                    .doc(dateKey);
-
-                const screenshotsUnsubscribe = screenshotsDocRef.onSnapshot(async (doc) => {
-                    if (!doc.exists) {
+                // Use subscription service to manage listeners
+                const unsubscribe = await subscriptionService.subscribe(
+                    userId,
+                    dateKey,
+                    // Activity update callback
+                    (transformedData) => {
+                        io.emit('timeline:activity-updated', {
+                            userId,
+                            dateKey,
+                            ...transformedData
+                        });
+                    },
+                    // Screenshots update callback
+                    (screenshotsData) => {
                         io.emit('timeline:screenshots-updated', {
                             userId,
                             dateKey,
-                            images: [],
-                            timestamp: new Date().toISOString()
+                            ...screenshotsData
                         });
-                        return;
                     }
+                );
 
-                    const data = doc.data();
-                    const images = data.images || [];
+                // Store unsubscribe function for cleanup
+                const subscriptions = socketSubscriptions.get(socket.id) || [];
+                subscriptions.push(unsubscribe);
+                socketSubscriptions.set(socket.id, subscriptions);
 
-                    // Invalidate cache
-                    const cacheKey = `timeline:${userId}:${dateKey}`;
-                    await cacheService.delete(cacheKey);
-                    console.log(`[TimelineSocket] 🗑️ Invalidated cache for ${cacheKey}`);
-
-                    // Emit update
-                    io.emit('timeline:screenshots-updated', {
-                        userId,
-                        dateKey,
-                        images,
-                        timestamp: new Date().toISOString()
-                    });
-
-                    console.log(`[TimelineSocket] 📤 Screenshots update broadcasted (${images.length} new images)`);
-                });
-
-                unsubscribeFunctions.push(screenshotsUnsubscribe);
-
-                // Store unsubscribe functions for cleanup on disconnect
-                activeListeners.set(socket.id, unsubscribeFunctions);
                 socket.emit('timeline:subscribed', { userId, dateKey });
-
+                console.log(`[TimelineSocket] ${socket.id} subscribed to ${userId}/${dateKey}`);
             } catch (error) {
-                console.error(`[TimelineSocket] Error subscribing to ${userId}/${dateKey}:`, error.message);
+                console.error(`[TimelineSocket] Subscription error:`, error.message);
                 socket.emit('timeline:error', { error: error.message });
             }
         });
 
         /**
-         * Unsubscribe from real-time updates
-         * Event: timeline:unsubscribe
+         * Get subscription stats (for debugging/monitoring)
+         * Event: timeline:stats
          */
-        socket.on('timeline:unsubscribe', () => {
-            const unsubscribeFunctions = activeListeners.get(socket.id);
-            if (unsubscribeFunctions) {
-                unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
-                activeListeners.delete(socket.id);
-                console.log(`[TimelineSocket] ${socket.id} unsubscribed`);
-            }
+        socket.on('timeline:stats', () => {
+            const stats = subscriptionService.getStats();
+            socket.emit('timeline:stats-response', stats);
         });
 
         /**
          * Handle disconnect
          */
         socket.on('disconnect', () => {
-            const unsubscribeFunctions = activeListeners.get(socket.id);
-            if (unsubscribeFunctions) {
-                unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
-                activeListeners.delete(socket.id);
-                console.log(`[TimelineSocket] ${socket.id} disconnected, listeners cleaned up`);
-            }
+            const subscriptions = socketSubscriptions.get(socket.id) || [];
+            subscriptions.forEach(unsubscribe => {
+                try {
+                    unsubscribe();
+                } catch (error) {
+                    console.error('[TimelineSocket] Error unsubscribing:', error.message);
+                }
+            });
+            socketSubscriptions.delete(socket.id);
+            console.log(`[TimelineSocket] ${socket.id} disconnected, cleaned up ${subscriptions.length} subscription(s)`);
         });
     });
 }
 
 /**
- * Cleanup all timeline socket listeners
+ * Cleanup all timeline sockets and subscriptions
+ * Called on graceful shutdown
  */
-function cleanupTimelineSocket() {
-    activeListeners.forEach(unsubscribeFunctions => {
-        unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
+async function cleanupTimelineSocket() {
+    console.log('[TimelineSocket] Cleaning up all socket subscriptions...');
+    
+    // Unsubscribe all sockets
+    socketSubscriptions.forEach((subscriptions, socketId) => {
+        subscriptions.forEach(unsubscribe => {
+            try {
+                unsubscribe();
+            } catch (error) {
+                console.error(`[TimelineSocket] Error cleaning up ${socketId}:`, error.message);
+            }
+        });
     });
-    activeListeners.clear();
-    console.log('[TimelineSocket] All listeners cleaned up');
+    socketSubscriptions.clear();
+
+    // Cleanup subscription service
+    await subscriptionService.cleanup();
+    console.log('[TimelineSocket] ✅ All cleanup complete');
+}
+
+/**
+ * Get subscription service (for advanced use cases)
+ */
+function getSubscriptionService() {
+    return subscriptionService;
 }
 
 module.exports = {
     setupTimelineSocket,
-    cleanupTimelineSocket
+    cleanupTimelineSocket,
+    getSubscriptionService
 };

@@ -30,7 +30,7 @@ const { startRealtimeRefreshJob, stopRealtimeRefreshJob } = require('./jobs/real
 
 // Socket handlers
 const setupMonitoringSocket = require('./sockets/monitoringSocket');
-const { setupTimelineSocket } = require('./sockets/timelineSocket');
+const { setupTimelineSocket, cleanupTimelineSocket } = require('./sockets/timelineSocket');
 
 // Services with side-effects
 const { initializeEmailJS } = require('./services/emailService');
@@ -150,6 +150,7 @@ async function gracefulShutdown(signal) {
   console.log(`${signal} received, shutting down gracefully...`);
   stopCacheRefreshJob();
   stopRealtimeRefreshJob();
+  await cleanupTimelineSocket();
   await cacheService.disconnect();
   const { closePool } = require('./config/database');
   await closePool();

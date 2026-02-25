@@ -1,30 +1,36 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
 
 /**
- * Custom hook for managing real-time timeline updates via Socket.IO
- * Subscribes to Firestore changes and updates the UI in real-time
+ * useTimelineRealtimeSync Hook
+ * 
+ * Responsible for:
+ * - Socket.IO connection management
+ * - Subscription to real-time updates
+ * - Connection state tracking
+ * - Automatic reconnection
+ * 
+ * Does NOT handle: Data state management (that's useTimelineData)
  */
-export const useTimelineRealtime = (selectedUser, dateKey, onDataUpdate) => {
+export const useTimelineRealtime = (selectedUser, dateKey, onActivityUpdate, onScreenshotsUpdate) => {
+    const [isConnected, setIsConnected] = useState(false);
+
     // Determine backend URL based on environment
     const getBackendUrl = () => {
-        // In production or when explicitly set
         const envUrl = import.meta.env.VITE_BACKEND_URL;
         if (envUrl) return envUrl;
 
-        // In development, use the vite proxy target (http://localhost:4000)
         if (import.meta.env.DEV) {
             return 'http://localhost:4000';
         }
 
-        // Production fallback: use current domain
         return window.location.origin;
     };
 
     const BACKEND_URL = getBackendUrl();
 
     useEffect(() => {
-        if (!selectedUser || !dateKey) return;
+        if (!selectedUser || !dateKey || !onActivityUpdate || !onScreenshotsUpdate) return;
 
         // Connect to Socket.IO server
         const socket = io(BACKEND_URL, {
@@ -35,21 +41,31 @@ export const useTimelineRealtime = (selectedUser, dateKey, onDataUpdate) => {
             transports: ['websocket', 'polling']
         });
 
-        // Subscribe to timeline updates
+        let subscriptionKey = null;
+
+        // Handle connection
         const handleConnect = () => {
-            console.log('[TimelineRealtime] Connected to server:', BACKEND_URL);
+            console.log('[useTimelineRealtime] Connected to server:', BACKEND_URL);
+            setIsConnected(true);
+
+            // Subscribe to updates
+            subscriptionKey = `${selectedUser.id}:${dateKey}`;
             socket.emit('timeline:subscribe', {
                 userId: selectedUser.id,
                 dateKey: dateKey
             });
         };
 
-        // Handle activity log updates
+        // Handle subscription confirmation
+        const handleSubscribed = (data) => {
+            console.log('[useTimelineRealtime] Subscribed to', data);
+        };
+
+        // Handle activity updates
         const handleActivityUpdate = (data) => {
-            console.log('[TimelineRealtime] Activity update received:', data);
-            if (data.userId === selectedUser.id && data.dateKey === dateKey) {
-                onDataUpdate({
-                    type: 'activity',
+            console.log('[useTimelineRealtime] Activity update:', data);
+            if (onActivityUpdate) {
+                onActivityUpdate({
                     activities: data.activities,
                     topApps: data.topApps,
                     totalActiveMs: data.totalActiveMs
@@ -59,10 +75,9 @@ export const useTimelineRealtime = (selectedUser, dateKey, onDataUpdate) => {
 
         // Handle screenshot updates
         const handleScreenshotsUpdate = (data) => {
-            console.log('[TimelineRealtime] Screenshots update received:', data);
-            if (data.userId === selectedUser.id && data.dateKey === dateKey) {
-                onDataUpdate({
-                    type: 'screenshots',
+            console.log('[useTimelineRealtime] Screenshots update:', data);
+            if (onScreenshotsUpdate) {
+                onScreenshotsUpdate({
                     images: data.images
                 });
             }
@@ -70,30 +85,31 @@ export const useTimelineRealtime = (selectedUser, dateKey, onDataUpdate) => {
 
         // Handle errors
         const handleError = (data) => {
-            console.error('[TimelineRealtime] Socket error:', data.error);
-        };
-
-        // Handle subscription confirmation
-        const handleSubscribed = (data) => {
-            console.log('[TimelineRealtime] Subscribed to', data);
+            console.error('[useTimelineRealtime] Socket error:', data.error);
         };
 
         // Handle disconnect
         const handleDisconnect = () => {
-            console.log('[TimelineRealtime] Disconnected from server');
+            console.log('[useTimelineRealtime] Disconnected');
+            setIsConnected(false);
         };
 
+        // Register listeners
         socket.on('connect', handleConnect);
+        socket.on('timeline:subscribed', handleSubscribed);
         socket.on('timeline:activity-updated', handleActivityUpdate);
         socket.on('timeline:screenshots-updated', handleScreenshotsUpdate);
         socket.on('timeline:error', handleError);
-        socket.on('timeline:subscribed', handleSubscribed);
         socket.on('disconnect', handleDisconnect);
 
-        // Cleanup on unmount or when dependencies change
+        // Cleanup on unmount
         return () => {
             socket.emit('timeline:unsubscribe');
             socket.disconnect();
         };
-    }, [selectedUser, dateKey, onDataUpdate, BACKEND_URL]);
+    }, [selectedUser, dateKey, onActivityUpdate, onScreenshotsUpdate, BACKEND_URL]);
+
+    return {
+        isConnected
+    };
 };
