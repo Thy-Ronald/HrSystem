@@ -55,9 +55,9 @@ router.get('/:userId/:dateKey', async (req, res) => {
             screenshots
         };
 
-        // Cache the result for 1 hour (3600 seconds)
-        await cacheService.set(cacheKey, responseData, 3600);
-        console.log(`[Timeline] 💾 Cached data for ${cacheKey}`);
+        // Cache the result for 5 days (432000 seconds) - automatically expires and deletes
+        await cacheService.set(cacheKey, responseData, 432000);
+        console.log(`[Timeline] 💾 Cached data for ${cacheKey} (expires in 5 days)`);
 
         res.json(responseData);
     } catch (error) {
