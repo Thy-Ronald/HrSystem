@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { fetchTimelineUsers, fetchTimelineData } from '../services/api';
 import { getAppData, generateTimeLabels } from '../lib/timeline-helpers';
+import { useTimelineRealtime } from './useTimelineRealtime';
 
 /**
  * Custom hook for managing Timeline state and data operations.
  * Implements SRP by separating data orchestration from the UI.
  * Persists state to sessionStorage for resilience across navigation.
+ * Integrates real-time updates via Socket.IO.
  */
 export const useTimeline = () => {
     const STORAGE_KEY = 'timelineState';
@@ -37,6 +39,46 @@ export const useTimeline = () => {
     const [data, setData] = useState(null);
     const [error, setError] = useState(null);
     const [showScreenshots, setShowScreenshots] = useState(initialState.showScreenshots);
+
+    // Handle real-time data updates from Socket.IO
+    const handleRealtimeUpdate = useCallback((update) => {
+        setData(prevData => {
+            if (!prevData) return prevData;
+
+            const updatedData = { ...prevData };
+
+            if (update.type === 'activity') {
+                updatedData.activityLogs = {
+                    ...updatedData.activityLogs,
+                    activities: update.activities,
+                    topApps: update.topApps,
+                    totalActiveMs: update.totalActiveMs
+                };
+                console.log('[useTimeline] Updated activity logs in real-time');
+            } else if (update.type === 'screenshots') {
+                updatedData.screenshots = {
+                    ...updatedData.screenshots,
+                    images: update.images
+                };
+                console.log('[useTimeline] Updated screenshots in real-time');
+            }
+
+            // Update sessionStorage with new data
+            try {
+                if (selectedUser && date) {
+                    const dataKey = `${DATA_STORAGE_KEY}:${selectedUser.id}:${date}`;
+                    sessionStorage.setItem(dataKey, JSON.stringify(updatedData));
+                }
+            } catch (err) {
+                console.warn('Failed to save real-time data to storage:', err);
+            }
+
+            return updatedData;
+        });
+    }, [selectedUser, date]);
+
+    // Setup real-time socket listener
+    useTimelineRealtime(selectedUser, date, handleRealtimeUpdate);
 
     // Persist state to sessionStorage whenever it changes
     useEffect(() => {

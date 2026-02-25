@@ -28,8 +28,9 @@ const { startContractExpirationJob } = require('./jobs/contractExpirationJob');
 const { startCacheRefreshJob, stopCacheRefreshJob } = require('./jobs/cacheRefreshJob');
 const { startRealtimeRefreshJob, stopRealtimeRefreshJob } = require('./jobs/realtimeRefreshJob');
 
-// Socket handler
+// Socket handlers
 const setupMonitoringSocket = require('./sockets/monitoringSocket');
+const { setupTimelineSocket } = require('./sockets/timelineSocket');
 
 // Services with side-effects
 const { initializeEmailJS } = require('./services/emailService');
@@ -88,6 +89,7 @@ app.use(errorHandler);
 
 // ─── Socket.IO setup ──────────────────────────────────────────────────────────
 setupMonitoringSocket(io, userSockets);
+setupTimelineSocket(io);
 
 // ─── Server startup ───────────────────────────────────────────────────────────
 async function startServer() {
