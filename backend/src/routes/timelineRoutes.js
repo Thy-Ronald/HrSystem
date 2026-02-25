@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const timelineService = require('../services/timelineService');
+const cacheService = require('../services/cacheService');
 
 /**
  * @route GET /api/timeline/users
@@ -18,7 +19,7 @@ router.get('/users', async (req, res) => {
 
 /**
  * @route GET /api/timeline/:userId/:dateKey
- * @desc Fetch activity logs and screenshots for a user and date
+ * @desc Fetch activity logs and screenshots for a user and date with Redis caching
  * @access Private (Add your auth middleware here)
  */
 router.get('/:userId/:dateKey', async (req, res) => {
@@ -31,18 +32,34 @@ router.get('/:userId/:dateKey', async (req, res) => {
             return res.status(400).json({ error: 'Invalid date format. Expected YYYY-MM-DD' });
         }
 
+        // Create cache key
+        const cacheKey = `timeline:${userId}:${dateKey}`;
+
+        // Try to get from cache first
+        const cachedData = await cacheService.get(cacheKey);
+        if (cachedData) {
+            console.log(`[Timeline] ✅ Cache hit for ${cacheKey}`);
+            return res.json(cachedData);
+        }
+
         // Fetch data in parallel
         const [activityLogs, screenshots] = await Promise.all([
             timelineService.getActivityLogs(userId, dateKey),
             timelineService.getScreenshots(userId, dateKey)
         ]);
 
-        res.json({
+        const responseData = {
             userId,
             dateKey,
             activityLogs,
             screenshots
-        });
+        };
+
+        // Cache the result for 1 hour (3600 seconds)
+        await cacheService.set(cacheKey, responseData, 3600);
+        console.log(`[Timeline] 💾 Cached data for ${cacheKey}`);
+
+        res.json(responseData);
     } catch (error) {
         console.error(`Error in timeline route: ${error.message}`);
         res.status(500).json({ error: 'Failed to fetch timeline data' });
