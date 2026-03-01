@@ -14,7 +14,7 @@ const { firestoreA } = require('../config/firebaseProjectA');
 
 const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
-/** uid → Firestore unsubscribe function */
+/** uid → { presence: unsubFn, activity: unsubFn } */
 const unsubscribeMap = new Map();
 
 let ioRef = null;
@@ -54,14 +54,21 @@ function buildPayload(emp, presenceData) {
   };
 }
 
-// ─── Per-employee listener ─────────────────────────────────────────────────────
+// ─── Today key helper ─────────────────────────────────────────────────────────
+
+function getTodayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// ─── Per-employee listeners ────────────────────────────────────────────────────
 
 function watchEmployee(emp) {
   if (unsubscribeMap.has(emp.uid)) return; // already watching
 
-  const docRef = firestoreA.doc(`users/${emp.uid}/presence/current`);
-
-  const unsub = docRef.onSnapshot(
+  // --- Presence listener ---
+  const presRef = firestoreA.doc(`users/${emp.uid}/presence/current`);
+  const unsubPresence = presRef.onSnapshot(
     (snap) => {
       if (!ioRef) return;
       const presenceData = snap.exists ? snap.data() : null;
@@ -69,18 +76,48 @@ function watchEmployee(emp) {
       ioRef.to('tracking:admins').emit('tracking:presence-update', payload);
     },
     (err) => {
-      console.error(`[TrackingSocket] Snapshot error for ${emp.uid}:`, err.message);
+      console.error(`[TrackingSocket] Presence snapshot error for ${emp.uid}:`, err.message);
     }
   );
 
-  unsubscribeMap.set(emp.uid, unsub);
-  console.log(`[TrackingSocket] Watching presence for ${emp.name || emp.uid}`);
+  // --- Activity listener (today's doc) ---
+  const todayKey = getTodayKey();
+  const actRef = firestoreA.doc(`users/${emp.uid}/activity/${todayKey}`);
+  const unsubActivity = actRef.onSnapshot(
+    (snap) => {
+      if (!ioRef) return;
+      const data = snap.exists ? snap.data() : null;
+      if (!data) return;
+
+      // Unsanitize dot-encoded app keys
+      const apps = {};
+      Object.entries(data.apps || {}).forEach(([key, ms]) => {
+        apps[key.replace(/__dot__/g, '.')] = ms;
+      });
+
+      ioRef.to('tracking:admins').emit('tracking:activity-update', {
+        uid: emp.uid,
+        totalActiveMs: data.totalActiveMs || 0,
+        totalIdleMs: data.totalIdleMs || 0,
+        apps,
+        activities: data.activities || [],
+        lastUpdated: data.lastUpdated?.toMillis?.() || null,
+      });
+    },
+    (err) => {
+      console.error(`[TrackingSocket] Activity snapshot error for ${emp.uid}:`, err.message);
+    }
+  );
+
+  unsubscribeMap.set(emp.uid, { presence: unsubPresence, activity: unsubActivity });
+  console.log(`[TrackingSocket] Watching presence + activity for ${emp.name || emp.uid}`);
 }
 
 function unwatchEmployee(uid) {
-  const unsub = unsubscribeMap.get(uid);
-  if (unsub) {
-    unsub();
+  const subs = unsubscribeMap.get(uid);
+  if (subs) {
+    subs.presence();
+    subs.activity();
     unsubscribeMap.delete(uid);
   }
 }

@@ -41,6 +41,7 @@ import {
   EmployeeDetailModal,
 } from '../features/tracking';
 import { fetchUserActivity } from '../services/employeeTracking';
+import { useSocket } from '../hooks/useSocket';
 import {
   STATUS_COLORS,
   formatMs,
@@ -152,20 +153,24 @@ function ProductivityBar({ value }) {
   );
 }
 
-/* â”€â”€ Live overview + daily summary table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* — Live overview table — */
 function LiveOverviewTable({ data, loading, onOpen, recentlyUpdated }) {
   const [activityRows, setActivityRows] = useState({});
   const [loadingUids, setLoadingUids] = useState(new Set());
   const prevUidsRef = useRef('');
+  const dataRef = useRef(data);
+  const { subscribe, unsubscribe } = useSocket();
 
-  // Only re-fetch activity when the set of employee UIDs changes
-  // (not on every presence status update, which would cause N requests per push)
+  useEffect(() => { dataRef.current = data; }, [data]);
+
   const uidKey = useMemo(() => data.map((e) => e.uid).sort().join(','), [data]);
 
+  // Initial HTTP load for first paint (one-time per UID set)
   const loadAll = useCallback(async () => {
-    if (!data.length) return;
+    const employees = dataRef.current;
+    if (!employees.length) return;
     const today = todayKey();
-    const promises = data.map(async (emp) => {
+    const promises = employees.map(async (emp) => {
       setLoadingUids((s) => new Set([...s, emp.uid]));
       try {
         const activity = await fetchUserActivity(emp.uid, today);
@@ -178,8 +183,7 @@ function LiveOverviewTable({ data, loading, onOpen, recentlyUpdated }) {
     });
     const results = await Promise.all(promises);
     setActivityRows(Object.fromEntries(results));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uidKey]);
+  }, []);
 
   useEffect(() => {
     if (uidKey && uidKey !== prevUidsRef.current) {
@@ -188,7 +192,16 @@ function LiveOverviewTable({ data, loading, onOpen, recentlyUpdated }) {
     }
   }, [uidKey, loadAll]);
 
-  const COL_COUNT = 7;
+  // Real-time activity updates via socket (replaces HTTP polling)
+  useEffect(() => {
+    const handleActivityUpdate = (payload) => {
+      setActivityRows((prev) => ({ ...prev, [payload.uid]: payload }));
+    };
+    subscribe('tracking:activity-update', handleActivityUpdate);
+    return () => unsubscribe('tracking:activity-update', handleActivityUpdate);
+  }, [subscribe, unsubscribe]);
+
+  const COL_COUNT = 4;
 
   return (
     <Table>
@@ -196,9 +209,6 @@ function LiveOverviewTable({ data, loading, onOpen, recentlyUpdated }) {
         <TableRow>
           <TableHead className="w-[220px]">Employee</TableHead>
           <TableHead className="w-[110px]">Status</TableHead>
-          <TableHead className="w-[90px]">Active</TableHead>
-          <TableHead className="w-[80px]">Idle</TableHead>
-          <TableHead>Top Apps</TableHead>
           <TableHead className="w-[160px]">Productivity</TableHead>
           <TableHead className="w-[60px]" />
         </TableRow>
@@ -264,49 +274,6 @@ function LiveOverviewTable({ data, loading, onOpen, recentlyUpdated }) {
               {/* Status */}
               <TableCell>
                 <StatusBadge status={effectiveStatus} />
-              </TableCell>
-
-              {/* Active */}
-              <TableCell>
-                {isLoadingActivity ? (
-                  <div className="h-4 w-12 rounded bg-muted animate-pulse" />
-                ) : (
-                  <span className="text-sm font-semibold text-green-600 dark:text-green-400 tabular-nums">
-                    {formatMs(activity?.totalActiveMs ?? 0)}
-                  </span>
-                )}
-              </TableCell>
-
-              {/* Idle */}
-              <TableCell>
-                {isLoadingActivity ? (
-                  <div className="h-4 w-10 rounded bg-muted animate-pulse" />
-                ) : (
-                  <span className="text-sm text-muted-foreground tabular-nums">
-                    {formatMs(activity?.totalIdleMs ?? 0)}
-                  </span>
-                )}
-              </TableCell>
-
-              {/* Top Apps */}
-              <TableCell>
-                {isLoadingActivity ? (
-                  <div className="h-4 w-32 rounded bg-muted animate-pulse" />
-                ) : apps.length > 0 ? (
-                  <div className="flex flex-wrap gap-1">
-                    {apps.map(([appName, ms]) => (
-                      <span
-                        key={appName}
-                        className="inline-flex items-center rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-xs"
-                      >
-                        {appName}
-                        <span className="ml-1 text-muted-foreground">{formatMs(ms)}</span>
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-xs text-muted-foreground">No data</span>
-                )}
               </TableCell>
 
               {/* Productivity */}
