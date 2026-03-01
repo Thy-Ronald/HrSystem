@@ -1,11 +1,34 @@
 /**
  * Employee Tracking API Service
  * Connects the frontend to the /api/employee-tracking/* endpoints.
+ *
+ * Client-side in-memory cache mirrors the Redis TTLs so repeated modal
+ * opens don't hit the backend at all when data is fresh.
  */
 
 import { getToken } from '../utils/auth';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
+
+// --- simple TTL cache ---------------------------------------------------
+const _cache = new Map(); // key → { data, expiresAt }
+
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function memGet(key) {
+  const entry = _cache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt && Date.now() > entry.expiresAt) { _cache.delete(key); return null; }
+  return entry.data;
+}
+
+function memSet(key, data, ttlMs) {
+  _cache.set(key, { data, expiresAt: ttlMs ? Date.now() + ttlMs : null });
+}
+// -------------------------------------------------------------------------
 
 function authHeaders() {
   const token = getToken();
@@ -39,24 +62,41 @@ export async function fetchAllPresence() {
 
 /**
  * Fetch screenshots for a specific user.
- * @param {string} uid - Firestore user ID
- * @param {string} [date] - YYYY-MM-DD (defaults to today on the server)
+ * Today → 30 min client cache (mirrors Redis TTL).
+ * Past dates → cached indefinitely (immutable).
  */
 export async function fetchUserScreenshots(uid, date) {
+  const d = date || todayKey();
+  const key = `screenshots:${uid}:${d}`;
+  const cached = memGet(key);
+  if (cached) return cached;
+
   const url = new URL(`${API_BASE}/api/employee-tracking/screenshots/${uid}`);
-  if (date) url.searchParams.set('date', date);
+  url.searchParams.set('date', d);
   const res = await fetch(url.toString(), { headers: authHeaders() });
-  return handleResponse(res);
+  const data = await handleResponse(res);
+
+  const isToday = d === todayKey();
+  memSet(key, data, isToday ? 30 * 60 * 1000 : null); // 30 min or permanent
+  return data;
 }
 
 /**
  * Fetch daily activity for a specific user.
- * @param {string} uid - Firestore user ID
- * @param {string} [date] - YYYY-MM-DD (defaults to today on the server)
+ * Today → 60 s client cache. Past dates → indefinite.
  */
 export async function fetchUserActivity(uid, date) {
+  const d = date || todayKey();
+  const key = `activity:${uid}:${d}`;
+  const cached = memGet(key);
+  if (cached) return cached;
+
   const url = new URL(`${API_BASE}/api/employee-tracking/activity/${uid}`);
-  if (date) url.searchParams.set('date', date);
+  url.searchParams.set('date', d);
   const res = await fetch(url.toString(), { headers: authHeaders() });
-  return handleResponse(res);
+  const data = await handleResponse(res);
+
+  const isToday = d === todayKey();
+  memSet(key, data, isToday ? 60 * 1000 : null);
+  return data;
 }

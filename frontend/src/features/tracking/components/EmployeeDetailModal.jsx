@@ -229,7 +229,96 @@ function ActivityTimeline({ activities = [] }) {
 
 const TABS = ['Timeline', 'App Usage', 'Hourly Chart', 'Screenshots'];
 
-// ─── Screenshots tab ───────────────────────────────────────────────────────────
+// ─── Single screenshot card with skeleton ─────────────────────────────────────
+function ScreenshotCard({ s, onOpen }) {
+  const [imgLoaded, setImgLoaded] = useState(false);
+
+  return (
+    <Box
+      onClick={() => s.url && onOpen(s)}
+      sx={{
+        borderRadius: 2, overflow: 'hidden',
+        border: '1px solid', borderColor: 'divider',
+        cursor: s.url ? 'zoom-in' : 'default',
+        bgcolor: 'background.paper',
+        boxShadow: 1,
+        transition: 'box-shadow 0.15s, transform 0.15s',
+        '&:hover': s.url ? {
+          boxShadow: 6,
+          transform: 'translateY(-2px)',
+          '& .ss-overlay': { opacity: 1 },
+        } : {},
+      }}
+    >
+      {/* 16:9 image area */}
+      <Box sx={{ position: 'relative', width: '100%', paddingTop: '56.25%', bgcolor: 'action.hover' }}>
+        {/* Skeleton — visible until image loads */}
+        {s.url && !imgLoaded && (
+          <Box
+            sx={{
+              position: 'absolute', inset: 0,
+              bgcolor: 'action.hover',
+              '&::after': {
+                content: '""',
+                display: 'block', position: 'absolute', inset: 0,
+                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.4s infinite',
+              },
+              '@keyframes shimmer': {
+                '0%': { backgroundPosition: '-200% 0' },
+                '100%': { backgroundPosition: '200% 0' },
+              },
+            }}
+          />
+        )}
+
+        {s.url ? (
+          <>
+            <Box
+              component="img"
+              src={s.url}
+              alt="Screenshot"
+              loading="lazy"
+              onLoad={() => setImgLoaded(true)}
+              sx={{
+                position: 'absolute', inset: 0,
+                width: '100%', height: '100%',
+                objectFit: 'cover', display: 'block',
+                opacity: imgLoaded ? 1 : 0,
+                transition: 'opacity 0.25s ease',
+              }}
+            />
+            <Box
+              className="ss-overlay"
+              sx={{
+                position: 'absolute', inset: 0,
+                bgcolor: 'rgba(0,0,0,0.45)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                opacity: 0, transition: 'opacity 0.15s',
+              }}
+            >
+              <Typography sx={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>
+                🔍 View full size
+              </Typography>
+            </Box>
+          </>
+        ) : (
+          <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Typography variant="caption" color="text.disabled">No image</Typography>
+          </Box>
+        )}
+      </Box>
+
+      {/* Timestamp footer */}
+      <Box sx={{ px: 1.5, py: 1 }}>
+        <Typography variant="caption" color="text.secondary" sx={{ fontSize: 12, fontWeight: 500 }}>
+          🕐 {s.timestamp ? new Date(s.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
 function ScreenshotsTab({ uid }) {
   const [screenshots, setScreenshots] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -273,9 +362,6 @@ function ScreenshotsTab({ uid }) {
     );
   }
 
-  const fmtTime = (ts) =>
-    ts ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-
   return (
     <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Lightbox overlay */}
@@ -315,61 +401,11 @@ function ScreenshotsTab({ uid }) {
       <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 2.5, pb: 2.5 }}>
         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2 }}>
           {screenshots.map((s) => (
-            <Box
+            <ScreenshotCard
               key={s.id}
-              onClick={() => s.url && setLightbox({ url: s.url, ts: s.timestamp })}
-              sx={{
-                borderRadius: 2, overflow: 'hidden',
-                border: '1px solid', borderColor: 'divider',
-                cursor: s.url ? 'zoom-in' : 'default',
-                bgcolor: 'background.paper',
-                boxShadow: 1,
-                transition: 'box-shadow 0.15s, transform 0.15s',
-                '&:hover': s.url ? {
-                  boxShadow: 6,
-                  transform: 'translateY(-2px)',
-                  '& .ss-overlay': { opacity: 1 },
-                } : {},
-              }}
-            >
-              {/* 16:9 image */}
-              <Box sx={{ position: 'relative', width: '100%', paddingTop: '56.25%', bgcolor: 'action.hover' }}>
-                {s.url ? (
-                  <>
-                    <Box
-                      component="img"
-                      src={s.url}
-                      alt="Screenshot"
-                      sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                    />
-                    <Box
-                      className="ss-overlay"
-                      sx={{
-                        position: 'absolute', inset: 0,
-                        bgcolor: 'rgba(0,0,0,0.45)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        opacity: 0, transition: 'opacity 0.15s',
-                      }}
-                    >
-                      <Typography sx={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>
-                        🔍 View full size
-                      </Typography>
-                    </Box>
-                  </>
-                ) : (
-                  <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Typography variant="caption" color="text.disabled">No image</Typography>
-                  </Box>
-                )}
-              </Box>
-
-              {/* Timestamp footer */}
-              <Box sx={{ px: 1.5, py: 1 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: 12, fontWeight: 500 }}>
-                  🕐 {fmtTime(s.timestamp)}
-                </Typography>
-              </Box>
-            </Box>
+              s={s}
+              onOpen={(s) => setLightbox({ url: s.url, ts: s.timestamp })}
+            />
           ))}
         </Box>
       </Box>
