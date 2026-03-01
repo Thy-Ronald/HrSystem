@@ -1,42 +1,75 @@
-/**
+﻿/**
  * DailySummaryTable
  * Shows each employee's totalActiveMs, totalIdleMs, top 3 apps, and productivity%
- * by fetching today's activity document for every person.
+ * using shadcn/Tailwind components.
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { RefreshCw, User } from 'lucide-react';
 import {
-  Box,
   Table,
-  TableHead,
   TableBody,
-  TableRow,
   TableCell,
-  Typography,
-  LinearProgress,
-  Chip,
-  CircularProgress,
-  IconButton,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import {
   Tooltip,
-} from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import PersonIcon from '@mui/icons-material/Person';
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  Avatar,
+  AvatarFallback,
+} from '@/components/ui/avatar';
 import { fetchUserActivity } from '../../../services/employeeTracking';
 import {
   formatMs,
   computeProductivity,
   topApps,
   todayKey,
+  getInitials,
 } from '../utils/trackingHelpers';
+import { cn } from '@/lib/utils';
 
-export default function DailySummaryTable({ employees = [], onSelectEmployee }) {
+function ProductivityBar({ value }) {
+  const color =
+    value >= 70 ? 'bg-green-500' :
+    value >= 40 ? 'bg-yellow-500' :
+                  'bg-red-500';
+  return (
+    <div className="flex items-center gap-2 min-w-[100px]">
+      <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+        <div className={cn('h-full rounded-full transition-all', color)} style={{ width: `${value}%` }} />
+      </div>
+      <span className="text-xs font-semibold tabular-nums w-8 text-right">{value}%</span>
+    </div>
+  );
+}
+
+function RowSkeleton() {
+  return (
+    <TableRow>
+      {[220, 80, 80, 200, 130, 40].map((w, i) => (
+        <TableCell key={i}>
+          <div className="h-4 rounded bg-muted animate-pulse" style={{ maxWidth: w }} />
+          {i === 0 && <div className="h-3 rounded bg-muted animate-pulse mt-1.5 w-28" />}
+        </TableCell>
+      ))}
+    </TableRow>
+  );
+}
+
+export default function DailySummaryTable({ employees = [], loading: presenceLoading, onSelectEmployee }) {
   const [rows, setRows] = useState({});
   const [loadingUids, setLoadingUids] = useState(new Set());
 
   const loadAll = useCallback(async () => {
     if (!employees.length) return;
     const today = todayKey();
-
     const promises = employees.map(async (emp) => {
       setLoadingUids((s) => new Set([...s, emp.uid]));
       try {
@@ -45,146 +78,154 @@ export default function DailySummaryTable({ employees = [], onSelectEmployee }) 
       } catch {
         return [emp.uid, null];
       } finally {
-        setLoadingUids((s) => {
-          const next = new Set(s);
-          next.delete(emp.uid);
-          return next;
-        });
+        setLoadingUids((s) => { const n = new Set(s); n.delete(emp.uid); return n; });
       }
     });
-
     const results = await Promise.all(promises);
     setRows(Object.fromEntries(results));
   }, [employees]);
 
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  useEffect(() => { loadAll(); }, [loadAll]);
 
-  if (!employees.length) {
+  if (!employees.length && !presenceLoading) {
     return (
-      <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
+      <p className="py-12 text-center text-sm text-muted-foreground">
         No employees found.
-      </Typography>
+      </p>
     );
   }
 
   return (
-    <Box>
-      {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="subtitle2" color="text.secondary">
-          Today's summary — {todayKey()}
-        </Typography>
-        <Tooltip title="Refresh">
-          <IconButton size="small" onClick={loadAll}>
-            <RefreshIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      </Box>
+    <TooltipProvider>
+      <div>
+        {/* Sub-header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <span className="text-xs text-muted-foreground">
+            Today's summary â€” {todayKey()}
+          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={loadAll}>
+                <RefreshCw className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Refresh activity data</TooltipContent>
+          </Tooltip>
+        </div>
 
-      <Box sx={{ overflowX: 'auto' }}>
-        <Table size="small" sx={{ minWidth: 640 }}>
-          <TableHead>
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell sx={{ fontWeight: 700 }}>Employee</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Active Time</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Idle Time</TableCell>
-              <TableCell sx={{ fontWeight: 700, minWidth: 180 }}>Top Apps</TableCell>
-              <TableCell sx={{ fontWeight: 700, minWidth: 120 }}>Productivity</TableCell>
-              <TableCell />
+              <TableHead className="w-[220px]">Employee</TableHead>
+              <TableHead className="w-[100px]">Active</TableHead>
+              <TableHead className="w-[100px]">Idle</TableHead>
+              <TableHead>Top Apps</TableHead>
+              <TableHead className="w-[160px]">Productivity</TableHead>
+              <TableHead className="w-[50px]" />
             </TableRow>
-          </TableHead>
+          </TableHeader>
           <TableBody>
-            {employees.map((emp) => {
+            {(presenceLoading && employees.length === 0
+              ? Array.from({ length: 5 })
+              : employees
+            ).map((emp, i) => {
+              if (!emp) return <RowSkeleton key={i} />;
+
               const activity = rows[emp.uid];
               const isLoading = loadingUids.has(emp.uid);
               const productivity = activity ? computeProductivity(activity.activities) : 0;
               const apps = activity ? topApps(activity.apps, 3) : [];
+              const initials = getInitials(emp.name || emp.email || '?');
 
               return (
-                <TableRow key={emp.uid} hover>
+                <TableRow key={emp.uid}>
+                  {/* Employee */}
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {emp.name || emp.email}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {emp.email}
-                    </Typography>
+                    <div className="flex items-center gap-2.5">
+                      <Avatar className="h-8 w-8 shrink-0">
+                        <AvatarFallback className="text-xs font-bold bg-muted">
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold leading-none truncate">
+                          {emp.name || emp.email}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                          {emp.email}
+                        </p>
+                      </div>
+                    </div>
                   </TableCell>
 
+                  {/* Active */}
                   <TableCell>
                     {isLoading ? (
-                      <CircularProgress size={12} />
+                      <div className="h-4 w-12 rounded bg-muted animate-pulse" />
                     ) : (
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
+                      <span className="text-sm font-semibold text-green-600 dark:text-green-400 tabular-nums">
                         {formatMs(activity?.totalActiveMs ?? 0)}
-                      </Typography>
+                      </span>
                     )}
                   </TableCell>
 
+                  {/* Idle */}
                   <TableCell>
-                    {isLoading ? null : (
-                      <Typography variant="body2" color="text.secondary">
+                    {isLoading ? (
+                      <div className="h-4 w-10 rounded bg-muted animate-pulse" />
+                    ) : (
+                      <span className="text-sm text-muted-foreground tabular-nums">
                         {formatMs(activity?.totalIdleMs ?? 0)}
-                      </Typography>
+                      </span>
                     )}
                   </TableCell>
 
+                  {/* Top apps */}
                   <TableCell>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {apps.map(([appName, ms]) => (
-                        <Chip
-                          key={appName}
-                          size="small"
-                          label={`${appName} · ${formatMs(ms)}`}
-                          sx={{ fontSize: 10, height: 20 }}
-                        />
-                      ))}
-                      {!isLoading && apps.length === 0 && (
-                        <Typography variant="caption" color="text.disabled">
-                          No data
-                        </Typography>
-                      )}
-                    </Box>
-                  </TableCell>
-
-                  <TableCell sx={{ minWidth: 120 }}>
-                    {!isLoading && activity && (
-                      <Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <LinearProgress
-                            variant="determinate"
-                            value={productivity}
-                            sx={{
-                              flex: 1,
-                              height: 6,
-                              borderRadius: 3,
-                              bgcolor: 'action.hover',
-                              '& .MuiLinearProgress-bar': {
-                                borderRadius: 3,
-                                bgcolor: productivity >= 70 ? 'success.main' : productivity >= 40 ? 'warning.main' : 'error.main',
-                              },
-                            }}
-                          />
-                          <Typography variant="caption" sx={{ fontWeight: 600, minWidth: 30 }}>
-                            {productivity}%
-                          </Typography>
-                        </Box>
-                      </Box>
-                    )}
-                    {!isLoading && !activity && (
-                      <Typography variant="caption" color="text.disabled">
-                        No data
-                      </Typography>
+                    {isLoading ? (
+                      <div className="h-4 w-32 rounded bg-muted animate-pulse" />
+                    ) : apps.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {apps.map(([appName, ms]) => (
+                          <span
+                            key={appName}
+                            className="inline-flex items-center rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-xs"
+                          >
+                            {appName}
+                            <span className="ml-1 text-muted-foreground">{formatMs(ms)}</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No data</span>
                     )}
                   </TableCell>
 
+                  {/* Productivity */}
                   <TableCell>
-                    <Tooltip title="View Details">
-                      <IconButton size="small" onClick={() => onSelectEmployee?.(emp)}>
-                        <PersonIcon fontSize="small" />
-                      </IconButton>
+                    {isLoading ? (
+                      <div className="h-4 w-24 rounded bg-muted animate-pulse" />
+                    ) : activity ? (
+                      <ProductivityBar value={productivity} />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No data</span>
+                    )}
+                  </TableCell>
+
+                  {/* Action */}
+                  <TableCell>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => onSelectEmployee?.(emp)}
+                        >
+                          <User className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>View details</TooltipContent>
                     </Tooltip>
                   </TableCell>
                 </TableRow>
@@ -192,7 +233,8 @@ export default function DailySummaryTable({ employees = [], onSelectEmployee }) 
             })}
           </TableBody>
         </Table>
-      </Box>
-    </Box>
+      </div>
+    </TooltipProvider>
   );
 }
+

@@ -39,34 +39,80 @@ import {
 } from '../utils/trackingHelpers';
 import { useEmployeeActivity } from '../hooks/useEmployeeActivity';
 
-function AppBarChart({ apps = {} }) {
-  const sorted = Object.entries(apps)
+const APP_BAR_COLORS = ['#3b82f6', '#f59e0b', '#8b5cf6', '#10b981', '#ef4444', '#06b6d4', '#f97316', '#6366f1', '#84cc16', '#ec4899'];
+
+function AppBarChart({ apps = {}, activities = [] }) {
+  // Derive app usage from activities if the apps map is empty
+  const appsMap = Object.keys(apps).length > 0
+    ? apps
+    : activities.reduce((acc, a) => {
+        if (!a.isIdle && a.app) {
+          acc[a.app] = (acc[a.app] || 0) + (a.durationMs || 0);
+        }
+        return acc;
+      }, {});
+
+  const sorted = Object.entries(appsMap)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 10);
 
-  const labels = sorted.map(([name]) => (name.length > 18 ? name.slice(0, 17) + '…' : name));
-  const values = sorted.map(([, ms]) => Math.round(ms / 60_000)); // minutes
+  if (!sorted.length) {
+    return (
+      <Typography color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
+        No app usage data for today.
+      </Typography>
+    );
+  }
 
-  const options = {
-    chart: { type: 'bar', toolbar: { show: false } },
-    plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
-    dataLabels: { enabled: false },
-    xaxis: { title: { text: 'Minutes' }, labels: { style: { fontSize: '11px' } } },
-    yaxis: { labels: { style: { fontSize: '11px' } } },
-    colors: ['#3b82f6'],
-    grid: { strokeDashArray: 3 },
-    tooltip: {
-      y: { formatter: (v) => `${v} min` },
-    },
-  };
+  const maxMs = sorted[0][1];
+  const totalMs = sorted.reduce((acc, [, m]) => acc + m, 0);
 
   return (
-    <ReactApexChart
-      type="bar"
-      options={{ ...options, xaxis: { ...options.xaxis, categories: labels } }}
-      series={[{ name: 'Duration', data: values }]}
-      height={Math.max(180, sorted.length * 28)}
-    />
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Typography variant="overline" sx={{ fontWeight: 700, letterSpacing: 1.5, fontSize: 11, color: 'text.secondary' }}>
+        Application Usage
+      </Typography>
+      {sorted.map(([appName, ms], i) => {
+        const color = APP_BAR_COLORS[i % APP_BAR_COLORS.length];
+        const pct = Math.round((ms / maxMs) * 100);
+        const minutes = Math.floor(ms / 60_000);
+        const seconds = Math.round((ms % 60_000) / 1000);
+        const label = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+        const sharePct = Math.round((ms / totalMs) * 100);
+
+        return (
+          <Box key={appName}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ width: 3, height: 18, borderRadius: 1, bgcolor: color, flexShrink: 0 }} />
+                <Typography variant="body2" sx={{ fontWeight: 500, fontSize: 13 }}>
+                  {appName}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0, ml: 2 }}>
+                <Typography variant="caption" sx={{ fontFamily: 'monospace', fontSize: 12, color: 'text.secondary' }}>
+                  {label}
+                </Typography>
+                <Typography variant="caption" sx={{ fontFamily: 'monospace', fontSize: 12, color: 'text.secondary', minWidth: 32, textAlign: 'right' }}>
+                  {sharePct}%
+                </Typography>
+              </Box>
+            </Box>
+            <Box sx={{ height: 6, borderRadius: 3, bgcolor: 'rgba(128,128,128,0.25)', overflow: 'hidden' }}>
+              <Box
+                sx={{
+                  height: '100%',
+                  width: `${pct}%`,
+                  borderRadius: 3,
+                  bgcolor: color,
+                  transition: 'width 0.6s ease',
+                }}
+              />
+            </Box>
+          </Box>
+        );
+      })}
+    </Box>
   );
 }
 
@@ -278,7 +324,7 @@ export default function EmployeeDetailModal({ employee, open, onClose }) {
 
             <Box sx={{ p: 3, overflowY: 'auto', maxHeight: 'calc(90vh - 220px)' }}>
               {tab === 0 && <ActivityTimeline activities={data.activities} />}
-              {tab === 1 && <AppBarChart apps={data.apps} />}
+              {tab === 1 && <AppBarChart apps={data.apps} activities={data.activities} />}
               {tab === 2 && <HourlyChart activities={data.activities} />}
             </Box>
           </>

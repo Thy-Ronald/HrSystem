@@ -21,10 +21,13 @@ export function useTeamPresence() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  // Set of UIDs that received a live update in the last 2 s (used for row flash)
+  const [recentlyUpdated, setRecentlyUpdated] = useState(() => new Set());
 
   const { subscribe, unsubscribe, emit, isConnected } = useSocket();
   const joinedRef = useRef(false);
   const prevConnected = useRef(false);
+  const clearTimers = useRef({});  // uid → timeoutId
 
   // ── Initial HTTP fetch ──────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -77,6 +80,14 @@ export function useTeamPresence() {
         return next;
       });
       setLastUpdated(new Date());
+
+      // Flash this row for 2 s
+      setRecentlyUpdated((prev) => new Set([...prev, payload.uid]));
+      if (clearTimers.current[payload.uid]) clearTimeout(clearTimers.current[payload.uid]);
+      clearTimers.current[payload.uid] = setTimeout(() => {
+        setRecentlyUpdated((prev) => { const n = new Set(prev); n.delete(payload.uid); return n; });
+        delete clearTimers.current[payload.uid];
+      }, 2000);
     };
 
     const handleRemoved = ({ uid }) => {
@@ -92,5 +103,5 @@ export function useTeamPresence() {
     };
   }, [subscribe, unsubscribe]);
 
-  return { data, loading, error, lastUpdated, refresh: load };
+  return { data, loading, error, lastUpdated, recentlyUpdated, refresh: load };
 }
