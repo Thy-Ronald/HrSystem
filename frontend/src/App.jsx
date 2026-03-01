@@ -12,9 +12,9 @@ import ContractForm from './pages/ContractForm';
 import Information from './pages/Information';
 
 import RankingPage from './pages/StaffRanking';
+import EmployeeTracking from './pages/EmployeeTracking';
 import Monitoring from './pages/Monitoring';
 import GithubAnalytics from './pages/GithubAnalytics';
-import TimelineScreen from './pages/TimelineScreen';
 import Auth from './pages/Auth';
 import Settings from './pages/Settings';
 import Layout from './components/Layout';
@@ -29,7 +29,7 @@ const routeMap = {
   '/ranking': 'staff-ranking', // Alias
   '/monitoring': 'monitoring',
   '/github-analytics': 'github-analytics',
-  '/timeline': 'timeline',
+  '/employee-tracking': 'employee-tracking',
   '/auth': 'auth',
   '/settings': 'settings',
 };
@@ -48,7 +48,7 @@ function setPathFromPage(page, replace = false) {
     'staff-ranking': '/staff-ranking',
     'monitoring': '/monitoring',
     'github-analytics': '/github-analytics',
-    'timeline': '/timeline',
+    'employee-tracking': '/employee-tracking',
     'auth': '/auth',
     'settings': '/settings',
   };
@@ -116,7 +116,7 @@ function AppContent() {
   }
 
   // Check if user is trying to access admin pages but is not admin
-  const adminOnlyPages = ['contract-form', 'information'];
+  const adminOnlyPages = ['contract-form', 'information', 'employee-tracking'];
   if (adminOnlyPages.includes(currentPage) && user?.role !== 'admin') {
     return (
       <MonitoringProvider>
@@ -153,7 +153,7 @@ function AppContent() {
         {currentPage === 'staff-ranking' && <RankingPage onNavigate={handleNavigate} />}
         {currentPage === 'monitoring' && <Monitoring />}
         {currentPage === 'github-analytics' && <GithubAnalytics onNavigate={handleNavigate} />}
-        {currentPage === 'timeline' && <TimelineScreen />}
+        {currentPage === 'employee-tracking' && <EmployeeTracking />}
         {currentPage === 'settings' && <Settings />}
       </Layout>
     </MonitoringProvider>

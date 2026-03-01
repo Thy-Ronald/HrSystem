@@ -51,7 +51,6 @@ const Layout = ({ children, currentPath, onNavigate }) => {
     { label: 'Employees', path: 'employee-dropdown', adminOnly: true },
     { label: 'Github Analytics', path: 'github-analytics' },
     { label: 'Ranking', path: 'staff-ranking' },
-    { label: 'Timeline', path: 'timeline' },
     { label: 'Monitoring', path: 'monitoring' },
     { label: 'Settings', path: 'settings' },
   ].filter(item => !item.adminOnly || isAdmin);
@@ -59,7 +58,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
   // Map our currentPath to the tab index
   const tabValue = navItems.findIndex(item => {
     if (item.path === 'employee-dropdown') {
-      return currentPath === 'contract-form' || currentPath === 'information';
+      return currentPath === 'contract-form' || currentPath === 'information' || currentPath === 'employee-tracking';
     }
     return item.path === currentPath;
   });
@@ -69,7 +68,7 @@ const Layout = ({ children, currentPath, onNavigate }) => {
     const item = navItems[newValue];
 
     // Only navigate to implemented pages
-    if (['staff-ranking', 'monitoring', 'timeline', 'github-analytics', 'settings'].includes(item.path)) {
+    if (['staff-ranking', 'monitoring', 'github-analytics', 'settings'].includes(item.path)) {
       onNavigate(item.path);
     }
   };
@@ -169,6 +168,12 @@ const Layout = ({ children, currentPath, onNavigate }) => {
                           onClick={() => onNavigate('information')}
                         >
                           Information
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-slate-700 dark:text-slate-200 focus:bg-slate-100 dark:focus:bg-slate-800 cursor-pointer py-2 px-3 rounded-md text-sm transition-colors"
+                          onClick={() => onNavigate('employee-tracking')}
+                        >
+                          Activity Tracking
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

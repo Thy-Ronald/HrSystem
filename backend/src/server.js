@@ -13,8 +13,6 @@ const monitoringRouter = require('./routes/monitoring');
 const notificationRoutes = require('./routes/notificationRoutes');
 const authRouter = require('./routes/auth');
 const personnelRouter = require('./routes/personnelRoutes');
-const timelineRouter = require('./routes/timelineRoutes');
-
 // Middleware imports
 const { errorHandler } = require('./middlewares/errorHandler');
 const { generalApiLimiter } = require('./middlewares/rateLimiter');
@@ -30,8 +28,7 @@ const { startRealtimeRefreshJob, stopRealtimeRefreshJob } = require('./jobs/real
 
 // Socket handlers
 const setupMonitoringSocket = require('./sockets/monitoringSocket');
-const { setupTimelineSocket, cleanupTimelineSocket } = require('./sockets/timelineSocket');
-
+const employeeTrackingSocket = require('./sockets/employeeTrackingSocket');
 // Services with side-effects
 const { initializeEmailJS } = require('./services/emailService');
 const monitoringService = require('./services/monitoringService');
@@ -80,7 +77,7 @@ app.use('/api/personnel', personnelRouter);
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/settings', require('./routes/settingsRoutes'));
-app.use('/api/timeline', timelineRouter);
+app.use('/api/employee-tracking', require('./routes/employeeTrackingRoutes'));
 
 // Expose io to controllers
 app.set('io', io);
@@ -89,7 +86,7 @@ app.use(errorHandler);
 
 // ─── Socket.IO setup ──────────────────────────────────────────────────────────
 setupMonitoringSocket(io, userSockets);
-setupTimelineSocket(io);
+employeeTrackingSocket.start(io);
 
 // ─── Server startup ───────────────────────────────────────────────────────────
 async function startServer() {
@@ -150,7 +147,7 @@ async function gracefulShutdown(signal) {
   console.log(`${signal} received, shutting down gracefully...`);
   stopCacheRefreshJob();
   stopRealtimeRefreshJob();
-  await cleanupTimelineSocket();
+  employeeTrackingSocket.stop();
   await cacheService.disconnect();
   const { closePool } = require('./config/database');
   await closePool();

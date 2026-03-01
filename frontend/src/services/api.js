@@ -619,16 +619,3 @@ export async function updateSetting(payload) {
   return handleResponse(res);
 }
 
-export async function fetchTimelineUsers() {
-  const res = await fetch(`${API_BASE}/api/timeline/users`, {
-    headers: getAuthHeaders(),
-  });
-  return handleResponse(res);
-}
-
-export async function fetchTimelineData(userId, dateKey) {
-  const res = await fetch(`${API_BASE}/api/timeline/${userId}/${dateKey}`, {
-    headers: getAuthHeaders(),
-  });
-  return handleResponse(res);
-}
