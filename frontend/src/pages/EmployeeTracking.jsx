@@ -41,7 +41,6 @@ import {
   EmployeeDetailModal,
 } from '../features/tracking';
 import { fetchUserActivity } from '../services/employeeTracking';
-import { useSocket } from '../hooks/useSocket';
 import {
   STATUS_COLORS,
   formatMs,
@@ -159,7 +158,6 @@ function LiveOverviewTable({ data, loading, onOpen, recentlyUpdated }) {
   const [loadingUids, setLoadingUids] = useState(new Set());
   const prevUidsRef = useRef('');
   const dataRef = useRef(data);
-  const { subscribe, unsubscribe } = useSocket();
 
   useEffect(() => { dataRef.current = data; }, [data]);
 
@@ -191,15 +189,6 @@ function LiveOverviewTable({ data, loading, onOpen, recentlyUpdated }) {
       loadAll();
     }
   }, [uidKey, loadAll]);
-
-  // Real-time activity updates via socket (replaces HTTP polling)
-  useEffect(() => {
-    const handleActivityUpdate = (payload) => {
-      setActivityRows((prev) => ({ ...prev, [payload.uid]: payload }));
-    };
-    subscribe('tracking:activity-update', handleActivityUpdate);
-    return () => unsubscribe('tracking:activity-update', handleActivityUpdate);
-  }, [subscribe, unsubscribe]);
 
   const COL_COUNT = 4;
 
