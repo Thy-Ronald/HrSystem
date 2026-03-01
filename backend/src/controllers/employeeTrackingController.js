@@ -60,13 +60,17 @@ async function getAllPresence(req, res) {
 
     const employees = usersSnap.docs.map((doc) => ({ uid: doc.id, ...doc.data() }));
 
-    // 2. Batch-fetch all presence docs
-    const presencePromises = employees.map(async (emp) => {
-      const presSnap = await firestoreA
-        .doc(`users/${emp.uid}/presence/current`)
-        .get();
+    // 2. Batch-fetch all presence docs in a single round-trip
+    const presenceRefs = employees.map((emp) =>
+      firestoreA.doc(`users/${emp.uid}/presence/current`)
+    );
+    const presenceSnaps = presenceRefs.length > 0
+      ? await firestoreA.getAll(...presenceRefs)
+      : [];
 
-      const presence = presSnap.exists ? presSnap.data() : null;
+    const presenceData = employees.map((emp, i) => {
+      const presSnap = presenceSnaps[i];
+      const presence = presSnap?.exists ? presSnap.data() : null;
       const effectiveStatus = resolveStatus(presence);
 
       return {
@@ -90,8 +94,6 @@ async function getAllPresence(req, res) {
           : null,
       };
     });
-
-    const presenceData = await Promise.all(presencePromises);
     res.json({ success: true, data: presenceData });
   } catch (error) {
     console.error('[EmployeeTracking] getAllPresence error:', error);

@@ -82,7 +82,12 @@ export function useTeamPresence() {
       setLastUpdated(new Date());
 
       // Flash this row for 2 s
-      setRecentlyUpdated((prev) => new Set([...prev, payload.uid]));
+      setRecentlyUpdated((prev) => {
+        if (prev.has(payload.uid)) return prev; // no re-render needed
+        const n = new Set(prev);
+        n.add(payload.uid);
+        return n;
+      });
       if (clearTimers.current[payload.uid]) clearTimeout(clearTimers.current[payload.uid]);
       clearTimers.current[payload.uid] = setTimeout(() => {
         setRecentlyUpdated((prev) => { const n = new Set(prev); n.delete(payload.uid); return n; });

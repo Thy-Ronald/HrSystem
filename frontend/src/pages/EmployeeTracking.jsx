@@ -7,11 +7,10 @@
  */
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { RefreshCw, Search, ChevronDown } from 'lucide-react';
+import { RefreshCw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -44,7 +43,6 @@ import {
 import { fetchUserActivity } from '../services/employeeTracking';
 import {
   STATUS_COLORS,
-  CATEGORY_COLORS,
   formatMs,
   formatRelative,
   getInitials,
@@ -158,6 +156,11 @@ function ProductivityBar({ value }) {
 function LiveOverviewTable({ data, loading, onOpen, recentlyUpdated }) {
   const [activityRows, setActivityRows] = useState({});
   const [loadingUids, setLoadingUids] = useState(new Set());
+  const prevUidsRef = useRef('');
+
+  // Only re-fetch activity when the set of employee UIDs changes
+  // (not on every presence status update, which would cause N requests per push)
+  const uidKey = useMemo(() => data.map((e) => e.uid).sort().join(','), [data]);
 
   const loadAll = useCallback(async () => {
     if (!data.length) return;
@@ -175,9 +178,15 @@ function LiveOverviewTable({ data, loading, onOpen, recentlyUpdated }) {
     });
     const results = await Promise.all(promises);
     setActivityRows(Object.fromEntries(results));
-  }, [data]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uidKey]);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => {
+    if (uidKey && uidKey !== prevUidsRef.current) {
+      prevUidsRef.current = uidKey;
+      loadAll();
+    }
+  }, [uidKey, loadAll]);
 
   const COL_COUNT = 7;
 

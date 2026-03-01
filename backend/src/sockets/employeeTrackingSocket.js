@@ -19,6 +19,7 @@ const unsubscribeMap = new Map();
 
 let ioRef = null;
 let employeeListenerUnsubscribe = null;
+let adminCount = 0; // track how many admin sockets are in the room
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -97,13 +98,54 @@ async function start(io) {
   io.on('connection', (socket) => {
     socket.on('tracking:join', () => {
       socket.join('tracking:admins');
-      console.log(`[TrackingSocket] Admin ${socket.id} joined tracking:admins`);
+      adminCount++;
+      console.log(`[TrackingSocket] Admin ${socket.id} joined tracking:admins (${adminCount} active)`);
+
+      // Start Firestore listeners when the first admin connects
+      if (adminCount === 1) {
+        startFirestoreListeners();
+      }
     });
 
     socket.on('tracking:leave', () => {
-      socket.leave('tracking:admins');
+      if (socket.rooms.has('tracking:admins')) {
+        socket.leave('tracking:admins');
+        adminCount = Math.max(0, adminCount - 1);
+        stopIfNoAdmins();
+      }
     });
+
+    socket.on('disconnect', () => {
+      // Socket.IO auto-removes from rooms on disconnect, but we need to decrement
+      // We check if this socket was in the tracking room
+      // Note: rooms are already cleared by the time disconnect fires,
+      // so we track via a socket-level flag
+      if (socket._trackingAdmin) {
+        adminCount = Math.max(0, adminCount - 1);
+        console.log(`[TrackingSocket] Admin ${socket.id} disconnected (${adminCount} active)`);
+        stopIfNoAdmins();
+      }
+    });
+
+    // Track membership via a flag so we can decrement on disconnect
+    const origJoin = socket.join.bind(socket);
+    socket.join = function(room) {
+      if (room === 'tracking:admins') socket._trackingAdmin = true;
+      return origJoin(room);
+    };
   });
+
+  console.log('[TrackingSocket] Employee tracking socket service started (listeners are lazy — activated on first admin join)');
+}
+
+/**
+ * Start Firestore onSnapshot listeners for all employees.
+ * Called when the first admin joins the tracking room.
+ */
+function startFirestoreListeners() {
+  if (employeeListenerUnsubscribe) return; // already running
+
+  console.log('[TrackingSocket] Starting Firestore listeners (first admin connected)');
 
   // Watch all current employees via onSnapshot on the users collection
   employeeListenerUnsubscribe = firestoreA
@@ -135,13 +177,19 @@ async function start(io) {
       }
     );
 
-  console.log('[TrackingSocket] Employee tracking socket service started');
+  console.log('[TrackingSocket] Employee tracking socket service started (listeners are lazy — activated on first admin join)');
 }
 
 /**
- * Stop all Firestore listeners (call during graceful shutdown).
+ * Tear down Firestore listeners when no admins are connected.
  */
-function stop() {
+function stopIfNoAdmins() {
+  if (adminCount > 0) return;
+  console.log('[TrackingSocket] No admins connected — pausing Firestore listeners');
+  stopFirestoreListeners();
+}
+
+function stopFirestoreListeners() {
   if (employeeListenerUnsubscribe) {
     employeeListenerUnsubscribe();
     employeeListenerUnsubscribe = null;
@@ -149,6 +197,14 @@ function stop() {
   for (const uid of [...unsubscribeMap.keys()]) {
     unwatchEmployee(uid);
   }
+}
+
+/**
+ * Stop all Firestore listeners (call during graceful shutdown).
+ */
+function stop() {
+  stopFirestoreListeners();
+  adminCount = 0;
   console.log('[TrackingSocket] Employee tracking socket service stopped');
 }
 
