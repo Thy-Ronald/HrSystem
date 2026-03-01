@@ -10,14 +10,28 @@ let client = null;
 let ready = false;
 
 if (process.env.REDIS_URL) {
-  client = createClient({ url: process.env.REDIS_URL });
+  client = createClient({
+    url: process.env.REDIS_URL,
+    socket: {
+      // Exponential back-off capped at 5 s; give up after 7 retries (~30 s total)
+      reconnectStrategy: (retries) => {
+        if (retries > 7) return new Error('[Redis] Max reconnect attempts reached');
+        return Math.min(retries * 500, 5000);
+      },
+    },
+  });
 
   client.on('ready', () => {
     ready = true;
     console.log('[Redis] Connected to Upstash Redis');
   });
   client.on('error', (err) => {
+    ready = false;
     console.error('[Redis] Error:', err.message);
+  });
+  client.on('end', () => {
+    ready = false;
+    console.warn('[Redis] Connection closed');
   });
 
   client.connect().catch((err) => {
@@ -34,7 +48,13 @@ async function cacheGet(key) {
   if (!client || !ready) return null;
   try {
     const val = await client.get(key);
-    return val ? JSON.parse(val) : null;
+    if (!val) return null;
+    try {
+      return JSON.parse(val);
+    } catch {
+      console.error('[Redis] Malformed JSON for key:', key);
+      return null;
+    }
   } catch (err) {
     console.error('[Redis] GET error:', err.message);
     return null;

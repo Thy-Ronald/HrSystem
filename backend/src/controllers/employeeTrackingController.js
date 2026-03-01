@@ -127,9 +127,18 @@ async function getAllPresence(req, res) {
 async function getUserActivity(req, res) {
   try {
     const { uid } = req.params;
-    const date = req.query.date || getTodayKey();
-    const isToday = date === getTodayKey();
+    const today = getTodayKey();
+    const date = req.query.date || today;
 
+    // Validate inputs to prevent cache-key injection
+    if (!uid || !/^[\w-]{1,128}$/.test(uid)) {
+      return res.status(400).json({ success: false, error: 'Invalid uid' });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ success: false, error: 'Invalid date format (expected YYYY-MM-DD)' });
+    }
+
+    const isToday = date === today;
     const CACHE_KEY = `activity:${uid}:${date}`;
     const cached = await cacheGet(CACHE_KEY);
     if (cached) return res.json({ success: true, data: cached, cached: true });
@@ -171,9 +180,18 @@ async function getUserActivity(req, res) {
 async function getUserScreenshots(req, res) {
   try {
     const { uid } = req.params;
-    const date = req.query.date || getTodayKey();
-    const isToday = date === getTodayKey();
+    const today = getTodayKey();
+    const date = req.query.date || today;
 
+    // Validate inputs to prevent cache-key injection
+    if (!uid || !/^[\w-]{1,128}$/.test(uid)) {
+      return res.status(400).json({ success: false, error: 'Invalid uid' });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ success: false, error: 'Invalid date format (expected YYYY-MM-DD)' });
+    }
+
+    const isToday = date === today;
     const CACHE_KEY = `screenshots:${uid}:${date}`;
     const cached = await cacheGet(CACHE_KEY);
     if (cached) return res.json({ success: true, data: cached, cached: true });

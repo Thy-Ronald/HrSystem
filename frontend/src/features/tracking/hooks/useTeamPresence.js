@@ -45,10 +45,16 @@ export function useTeamPresence() {
 
   // ── Mount: initial load + cleanup ───────────────────────────────────────
   useEffect(() => {
+    // Sync prevConnected so the connection effect below doesn't double-load
+    // when the socket is already connected at mount time.
+    prevConnected.current = isConnected;
     load();
     return () => {
       emit('tracking:leave');
       joinedRef.current = false;
+      // Clear all pending flash timers to avoid state updates on unmounted components
+      Object.values(clearTimers.current).forEach(clearTimeout);
+      clearTimers.current = {};
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -59,7 +65,9 @@ export function useTeamPresence() {
         emit('tracking:join');
         joinedRef.current = true;
       }
-      // Re-fetch after reconnect to catch any missed updates
+      // Only re-fetch on a true reconnect (socket was down, now up again).
+      // prevConnected starts as the mount-time isConnected value, so first-connect
+      // after mount never triggers a duplicate load().
       if (prevConnected.current === false) {
         load();
       }

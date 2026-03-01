@@ -109,6 +109,7 @@ async function start(io) {
     socket.on('tracking:leave', () => {
       if (socket.rooms.has('tracking:admins')) {
         socket.leave('tracking:admins');
+        socket._trackingAdmin = false; // prevent double-decrement on disconnect
         adminCount = Math.max(0, adminCount - 1);
         stopIfNoAdmins();
       }
@@ -151,7 +152,8 @@ function startFirestoreListeners() {
     .collection('users')
     .where('role', '==', 'employee')
     .onSnapshot(
-      async (snap) => {
+      (snap) => {
+        // NOTE: keep callback synchronous — Firestore SDK does not await async callbacks
         const currentUids = new Set(snap.docs.map((d) => d.id));
 
         // Start watching any new employees
@@ -164,7 +166,6 @@ function startFirestoreListeners() {
         for (const uid of unsubscribeMap.keys()) {
           if (!currentUids.has(uid)) {
             unwatchEmployee(uid);
-            // Notify admins this employee is gone
             if (ioRef) {
               ioRef.to('tracking:admins').emit('tracking:employee-removed', { uid });
             }
@@ -176,7 +177,7 @@ function startFirestoreListeners() {
       }
     );
 
-  console.log('[TrackingSocket] Employee tracking socket service started (listeners are lazy — activated on first admin join)');
+  console.log('[TrackingSocket] Firestore listeners activated');
 }
 
 /**

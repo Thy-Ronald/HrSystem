@@ -5,6 +5,7 @@
  */
 
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const { httpAuth, requireRole } = require('../middlewares/monitoringAuth');
 const {
@@ -14,16 +15,25 @@ const {
   getUserScreenshots,
 } = require('../controllers/employeeTrackingController');
 
+// 300 requests / 15 min per IP — guards Firestore on cache misses
+const trackingLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many requests to the tracking API' },
+});
+
 /** GET /api/employee-tracking/employees — list all employees */
-router.get('/employees', httpAuth, requireRole(['admin']), getEmployees);
+router.get('/employees', trackingLimiter, httpAuth, requireRole(['admin']), getEmployees);
 
 /** GET /api/employee-tracking/presence — all employees with current presence */
-router.get('/presence', httpAuth, requireRole(['admin']), getAllPresence);
+router.get('/presence', trackingLimiter, httpAuth, requireRole(['admin']), getAllPresence);
 
 /** GET /api/employee-tracking/activity/:uid?date=YYYY-MM-DD — daily activity */
-router.get('/activity/:uid', httpAuth, requireRole(['admin']), getUserActivity);
+router.get('/activity/:uid', trackingLimiter, httpAuth, requireRole(['admin']), getUserActivity);
 
 /** GET /api/employee-tracking/screenshots/:uid?date=YYYY-MM-DD — daily screenshots */
-router.get('/screenshots/:uid', httpAuth, requireRole(['admin']), getUserScreenshots);
+router.get('/screenshots/:uid', trackingLimiter, httpAuth, requireRole(['admin']), getUserScreenshots);
 
 module.exports = router;

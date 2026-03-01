@@ -10,8 +10,12 @@ import { getToken } from '../utils/auth';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
 
-// --- simple TTL cache ---------------------------------------------------
+// --- simple TTL cache with LRU eviction ---------------------------------
 const _cache = new Map(); // key → { data, expiresAt }
+const MAX_CACHE_ENTRIES = 100;
+
+// In-flight deduplication: key → Promise
+const _inflight = new Map();
 
 function todayKey() {
   const d = new Date();
@@ -22,11 +26,26 @@ function memGet(key) {
   const entry = _cache.get(key);
   if (!entry) return null;
   if (entry.expiresAt && Date.now() > entry.expiresAt) { _cache.delete(key); return null; }
+  // LRU: move to end on access
+  _cache.delete(key);
+  _cache.set(key, entry);
   return entry.data;
 }
 
 function memSet(key, data, ttlMs) {
+  // Evict oldest entry if at capacity
+  if (_cache.size >= MAX_CACHE_ENTRIES) {
+    _cache.delete(_cache.keys().next().value);
+  }
   _cache.set(key, { data, expiresAt: ttlMs ? Date.now() + ttlMs : null });
+}
+
+/** Deduplicates concurrent requests for the same key. */
+async function fetchDeduped(key, fetcher) {
+  if (_inflight.has(key)) return _inflight.get(key);
+  const p = fetcher().finally(() => _inflight.delete(key));
+  _inflight.set(key, p);
+  return p;
 }
 // -------------------------------------------------------------------------
 
@@ -54,10 +73,18 @@ export async function fetchEmployees() {
 
 /** Fetch all employees with their current presence status. */
 export async function fetchAllPresence() {
-  const res = await fetch(`${API_BASE}/api/employee-tracking/presence`, {
-    headers: authHeaders(),
+  const key = 'presence:all';
+  const cached = memGet(key);
+  if (cached) return cached;
+
+  return fetchDeduped(key, async () => {
+    const res = await fetch(`${API_BASE}/api/employee-tracking/presence`, {
+      headers: authHeaders(),
+    });
+    const data = await handleResponse(res);
+    memSet(key, data, 5 * 1000); // 5 s — socket keeps it fresh after this
+    return data;
   });
-  return handleResponse(res);
 }
 
 /**
@@ -71,14 +98,15 @@ export async function fetchUserScreenshots(uid, date) {
   const cached = memGet(key);
   if (cached) return cached;
 
-  const url = new URL(`${API_BASE}/api/employee-tracking/screenshots/${uid}`);
-  url.searchParams.set('date', d);
-  const res = await fetch(url.toString(), { headers: authHeaders() });
-  const data = await handleResponse(res);
-
-  const isToday = d === todayKey();
-  memSet(key, data, isToday ? 30 * 60 * 1000 : null); // 30 min or permanent
-  return data;
+  return fetchDeduped(key, async () => {
+    const url = new URL(`${API_BASE}/api/employee-tracking/screenshots/${uid}`);
+    url.searchParams.set('date', d);
+    const res = await fetch(url.toString(), { headers: authHeaders() });
+    const data = await handleResponse(res);
+    const isToday = d === todayKey();
+    memSet(key, data, isToday ? 30 * 60 * 1000 : null);
+    return data;
+  });
 }
 
 /**
@@ -91,12 +119,13 @@ export async function fetchUserActivity(uid, date) {
   const cached = memGet(key);
   if (cached) return cached;
 
-  const url = new URL(`${API_BASE}/api/employee-tracking/activity/${uid}`);
-  url.searchParams.set('date', d);
-  const res = await fetch(url.toString(), { headers: authHeaders() });
-  const data = await handleResponse(res);
-
-  const isToday = d === todayKey();
-  memSet(key, data, isToday ? 60 * 1000 : null);
-  return data;
+  return fetchDeduped(key, async () => {
+    const url = new URL(`${API_BASE}/api/employee-tracking/activity/${uid}`);
+    url.searchParams.set('date', d);
+    const res = await fetch(url.toString(), { headers: authHeaders() });
+    const data = await handleResponse(res);
+    const isToday = d === todayKey();
+    memSet(key, data, isToday ? 60 * 1000 : null);
+    return data;
+  });
 }

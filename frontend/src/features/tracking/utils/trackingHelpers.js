@@ -3,6 +3,8 @@
  */
 
 export const PRODUCTIVE_CATEGORIES = ['Development', 'Design', 'Documentation'];
+// Normalised lowercase version used for matching — avoids case/whitespace mismatches
+const PRODUCTIVE_NORMALIZED = PRODUCTIVE_CATEGORIES.map((c) => c.toLowerCase().trim());
 
 export const CATEGORY_COLORS = {
   Development: { bg: '#dbeafe', text: '#1d4ed8' },
@@ -41,6 +43,8 @@ export function formatMs(ms) {
 export function formatRelative(epochMs) {
   if (!epochMs) return 'Never';
   const diffMs = Date.now() - epochMs;
+  // Guard against future timestamps (clock skew)
+  if (diffMs < 0) return 'Just now';
   const diffSec = Math.floor(diffMs / 1000);
   if (diffSec < 60) return 'Just now';
   const diffMin = Math.floor(diffSec / 60);
@@ -59,7 +63,7 @@ export function computeProductivity(activities = []) {
   activities.forEach((a) => {
     if (a.isIdle) return;
     totalMs += a.durationMs || 0;
-    if (PRODUCTIVE_CATEGORIES.includes(a.category)) {
+    if (PRODUCTIVE_NORMALIZED.includes((a.category || '').toLowerCase().trim())) {
       productiveMs += a.durationMs || 0;
     }
   });
@@ -82,13 +86,20 @@ export function topApps(apps = {}, n = 3) {
 export function buildHourlyBuckets(activities = []) {
   const buckets = Array.from({ length: 24 }, (_, h) => ({ hour: h, activeMs: 0, idleMs: 0 }));
   activities.forEach((a) => {
-    const startH = new Date(a.start).getHours();
-    if (startH < 0 || startH > 23) return;
     const ms = a.durationMs || 0;
-    if (a.isIdle) {
-      buckets[startH].idleMs += ms;
-    } else {
-      buckets[startH].activeMs += ms;
+    if (ms <= 0 || !a.start) return;
+    // Split the activity across all hour buckets it spans
+    const end = a.start + ms;
+    let cursor = a.start;
+    while (cursor < end) {
+      const h = new Date(cursor).getHours();
+      const nextHourMs = cursor - (cursor % 3_600_000) + 3_600_000;
+      const sliceMs = Math.min(end, nextHourMs) - cursor;
+      if (h >= 0 && h <= 23) {
+        if (a.isIdle) buckets[h].idleMs += sliceMs;
+        else buckets[h].activeMs += sliceMs;
+      }
+      cursor = nextHourMs;
     }
   });
   return buckets;

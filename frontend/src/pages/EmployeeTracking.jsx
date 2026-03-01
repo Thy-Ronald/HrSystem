@@ -101,17 +101,6 @@ function StatusBadge({ status = 'offline' }) {
 }
 
 /* â”€â”€ Category badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-function CategoryBadge({ category = 'Other' }) {
-  const colors = CATEGORY_COLORS[category] ?? CATEGORY_COLORS.Other;
-  return (
-    <span
-      className="inline-block rounded-full px-2 py-0.5 text-xs font-semibold"
-      style={{ backgroundColor: colors.bg, color: colors.text }}
-    >
-      {category || 'Other'}
-    </span>
-  );
-}
 
 /* â”€â”€ Status legend counts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function StatusCounts({ data }) {
@@ -168,18 +157,27 @@ function LiveOverviewTable({ data, loading, onOpen, recentlyUpdated }) {
     const employees = dataRef.current;
     if (!employees.length) return;
     const today = todayKey();
-    const promises = employees.map(async (emp) => {
-      setLoadingUids((s) => new Set([...s, emp.uid]));
-      try {
-        const activity = await fetchUserActivity(emp.uid, today);
-        return [emp.uid, activity];
-      } catch {
-        return [emp.uid, null];
-      } finally {
-        setLoadingUids((s) => { const n = new Set(s); n.delete(emp.uid); return n; });
-      }
-    });
-    const results = await Promise.all(promises);
+
+    // Process in batches of 5 to avoid saturating the backend
+    const BATCH = 5;
+    const results = [];
+    for (let i = 0; i < employees.length; i += BATCH) {
+      const batch = employees.slice(i, i + BATCH);
+      const batchResults = await Promise.all(
+        batch.map(async (emp) => {
+          setLoadingUids((s) => { const n = new Set(s); n.add(emp.uid); return n; });
+          try {
+            const activity = await fetchUserActivity(emp.uid, today);
+            return [emp.uid, activity];
+          } catch {
+            return [emp.uid, null];
+          } finally {
+            setLoadingUids((s) => { const n = new Set(s); n.delete(emp.uid); return n; });
+          }
+        })
+      );
+      results.push(...batchResults);
+    }
     setActivityRows(Object.fromEntries(results));
   }, []);
 
