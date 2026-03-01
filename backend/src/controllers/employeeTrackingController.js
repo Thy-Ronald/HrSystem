@@ -4,6 +4,14 @@
  */
 
 const { firestoreA } = require('../config/firebaseProjectA');
+const { cacheGet, cacheSet } = require('../config/redis');
+
+// TTLs in seconds
+const TTL_EMPLOYEES   = 1800; // 30 min  — rarely changes
+const TTL_PRESENCE    =    5; // 5 s     — socket handles real-time; just guards burst reconnects
+const TTL_ACTIVITY_TODAY     =   60; // 1 min   — live today data
+const TTL_SCREENSHOTS_TODAY  = 1800; // 30 min  — screenshots don't change that frequently
+// Past dates are immutable → no expiry (TTL omitted = permanent)
 
 /**
  * Returns today's date key in YYYY-MM-DD format (local time of the server).
@@ -33,12 +41,17 @@ function resolveStatus(presence) {
  */
 async function getEmployees(req, res) {
   try {
+    const CACHE_KEY = 'employees';
+    const cached = await cacheGet(CACHE_KEY);
+    if (cached) return res.json({ success: true, data: cached, cached: true });
+
     const snap = await firestoreA
       .collection('users')
       .where('role', '==', 'employee')
       .get();
 
     const employees = snap.docs.map((doc) => ({ uid: doc.id, ...doc.data() }));
+    await cacheSet(CACHE_KEY, employees, TTL_EMPLOYEES);
     res.json({ success: true, data: employees });
   } catch (error) {
     console.error('[EmployeeTracking] getEmployees error:', error);
@@ -52,6 +65,10 @@ async function getEmployees(req, res) {
  */
 async function getAllPresence(req, res) {
   try {
+    const CACHE_KEY = 'presence:all';
+    const cached = await cacheGet(CACHE_KEY);
+    if (cached) return res.json({ success: true, data: cached, cached: true });
+
     // 1. Fetch all employee profiles
     const usersSnap = await firestoreA
       .collection('users')
@@ -94,6 +111,7 @@ async function getAllPresence(req, res) {
           : null,
       };
     });
+    await cacheSet(CACHE_KEY, presenceData, TTL_PRESENCE);
     res.json({ success: true, data: presenceData });
   } catch (error) {
     console.error('[EmployeeTracking] getAllPresence error:', error);
@@ -110,6 +128,11 @@ async function getUserActivity(req, res) {
   try {
     const { uid } = req.params;
     const date = req.query.date || getTodayKey();
+    const isToday = date === getTodayKey();
+
+    const CACHE_KEY = `activity:${uid}:${date}`;
+    const cached = await cacheGet(CACHE_KEY);
+    if (cached) return res.json({ success: true, data: cached, cached: true });
 
     const snap = await firestoreA.doc(`users/${uid}/activity/${date}`).get();
 
@@ -125,16 +148,16 @@ async function getUserActivity(req, res) {
       apps[key.replace(/__dot__/g, '.')] = ms;
     });
 
-    res.json({
-      success: true,
-      data: {
-        totalActiveMs: data.totalActiveMs || 0,
-        totalIdleMs: data.totalIdleMs || 0,
-        apps,
-        activities: data.activities || [],
-        lastUpdated: data.lastUpdated?.toMillis?.() || null,
-      },
-    });
+    const payload = {
+      totalActiveMs: data.totalActiveMs || 0,
+      totalIdleMs: data.totalIdleMs || 0,
+      apps,
+      activities: data.activities || [],
+      lastUpdated: data.lastUpdated?.toMillis?.() || null,
+    };
+    // Today: short TTL (data updates live). Past dates: permanent (immutable).
+    await cacheSet(CACHE_KEY, payload, isToday ? TTL_ACTIVITY_TODAY : undefined);
+    res.json({ success: true, data: payload });
   } catch (error) {
     console.error('[EmployeeTracking] getUserActivity error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch activity data' });
@@ -149,6 +172,11 @@ async function getUserScreenshots(req, res) {
   try {
     const { uid } = req.params;
     const date = req.query.date || getTodayKey();
+    const isToday = date === getTodayKey();
+
+    const CACHE_KEY = `screenshots:${uid}:${date}`;
+    const cached = await cacheGet(CACHE_KEY);
+    if (cached) return res.json({ success: true, data: cached, cached: true });
 
     const snap = await firestoreA.doc(`users/${uid}/screenshots/${date}`).get();
 
@@ -168,6 +196,8 @@ async function getUserScreenshots(req, res) {
     // Return newest first
     images.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
 
+    // Today: short TTL. Past dates: permanent (immutable).
+    await cacheSet(CACHE_KEY, images, isToday ? TTL_SCREENSHOTS_TODAY : undefined);
     res.json({ success: true, data: images });
   } catch (error) {
     console.error('[EmployeeTracking] getUserScreenshots error:', error);
