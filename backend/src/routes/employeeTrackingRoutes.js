@@ -11,6 +11,7 @@ const {
   getEmployees,
   getAllPresence,
   getUserActivity,
+  getUserScreenshots,
 } = require('../controllers/employeeTrackingController');
 
 /** GET /api/employee-tracking/employees — list all employees */
@@ -21,5 +22,8 @@ router.get('/presence', httpAuth, requireRole(['admin']), getAllPresence);
 
 /** GET /api/employee-tracking/activity/:uid?date=YYYY-MM-DD — daily activity */
 router.get('/activity/:uid', httpAuth, requireRole(['admin']), getUserActivity);
+
+/** GET /api/employee-tracking/screenshots/:uid?date=YYYY-MM-DD — daily screenshots */
+router.get('/screenshots/:uid', httpAuth, requireRole(['admin']), getUserScreenshots);
 
 module.exports = router;

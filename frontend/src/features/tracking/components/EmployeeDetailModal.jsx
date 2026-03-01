@@ -6,7 +6,7 @@
  *  - Hourly active/idle stacked bar chart
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -24,7 +24,6 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ReactApexChart from 'react-apexcharts';
-import { useState } from 'react';
 import CategoryBadge from './CategoryBadge';
 import {
   formatMs,
@@ -36,6 +35,7 @@ import {
   CATEGORY_COLORS,
 } from '../utils/trackingHelpers';
 import { useEmployeeActivity } from '../hooks/useEmployeeActivity';
+import { fetchUserScreenshots } from '../../../services/employeeTracking';
 
 const APP_BAR_COLORS = ['#3b82f6', '#f59e0b', '#8b5cf6', '#10b981', '#ef4444', '#06b6d4', '#f97316', '#6366f1', '#84cc16', '#ec4899'];
 
@@ -227,7 +227,155 @@ function ActivityTimeline({ activities = [] }) {
   );
 }
 
-const TABS = ['Timeline', 'App Usage', 'Hourly Chart'];
+const TABS = ['Timeline', 'App Usage', 'Hourly Chart', 'Screenshots'];
+
+// ─── Screenshots tab ───────────────────────────────────────────────────────────
+function ScreenshotsTab({ uid }) {
+  const [screenshots, setScreenshots] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [lightbox, setLightbox] = useState(null); // url of enlarged image
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await fetchUserScreenshots(uid, todayKey());
+      setScreenshots(result ?? []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [uid]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>
+    );
+  }
+
+  if (!screenshots.length) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
+        <Typography color="text.secondary">No screenshots for today.</Typography>
+      </Box>
+    );
+  }
+
+  const fmtTime = (ts) =>
+    ts ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+
+  return (
+    <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Lightbox overlay */}
+      {lightbox && (
+        <Box
+          onClick={() => setLightbox(null)}
+          sx={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            bgcolor: 'rgba(0,0,0,0.9)',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            cursor: 'zoom-out',
+          }}
+        >
+          <Box
+            component="img"
+            src={lightbox.url}
+            onClick={(e) => e.stopPropagation()}
+            sx={{ maxWidth: '92vw', maxHeight: '85vh', borderRadius: 1.5, boxShadow: 24 }}
+          />
+          {lightbox.ts && (
+            <Typography sx={{ mt: 1.5, color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>
+              {new Date(lightbox.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </Typography>
+          )}
+        </Box>
+      )}
+
+      {/* Count header */}
+      <Box sx={{ px: 2.5, pt: 1.5, pb: 1, flexShrink: 0 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+          {screenshots.length} screenshot{screenshots.length !== 1 ? 's' : ''} today
+        </Typography>
+      </Box>
+
+      {/* Scrollable grid */}
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 2.5, pb: 2.5 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2 }}>
+          {screenshots.map((s) => (
+            <Box
+              key={s.id}
+              onClick={() => s.url && setLightbox({ url: s.url, ts: s.timestamp })}
+              sx={{
+                borderRadius: 2, overflow: 'hidden',
+                border: '1px solid', borderColor: 'divider',
+                cursor: s.url ? 'zoom-in' : 'default',
+                bgcolor: 'background.paper',
+                boxShadow: 1,
+                transition: 'box-shadow 0.15s, transform 0.15s',
+                '&:hover': s.url ? {
+                  boxShadow: 6,
+                  transform: 'translateY(-2px)',
+                  '& .ss-overlay': { opacity: 1 },
+                } : {},
+              }}
+            >
+              {/* 16:9 image */}
+              <Box sx={{ position: 'relative', width: '100%', paddingTop: '56.25%', bgcolor: 'action.hover' }}>
+                {s.url ? (
+                  <>
+                    <Box
+                      component="img"
+                      src={s.url}
+                      alt="Screenshot"
+                      sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                    <Box
+                      className="ss-overlay"
+                      sx={{
+                        position: 'absolute', inset: 0,
+                        bgcolor: 'rgba(0,0,0,0.45)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        opacity: 0, transition: 'opacity 0.15s',
+                      }}
+                    >
+                      <Typography sx={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>
+                        🔍 View full size
+                      </Typography>
+                    </Box>
+                  </>
+                ) : (
+                  <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Typography variant="caption" color="text.disabled">No image</Typography>
+                  </Box>
+                )}
+              </Box>
+
+              {/* Timestamp footer */}
+              <Box sx={{ px: 1.5, py: 1 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: 12, fontWeight: 500 }}>
+                  🕐 {fmtTime(s.timestamp)}
+                </Typography>
+              </Box>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    </Box>
+  );
+}
 
 export default function EmployeeDetailModal({ employee, open, onClose }) {
   const { data, loading, error, load, clear } = useEmployeeActivity();
@@ -250,7 +398,7 @@ export default function EmployeeDetailModal({ employee, open, onClose }) {
       onClose={onClose}
       maxWidth="md"
       fullWidth
-      PaperProps={{ sx: { borderRadius: 2, maxHeight: '90vh' } }}
+      PaperProps={{ sx: { borderRadius: 2, height: '85vh', maxHeight: '85vh', display: 'flex', flexDirection: 'column' } }}
     >
       <DialogTitle component="div" sx={{ pb: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -289,44 +437,48 @@ export default function EmployeeDetailModal({ employee, open, onClose }) {
 
       <Divider />
 
-      <DialogContent sx={{ p: 0 }}>
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-            <CircularProgress />
-          </Box>
-        )}
+      <DialogContent sx={{ p: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        {/* Tabs always visible */}
+        <Tabs
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          sx={{ px: 3, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}
+        >
+          {TABS.map((t, i) => (
+            <Tab key={t} label={t} value={i} sx={{ textTransform: 'none', fontWeight: 600 }} />
+          ))}
+        </Tabs>
 
-        {error && (
-          <Alert severity="error" sx={{ m: 2 }}>
-            {error}
-          </Alert>
-        )}
+        {/* Tab content */}
+        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
 
-        {!loading && !error && !data && (
-          <Typography color="text.secondary" sx={{ py: 6, textAlign: 'center' }}>
-            No activity data for today yet.
-          </Typography>
-        )}
+          {/* Screenshots tab — always works, independent of activity */}
+          {tab === 3 && <ScreenshotsTab uid={employee?.uid} />}
 
-        {!loading && !error && data && (
-          <>
-            <Tabs
-              value={tab}
-              onChange={(_, v) => setTab(v)}
-              sx={{ px: 3, borderBottom: '1px solid', borderColor: 'divider' }}
-            >
-              {TABS.map((t, i) => (
-                <Tab key={t} label={t} value={i} sx={{ textTransform: 'none', fontWeight: 600 }} />
-              ))}
-            </Tabs>
-
-            <Box sx={{ p: 3, overflowY: 'auto', maxHeight: 'calc(90vh - 220px)' }}>
+          {/* Activity tabs — show loading / error / no-data accordingly */}
+          {tab !== 3 && loading && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
+              <CircularProgress />
+            </Box>
+          )}
+          {tab !== 3 && !loading && error && (
+            <Box sx={{ display: 'flex', alignItems: 'center', flex: 1, p: 2 }}>
+              <Alert severity="error" sx={{ width: '100%' }}>{error}</Alert>
+            </Box>
+          )}
+          {tab !== 3 && !loading && !error && !data && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
+              <Typography color="text.secondary">No activity data for today yet.</Typography>
+            </Box>
+          )}
+          {tab !== 3 && !loading && !error && data && (
+            <Box sx={{ p: 3, overflowY: 'auto', flex: 1, minHeight: 0 }}>
               {tab === 0 && <ActivityTimeline activities={data.activities} />}
               {tab === 1 && <AppBarChart apps={data.apps} activities={data.activities} />}
               {tab === 2 && <HourlyChart activities={data.activities} />}
             </Box>
-          </>
-        )}
+          )}
+        </Box>
       </DialogContent>
     </Dialog>
   );

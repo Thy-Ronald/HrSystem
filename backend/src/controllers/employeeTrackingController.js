@@ -141,4 +141,38 @@ async function getUserActivity(req, res) {
   }
 }
 
-module.exports = { getEmployees, getAllPresence, getUserActivity };
+/**
+ * GET /api/employee-tracking/screenshots/:uid?date=YYYY-MM-DD
+ * Reads users/{uid}/screenshots/{dateKey} and returns the images array.
+ */
+async function getUserScreenshots(req, res) {
+  try {
+    const { uid } = req.params;
+    const date = req.query.date || getTodayKey();
+
+    const snap = await firestoreA.doc(`users/${uid}/screenshots/${date}`).get();
+
+    if (!snap.exists) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const data = snap.data();
+    const images = (data.images || []).map((img, i) => ({
+      id: i,
+      url: img.url || null,
+      timestamp: typeof img.timestamp === 'number'
+        ? img.timestamp
+        : img.timestamp?.toMillis?.() || null,
+    }));
+
+    // Return newest first
+    images.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
+
+    res.json({ success: true, data: images });
+  } catch (error) {
+    console.error('[EmployeeTracking] getUserScreenshots error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch screenshots' });
+  }
+}
+
+module.exports = { getEmployees, getAllPresence, getUserActivity, getUserScreenshots };

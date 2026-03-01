@@ -38,6 +38,18 @@ export async function fetchAllPresence() {
 }
 
 /**
+ * Fetch screenshots for a specific user.
+ * @param {string} uid - Firestore user ID
+ * @param {string} [date] - YYYY-MM-DD (defaults to today on the server)
+ */
+export async function fetchUserScreenshots(uid, date) {
+  const url = new URL(`${API_BASE}/api/employee-tracking/screenshots/${uid}`);
+  if (date) url.searchParams.set('date', date);
+  const res = await fetch(url.toString(), { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+/**
  * Fetch daily activity for a specific user.
  * @param {string} uid - Firestore user ID
  * @param {string} [date] - YYYY-MM-DD (defaults to today on the server)
