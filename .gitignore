@@ -4,6 +4,10 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
+# Firebase service account credentials (NEVER commit these)
+*-firebase-adminsdk*.json
+*-firebase-adminsdk-*.json
+
 # Environment variables
 .env
 .env.local
