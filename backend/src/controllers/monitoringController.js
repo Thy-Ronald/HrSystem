@@ -39,7 +39,7 @@ async function stopSession(req, res) {
             );
 
             if (activeRequest) {
-                await monitoringRequestModel.updateRequestStatus(activeRequest.id, 'rejected'); // 'rejected' acts as 'terminated' for now, or we could add 'terminated' state
+                await monitoringRequestModel.updateRequestStatus(activeRequest.id, 'terminated');
                 console.log(`[MonitoringController] Marked request ${activeRequest.id} as terminated`);
             } else {
                 // It might be that another admin started it, or it's a legacy session.

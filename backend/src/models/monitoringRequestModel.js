@@ -64,7 +64,7 @@ async function getRequestsForUser(userId) {
 async function getRequestsByAdmin(adminId) {
   const snap = await REQUESTS()
     .where('adminId', '==', adminId)
-    .where('status', 'in', ['pending', 'approved', 'rejected'])
+    .where('status', 'in', ['pending', 'approved', 'rejected', 'terminated'])
     .orderBy('createdAt', 'desc')
     .get();
   return snap.docs.map(toRequest);

@@ -19,7 +19,12 @@ export const MonitoringProvider = ({ children }) => {
     // Admin state
     const [sessions, setSessions] = useState(() => {
         const saved = localStorage.getItem('monitoring_sessions');
-        return saved ? JSON.parse(saved) : [];
+        if (!saved) return [];
+        // Reset streamActive on mount — the real value is fetched from the server once the socket
+        // connects. Keeping stale streamActive:true from localStorage causes session cards to
+        // immediately attempt WebRTC before the socket has re-authenticated, leaving them stuck
+        // on a loading spinner.
+        return JSON.parse(saved).map(s => ({ ...s, streamActive: false }));
     });
     const [connectError, setConnectError] = useState(null);
 
@@ -233,10 +238,17 @@ export const MonitoringProvider = ({ children }) => {
             const fetchedSessions = Array.isArray(response) ? response : (response?.data || []);
 
             setSessions(prev => {
-                // Merge logic: preserve streamActive/avatarUrl if we have more recent socket data
-                // but use fetched data as base
                 return fetchedSessions.map(fs => {
                     const existing = prev.find(p => p.sessionId === fs.sessionId);
+
+                    // If this session hasn't been joined yet (fresh refresh / first load),
+                    // force streamActive:false so WebRTC doesn't start until
+                    // monitoring:session-joined fires — which only happens AFTER the server
+                    // has registered the admin's new socket ID in session.adminSocketIds.
+                    // This prevents the answer being dropped by the server's security check
+                    // and the card being stuck on a loading spinner.
+                    const alreadyJoined = joinedSessionsRef.current.has(fs.sessionId);
+
                     if (existing) {
                         // Race condition protection: If we had a socket update in the last 5 seconds,
                         // don't let the (potentially stale) API response overwrite the status.
@@ -246,10 +258,12 @@ export const MonitoringProvider = ({ children }) => {
                         return {
                             ...fs,
                             ...existing,
-                            streamActive: isRecentlyUpdatedBySocket ? existing.streamActive : fs.streamActive
+                            streamActive: alreadyJoined
+                                ? (isRecentlyUpdatedBySocket ? existing.streamActive : fs.streamActive)
+                                : false,
                         };
                     }
-                    return fs;
+                    return { ...fs, streamActive: alreadyJoined ? fs.streamActive : false };
                 });
             });
 
@@ -272,6 +286,23 @@ export const MonitoringProvider = ({ children }) => {
             if (!silent) setLoading(false);
         }
     }, [role, isConnected, emit]);
+
+    // Re-fetch sessions once auth is confirmed (admin only).
+    // This guarantees monitoring:join-session is emitted AFTER the server has processed
+    // monitoring:auth — so the admin's new socket ID is added to session.adminSocketIds
+    // before any WebRTC offer is sent. Without this, a slow getToken() could cause
+    // join-session to be silently dropped (socket.data.authenticated not yet true),
+    // leaving the card stuck on a loading spinner after refresh.
+    useEffect(() => {
+        if (role !== 'admin') return;
+        const handleAuthSuccess = () => {
+            // Clear join tracking so fetchSessions re-emits join-session for all sessions
+            joinedSessionsRef.current.clear();
+            fetchSessions(true);
+        };
+        subscribe('monitoring:auth-success', handleAuthSuccess);
+        return () => unsubscribe('monitoring:auth-success', handleAuthSuccess);
+    }, [role, subscribe, unsubscribe, fetchSessions]);
 
     // Clear joined tracking when socket disconnects to ensure re-join on next connection
     useEffect(() => {

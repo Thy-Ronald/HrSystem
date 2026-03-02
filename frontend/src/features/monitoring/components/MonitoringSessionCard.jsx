@@ -114,12 +114,23 @@ const MonitoringSessionCard = React.memo(({ session, adminName, onRemove }) => {
             setLoading(false);
             if (!session.streamActive && active) setShowFullView(false);
         }
+        // Safety: if not stream-active and not share-connected, ensure loading is cleared
+        else if (!session.streamActive && !shareConnected) {
+            setLoading(false);
+        }
 
         return () => {
             active = false;
             clearTimeout(timeoutId); // Cancel connection attempt if user scrolld away
         };
     }, [session.streamActive, isVisible, showFullView, shareConnected, startViewing, stopViewing, session.sessionId]);
+
+    // Safety timeout: clear loading spinner if WebRTC hasn't connected within 15s
+    useEffect(() => {
+        if (!loading) return;
+        const t = setTimeout(() => setLoading(false), 15000);
+        return () => clearTimeout(t);
+    }, [loading]);
 
     useEffect(() => {
         return () => stopViewing();
