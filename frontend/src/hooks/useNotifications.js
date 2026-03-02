@@ -22,8 +22,8 @@ export function useNotifications() {
   const limit = 4;
 
   const loadNotifications = useCallback(async (pageNum = 1, append = false) => {
-    // Only load notifications for authenticated users
-    if (!isAuthenticated) {
+    // Only load notifications for authenticated admin users
+    if (!isAuthenticated || user?.role !== 'admin') {
       setNotifications([]);
       setError(null);
       setLoading(false);

@@ -219,13 +219,14 @@ function setupMonitoringSocket(io, userSockets) {
             io.to(session.employeeSocketId).emit('monitoring:connection-request', {
                 adminName: socket.data.name,
                 adminSocketId: socket.id,
+                adminUserId: socket.data.userId,
             });
 
             socket.emit('monitoring:request-sent', { employeeName });
         });
 
         // ── monitoring:respond-connection (Employee) ─────────────────
-        socket.on('monitoring:respond-connection', ({ adminSocketId, accepted }) => {
+        socket.on('monitoring:respond-connection', ({ adminSocketId, adminUserId, adminName: sentAdminName, accepted }) => {
             if (!socket.data.authenticated || socket.data.role !== 'employee' || !socket.data.sessionId) {
                 return;
             }
@@ -234,28 +235,49 @@ function setupMonitoringSocket(io, userSockets) {
             const session = monitoringService.getSession(sessionId);
             if (!session) return;
 
-            console.log(`[Monitoring] Employee ${socket.data.name} responded to ${adminSocketId}: ${accepted ? 'Accepted' : 'Denied'}`);
+            console.log(`[Monitoring] Employee ${socket.data.name} responded to ${adminSocketId} (userId: ${adminUserId}): ${accepted ? 'Accepted' : 'Denied'}`);
 
             if (accepted) {
-                monitoringService.addAdminToSession(sessionId, adminSocketId);
+                // Resolve the set of socket IDs to notify.
+                // Priority: look up current sockets for the admin via userSockets (handles
+                // reconnection & multi-instance when combined with the Redis adapter).
+                // Fall back to the original socket ID if no mapping exists.
+                let targetSocketIds = [];
+                if (adminUserId) {
+                    const currentSockets = userSockets.get(String(adminUserId));
+                    if (currentSockets && currentSockets.size > 0) {
+                        targetSocketIds = [...currentSockets];
+                    }
+                }
+                if (targetSocketIds.length === 0) {
+                    // Fallback: use the original socket ID (works when not reconnected)
+                    targetSocketIds = [adminSocketId];
+                }
 
-                const adminSocket = io.sockets.sockets.get(adminSocketId);
-                if (adminSocket) {
-                    adminSocket.join(sessionId);
-                    adminSocket.data.sessionId = sessionId;
-
-                    adminSocket.emit('monitoring:connect-success', {
+                targetSocketIds.forEach(sid => {
+                    monitoringService.addAdminToSession(sessionId, sid);
+                    // Cross-instance room join (works with Redis adapter)
+                    io.in(sid).socketsJoin(sessionId);
+                    // Set sessionId on the admin socket if it's local (for disconnect cleanup)
+                    const localAdminSocket = io.sockets.sockets.get(sid);
+                    if (localAdminSocket) {
+                        localAdminSocket.data.sessionId = sessionId;
+                    }
+                    io.to(sid).emit('monitoring:connect-success', {
                         sessionId,
                         employeeName: session.employeeName,
                         employeeId: session.employeeId,
                         avatarUrl: session.avatarUrl,
                         streamActive: session.streamActive,
                     });
+                });
 
-                    socket.emit('monitoring:admin-joined', {
-                        adminName: adminSocket.data.name,
-                    });
-                }
+                // Notify the employee — use the admin name from the payload (sent by the employee
+                // who stored it from the original connection-request), then fall back to the
+                // local socket lookup in case of an older client version.
+                const localAdmin = io.sockets.sockets.get(adminSocketId);
+                const adminName = sentAdminName || localAdmin?.data?.name || 'Admin';
+                socket.emit('monitoring:admin-joined', { adminName });
             } else {
                 io.to(adminSocketId).emit('monitoring:request-denied', {
                     employeeName: session.employeeName,
@@ -405,6 +427,7 @@ function setupMonitoringSocket(io, userSockets) {
 
             monitoringService.addAdminToSession(sessionId, socket.id, socket.data.name);
             socket.join(sessionId);
+            socket.data.sessionId = sessionId; // Needed for disconnect cleanup
 
             console.log(`[Monitoring] Admin ${socket.data.name} (${socket.id}) joined session ${sessionId}`);
 

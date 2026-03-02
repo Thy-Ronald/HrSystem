@@ -163,8 +163,8 @@ export const MonitoringProvider = ({ children }) => {
             setAdminCount(prev => Math.max(0, prev - 1));
         };
 
-        const handleConnectionRequest = ({ adminName, adminSocketId }) => {
-            setConnectionRequest({ adminName, adminSocketId });
+        const handleConnectionRequest = ({ adminName, adminSocketId, adminUserId }) => {
+            setConnectionRequest({ adminName, adminSocketId, adminUserId });
         };
 
         const handleRequestSent = ({ employeeName }) => {
@@ -355,9 +355,15 @@ export const MonitoringProvider = ({ children }) => {
     const clearConnectError = useCallback(() => setConnectError(null), []);
 
     const respondConnection = useCallback((adminSocketId, accepted) => {
-        emit('monitoring:respond-connection', { adminSocketId, accepted });
+        const req = connectionRequest;
+        emit('monitoring:respond-connection', {
+            adminSocketId,
+            adminUserId: req?.adminUserId,
+            adminName: req?.adminName,
+            accepted,
+        });
         setConnectionRequest(null);
-    }, [emit]);
+    }, [emit, connectionRequest]);
 
     const value = useMemo(() => ({
         sessionId,

@@ -6,6 +6,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const http = require('http');
 const { Server } = require('socket.io');
+const { createAdapter } = require('@socket.io/redis-adapter');
+const { createClient } = require('redis');
 const compression = require('compression');
 
 // Route imports
@@ -106,6 +108,21 @@ async function startServer() {
   } catch (error) {
     console.warn('⚠️ Failed to initialize Redis cache:', error.message);
     console.warn('⚠️ Using in-memory cache fallback');
+  }
+
+  // ── Socket.IO Redis adapter (enables cross-instance pub/sub on Cloud Run) ──
+  if (process.env.REDIS_URL) {
+    try {
+      const pubClient = createClient({ url: process.env.REDIS_URL });
+      const subClient = pubClient.duplicate();
+      await Promise.all([pubClient.connect(), subClient.connect()]);
+      io.adapter(createAdapter(pubClient, subClient));
+      console.log('✅ Socket.IO Redis adapter configured (cross-instance support enabled)');
+    } catch (adapterErr) {
+      console.warn('⚠️ Socket.IO Redis adapter failed, falling back to in-memory:', adapterErr.message);
+    }
+  } else {
+    console.warn('⚠️ REDIS_URL not set — Socket.IO running without Redis adapter (single-instance only)');
   }
 
   server.listen(PORT, () => {
