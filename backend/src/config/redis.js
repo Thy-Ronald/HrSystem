@@ -18,6 +18,9 @@ if (process.env.REDIS_URL) {
         if (retries > 7) return new Error('[Redis] Max reconnect attempts reached');
         return Math.min(retries * 500, 5000);
       },
+      // Send TCP keepalive every 10 s so Upstash's ~30 s idle timeout
+      // never fires on an otherwise-quiet connection.
+      keepAlive: 10000,
     },
   });
 

@@ -31,24 +31,42 @@ class CacheService {
       // Reuse the already-connected client from config/redis.js.
       // This avoids opening a second TCP connection to Upstash per instance.
       const existing = sharedRedis.getClient();
-      if (existing) {
-        this.client = existing;
-        // Treat ready state from the shared client (may already be connected)
-        this.isConnected = sharedRedis.isReady();
-
-        // Keep isConnected in sync with the shared client's lifecycle events.
-        // Use once-then-re-register pattern so we don't stack duplicate listeners.
-        existing.on('ready', () => { this.isConnected = true; });
-        existing.on('error', () => { this.isConnected = sharedRedis.isReady(); });
-        existing.on('end',   () => { this.isConnected = false; });
-
-        console.log('[CacheService] Reusing shared Redis client from config/redis.js');
+      if (!existing) {
+        // REDIS_URL not set — use in-memory cache only.
+        console.warn('[CacheService] No shared Redis client available — using in-memory cache');
+        this.isConnected = false;
         return;
       }
 
-      // Fallback: no shared client (REDIS_URL not set) — use in-memory cache only.
-      console.warn('[CacheService] No shared Redis client available — using in-memory cache');
-      this.isConnected = false;
+      this.client = existing;
+
+      // Keep isConnected in sync with the shared client's lifecycle events.
+      existing.on('ready', () => { this.isConnected = true; });
+      existing.on('error', () => { this.isConnected = sharedRedis.isReady(); });
+      existing.on('end',   () => { this.isConnected = false; });
+
+      if (sharedRedis.isReady()) {
+        // Already connected (fast path — module was required early enough)
+        this.isConnected = true;
+        console.log('[CacheService] Reusing shared Redis client from config/redis.js');
+      } else {
+        // Connect() fired at require() time but hasn't resolved yet.
+        // Wait up to 5 s for the ready event before continuing so we don't
+        // immediately fall back to in-memory cache on a cold start.
+        console.log('[CacheService] Waiting for shared Redis client to become ready...');
+        await new Promise((resolve) => {
+          const onReady = () => { this.isConnected = true; resolve(); };
+          const onError = () => resolve(); // resolve anyway — error handler above handles state
+          existing.once('ready', onReady);
+          existing.once('error', onError);
+          setTimeout(() => {
+            existing.off('ready', onReady);
+            existing.off('error', onError);
+            resolve(); // timed out — fall through with whatever state we have
+          }, 5000);
+        });
+        console.log(`[CacheService] Shared Redis client ready=${this.isConnected}`);
+      }
     } catch (error) {
       console.warn('⚠️ CacheService init error, falling back to in-memory cache:', error.message);
       this.isConnected = false;

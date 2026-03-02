@@ -124,11 +124,19 @@ async function startServer() {
   // ── Socket.IO Redis adapter (enables cross-instance pub/sub on Cloud Run) ──
   if (process.env.REDIS_URL) {
     try {
-      const pubClient = createClient({ url: process.env.REDIS_URL });
+      // Use the same socket config as the main client so Upstash idle-timeout
+      // reconnects work (without reconnectStrategy the clients die permanently).
+      const adapterSocketConfig = {
+        reconnectStrategy: (retries) => {
+          if (retries > 7) return new Error('[Redis Adapter] Max reconnect attempts');
+          return Math.min(retries * 500, 5000);
+        },
+        keepAlive: 10000, // send TCP keepalive every 10 s to prevent idle drops
+      };
+      const pubClient = createClient({ url: process.env.REDIS_URL, socket: adapterSocketConfig });
       const subClient = pubClient.duplicate();
 
-      // Must attach 'error' handlers BEFORE calling connect() — the redis package
-      // warns "missing 'error' handler" if the client emits an error with no listener.
+      // Must attach 'error' handlers BEFORE calling connect().
       pubClient.on('error', (err) => console.error('[Redis Adapter] pub error:', err.message));
       subClient.on('error', (err) => console.error('[Redis Adapter] sub error:', err.message));
 
