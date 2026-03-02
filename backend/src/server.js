@@ -40,6 +40,9 @@ const userSockets = new Map();
 // ─── App & server setup ──────────────────────────────────────────────────────
 const app = express();
 app.set('userSockets', userSockets);
+// Trust the first proxy hop (Cloud Run / load balancer) so that
+// express-rate-limit correctly reads X-Forwarded-For for client IPs.
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
