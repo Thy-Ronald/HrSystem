@@ -1,217 +1,168 @@
 /**
  * Authentication Routes
- * Handles login, signup and JWT token generation
+ * Firebase Auth — login is handled entirely by the client SDK.
+ * This module handles:
+ *   POST /signup  — create MySQL profile after Firebase account is created on the frontend
+ *   POST /verify  — verify a Firebase ID token and return user profile + monitoring state
+ *   GET  /github  — redirect to GitHub OAuth
+ *   GET  /github/callback — exchange GitHub code for a Firebase custom token
+ *   GET  /exchange — exchange one-time OAuth code for a custom token
  */
 
 const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
-const { generateToken } = require('../utils/jwt');
 const { validateName, validateRole } = require('../middlewares/monitoringValidation');
 const { authLimiter } = require('../middlewares/rateLimiter');
 const userService = require('../services/userService');
+const { authB } = require('../config/firebaseProjectB');
 const axios = require('axios');
 
 /**
  * One-time OAuth code store.
- * Stores short-lived codes (60 s) that are exchanged for JWTs after GitHub OAuth.
- * This prevents the JWT from appearing in the browser URL / history / referrer headers.
+ * Maps short-lived codes (60 s) to Firebase custom tokens.
  */
-const oauthCodes = new Map(); // Map<code: string, { token: string, expiresAt: number }>
+const oauthCodes = new Map(); // Map<code: string, { customToken: string, expiresAt: number }>
 const OAUTH_CODE_TTL_MS = 60 * 1000; // 60 seconds
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+/** Extract and verify a Firebase ID token from the Authorization header. */
+async function extractVerifiedToken(req) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw Object.assign(new Error('Bearer token required in Authorization header'), { status: 401 });
+  }
+  const idToken = authHeader.replace('Bearer ', '');
+  return authB.verifyIdToken(idToken);
+}
+
+/** Check for an approved monitoring request and whether the admin is online. */
+async function getMonitoringState(userId, io) {
+  try {
+    const monitoringRequestModel = require('../models/monitoringRequestModel');
+    const requests = await monitoringRequestModel.getRequestsForUser(userId);
+    const approved = requests.find(r => r.status === 'approved');
+    if (!approved) return { monitoringExpected: false, activeRequest: null };
+
+    let adminOnline = false;
+    if (io) {
+      const sockets = Array.from(io.sockets.sockets.values());
+      adminOnline = sockets.some(
+        s => s.data.userId == approved.admin_id && s.data.authenticated
+      );
+    }
+
+    if (adminOnline) {
+      return {
+        monitoringExpected: true,
+        activeRequest: { adminName: approved.admin_name, requestId: approved.id },
+      };
+    }
+  } catch (err) {
+    console.error('[Auth] Error checking monitoring state:', err);
+  }
+  return { monitoringExpected: false, activeRequest: null };
+}
+
+// ─── Routes ──────────────────────────────────────────────────────────────────
 
 /**
  * GET /api/auth/test
- * Test endpoint to verify auth routes are working
  */
-router.get('/test', (req, res) => {
+router.get('/test', (_req, res) => {
   res.json({ success: true, message: 'Auth routes are working' });
 });
 
 /**
  * POST /api/auth/signup
- * Signup endpoint - creates new user account
- * 
- * Body: { email: string, password: string, name: string, role: 'admin' | 'employee' }
- * Returns: { success: true, token: string, user: { id, email, name, role } }
+ * Called AFTER the client has created a Firebase Auth account.
+ * Creates the MySQL user profile and sets the `role` custom claim on Firebase.
+ *
+ * Headers: Authorization: Bearer <Firebase ID token>
+ * Body:    { name: string, role?: 'admin' | 'employee' }
+ * Returns: { success: true, user: { id, email, name, role } }
  */
 router.post('/signup', authLimiter, async (req, res) => {
   try {
-    const { email, password, name, role = 'employee' } = req.body;
+    const decoded = await extractVerifiedToken(req);
+    const { name, role = 'employee' } = req.body;
 
-    // Validate input
-    if (!email || !password || !name) {
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        message: 'Email, password, and name are required',
-      });
-    }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        message: 'Invalid email format',
-      });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        message: 'Password must be at least 6 characters long',
-      });
-    }
-
-    const roleValidation = validateRole(role);
-    if (!roleValidation.valid) {
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        message: roleValidation.error,
-      });
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Name is required' });
     }
 
     const nameValidation = validateName(name);
     if (!nameValidation.valid) {
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        message: nameValidation.error,
-      });
+      return res.status(400).json({ success: false, message: nameValidation.error });
     }
 
-    // Create user
-    const user = await userService.createUser(
-      email,
-      password,
-      nameValidation.sanitized,
-      roleValidation.sanitized
-    );
+    const roleValidation = validateRole(role);
+    if (!roleValidation.valid) {
+      return res.status(400).json({ success: false, message: roleValidation.error });
+    }
 
-    // Generate JWT token
-    const token = generateToken({
-      userId: user.id,
-      role: user.role,
-      name: user.name,
-      email: user.email,
-    });
+    // Idempotent: return existing profile if already created
+    let user = await userService.findUserByFirebaseUid(decoded.uid);
 
-    // Return token and user info
-    res.json({
+    if (!user) {
+      user = await userService.createUser(
+        decoded.email,
+        null, // no password — Firebase handles auth
+        nameValidation.sanitized,
+        roleValidation.sanitized,
+        { firebase_uid: decoded.uid }
+      );
+    }
+
+    // Stamp the role as a custom claim so middleware can trust it from the token
+    await authB.setCustomUserClaims(decoded.uid, { role: user.role });
+
+    return res.json({
       success: true,
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-      },
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
     });
   } catch (error) {
-    console.error('Signup error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Signup failed',
-      message: error.message || 'An error occurred during signup',
-    });
+    console.error('[Auth] Signup error:', error);
+    if (error.status === 401) {
+      return res.status(401).json({ success: false, message: error.message });
+    }
+    res.status(500).json({ success: false, message: error.message || 'Signup failed' });
   }
 });
 
 /**
- * POST /api/auth/login
- * Login endpoint - authenticates user with email/password
- * 
- * Body: { email: string, password: string }
- * Returns: { success: true, token: string, user: { id, email, name, role } }
+ * POST /api/auth/verify
+ * Verify a Firebase ID token, look up the MySQL user profile, and return
+ * it together with any active monitoring state.
+ *
+ * Headers: Authorization: Bearer <Firebase ID token>
+ * Returns: { success: true, user: { id, email, name, role, avatar_url, userId },
+ *            monitoringExpected, activeRequest }
  */
-router.post('/login', authLimiter, async (req, res) => {
+router.post('/verify', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const decoded = await extractVerifiedToken(req);
 
-    // Validate input
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        message: 'Email and password are required',
-      });
-    }
-
-    // Find user by email
-    const user = await userService.findUserByEmail(email);
+    const user = await userService.findUserByFirebaseUid(decoded.uid);
     if (!user) {
-      // Read remaining attempts from the rate limiter header (set by express-rate-limit)
-      const attemptsLeft = parseInt(res.getHeader('RateLimit-Remaining') ?? '5', 10);
       return res.status(401).json({
         success: false,
-        error: 'Authentication failed',
-        message: 'Invalid email or password',
-        attemptsLeft,
+        error: 'User profile not found',
+        message: 'No MySQL profile linked to this Firebase account. Please sign up.',
       });
     }
 
-    // Verify password
-    const isValidPassword = await userService.verifyPassword(password, user.password_hash);
-    if (!isValidPassword) {
-      const attemptsLeft = parseInt(res.getHeader('RateLimit-Remaining') ?? '5', 10);
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication failed',
-        message: 'Invalid email or password',
-        attemptsLeft,
-      });
-    }
+    const io = req.app.get('io');
+    const { monitoringExpected, activeRequest } = await getMonitoringState(user.id, io);
 
-    // Generate JWT token
-    const token = generateToken({
-      userId: user.id,
-      role: user.role,
-      name: user.name,
-      email: user.email,
-      avatar_url: user.avatar_url,
-    });
-
-    // Check for approved monitoring requests (Optimization for Immediate Resume)
-    let monitoringExpected = false;
-    let activeRequest = null;
-    try {
-      // Use the model directly if possible, or query DB
-      const monitoringRequestModel = require('../models/monitoringRequestModel');
-      const requests = await monitoringRequestModel.getRequestsForUser(user.id);
-      const approved = requests.find(r => r.status === 'approved');
-      if (approved) {
-        // Optimization: Only prompt if the Admin is actually online (connected to socket)
-        const io = req.app.get('io');
-        let adminOnline = false;
-
-        if (io) {
-          const sockets = Array.from(io.sockets.sockets.values());
-          // Check if any socket matches the admin's user ID AND has authenticated
-          adminOnline = sockets.some(s => s.data.userId == approved.admin_id && s.data.authenticated);
-        }
-
-        if (adminOnline) {
-          monitoringExpected = true;
-          activeRequest = { adminName: approved.admin_name, requestId: approved.id };
-          console.log(`[Auth] User ${user.email} has approved request from ${approved.admin_name} (Online). Expecting monitoring.`);
-        } else {
-          console.log(`[Auth] User ${user.email} has approved request from ${approved.admin_name}, but Admin is OFFLINE. Suppressing prompt.`);
-        }
-      }
-    } catch (err) {
-      console.error('Error checking monitoring status during login:', err);
-    }
-
-    // Return token and user info (without password)
-    res.json({
+    return res.json({
       success: true,
-      token,
-      monitoringExpected, // Flag for immediate UI resume
+      monitoringExpected,
       activeRequest,
       user: {
         id: user.id,
+        userId: user.id, // backward compat alias
         email: user.email,
         name: user.name,
         role: user.role,
@@ -219,91 +170,7 @@ router.post('/login', authLimiter, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Login failed',
-      message: error.message || 'An error occurred during login',
-    });
-  }
-});
-
-/**
- * POST /api/auth/verify
- * Verify JWT token
- * 
- * Headers: Authorization: Bearer <token>
- * Returns: { success: true, user: { role, name, userId } }
- */
-router.post('/verify', async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required',
-        message: 'Bearer token required in Authorization header',
-      });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { verifyToken } = require('../utils/jwt');
-    const decoded = verifyToken(token);
-
-    // Get user from database to ensure they still exist
-    const user = await userService.findUserById(decoded.userId);
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid token',
-        message: 'User not found',
-      });
-    }
-
-    // Check for approved monitoring requests (Optimization for Immediate Resume)
-    let monitoringExpected = false;
-    let activeRequest = null;
-    try {
-      const monitoringRequestModel = require('../models/monitoringRequestModel');
-      const requests = await monitoringRequestModel.getRequestsForUser(decoded.userId);
-      const approved = requests.find(r => r.status === 'approved');
-      if (approved) {
-        // Optimization: Only prompt if the Admin is actually online (connected to socket)
-        const io = req.app.get('io');
-        let adminOnline = false;
-
-        if (io) {
-          const sockets = Array.from(io.sockets.sockets.values());
-          // Check if any socket matches the admin's user ID AND has authenticated
-          adminOnline = sockets.some(s => s.data.userId == approved.admin_id && s.data.authenticated);
-        }
-
-        if (adminOnline) {
-          monitoringExpected = true;
-          activeRequest = { adminName: approved.admin_name, requestId: approved.id };
-          console.log(`[Auth] User ${user.email} has approved request from ${approved.admin_name} (Online). Expecting monitoring.`);
-        } else {
-          console.log(`[Auth] User ${user.email} has approved request from ${approved.admin_name}, but Admin is OFFLINE. Suppressing prompt.`);
-        }
-      }
-    } catch (err) {
-      console.error('Error checking monitoring status during verify:', err);
-    }
-
-    res.json({
-      success: true,
-      monitoringExpected,
-      activeRequest,
-      user: {
-        role: decoded.role,
-        name: decoded.name,
-        userId: decoded.userId,
-        email: decoded.email,
-        avatar_url: decoded.avatar_url,
-      },
-    });
-  } catch (error) {
+    console.error('[Auth] Verify error:', error);
     res.status(401).json({
       success: false,
       error: 'Invalid token',
@@ -328,115 +195,109 @@ router.get('/github', (req, res) => {
 
 /**
  * GET /api/auth/github/callback
- * Handle GitHub OAuth callback
+ * Exchange GitHub code → find/create Firebase Auth user → issue custom token
  */
 router.get('/github/callback', async (req, res) => {
   const { code } = req.query;
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-  console.log(`[GitHub OAuth] Callback received with code: ${code ? 'yes' : 'no'}`);
-
   if (!code) {
-    console.error('[GitHub OAuth] Missing code in callback');
     return res.redirect(`${frontendUrl}/auth?error=No+code+provided`);
   }
 
   try {
-    // 1. Exchange code for access token
-    console.log('[GitHub OAuth] Exchanging code for token...');
-    const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
-      client_id: process.env.GITHUB_CLIENT_ID,
-      client_secret: process.env.GITHUB_CLIENT_SECRET,
-      code,
-    }, {
-      headers: { Accept: 'application/json' }
-    });
-
+    // 1. Exchange GitHub code for access token
+    const tokenResponse = await axios.post(
+      'https://github.com/login/oauth/access_token',
+      {
+        client_id:     process.env.GITHUB_CLIENT_ID,
+        client_secret: process.env.GITHUB_CLIENT_SECRET,
+        code,
+      },
+      { headers: { Accept: 'application/json' } }
+    );
     const accessToken = tokenResponse.data.access_token;
-    if (!accessToken) {
-      console.error('[GitHub OAuth] Failed to get access token:', tokenResponse.data);
-      return res.redirect(`${frontendUrl}/auth?error=OAuth+failed`);
-    }
+    if (!accessToken) return res.redirect(`${frontendUrl}/auth?error=OAuth+failed`);
 
-    console.log('[GitHub OAuth] Access token obtained, fetching user info...');
-
-    // 2. Get user info from GitHub
+    // 2. Fetch GitHub user profile
     const userResponse = await axios.get('https://api.github.com/user', {
-      headers: { Authorization: `token ${accessToken}` }
+      headers: { Authorization: `token ${accessToken}` },
     });
-
     const githubUser = userResponse.data;
-    console.log(`[GitHub OAuth] GitHub user: ${githubUser.login} (ID: ${githubUser.id})`);
 
-    // 3. Get user email (might need extra call if not public)
+    // 3. Resolve email
     let email = githubUser.email;
     if (!email) {
-      console.log('[GitHub OAuth] Email not public, fetching shared/private emails...');
       const emailsResponse = await axios.get('https://api.github.com/user/emails', {
-        headers: { Authorization: `token ${accessToken}` }
+        headers: { Authorization: `token ${accessToken}` },
       });
-      const primaryEmail = emailsResponse.data.find(e => e.primary) || emailsResponse.data[0];
-      email = primaryEmail ? primaryEmail.email : null;
+      const primary = emailsResponse.data.find(e => e.primary) || emailsResponse.data[0];
+      email = primary ? primary.email : null;
+    }
+    if (!email) return res.redirect(`${frontendUrl}/auth?error=No+email+found`);
+
+    // 4. Find or create Firebase Auth user
+    let firebaseUser;
+    try {
+      firebaseUser = await authB.getUserByEmail(email);
+    } catch (err) {
+      if (err.code === 'auth/user-not-found') {
+        firebaseUser = await authB.createUser({
+          email,
+          displayName: githubUser.name || githubUser.login,
+          photoURL:    githubUser.avatar_url,
+        });
+      } else {
+        throw err;
+      }
     }
 
-    if (!email) {
-      console.error('[GitHub OAuth] No email found for user');
-      return res.redirect(`${frontendUrl}/auth?error=No+email+found`);
-    }
-
-    console.log(`[GitHub OAuth] User email: ${email}`);
-
-    // 4. Check if user exists by GitHub ID or email
-    let user = await userService.findUserByGithubId(githubUser.id.toString());
-
+    // 5. Find or create MySQL user profile
+    let user = await userService.findUserByFirebaseUid(firebaseUser.uid);
     if (!user) {
-      console.log('[GitHub OAuth] User not found by GitHub ID, checking email...');
       user = await userService.findUserByEmail(email);
       if (user) {
-        console.log('[GitHub OAuth] Linking existing user to GitHub account (implicit)');
+        // Link existing MySQL user to this Firebase UID
+        await userService.linkFirebaseUid(user.id, firebaseUser.uid);
       } else {
-        console.log('[GitHub OAuth] Creating new user profile...');
-        // Create new user
+        // Brand-new user
         user = await userService.createUser(
           email,
-          null, // No password
+          null,
           githubUser.name || githubUser.login,
           'employee',
-          { github_id: githubUser.id.toString(), avatar_url: githubUser.avatar_url }
+          {
+            github_id:   githubUser.id.toString(),
+            avatar_url:  githubUser.avatar_url,
+            firebase_uid: firebaseUser.uid,
+          }
         );
       }
     }
 
-    // 5. Generate JWT
-    console.log(`[GitHub OAuth] Generating JWT for user ID: ${user.id}`);
-    const token = generateToken({
-      userId: user.id,
-      role: user.role,
-      name: user.name,
-      email: user.email,
-      avatar_url: user.avatar_url,
-    });
+    // 6. Set role custom claim
+    await authB.setCustomUserClaims(firebaseUser.uid, { role: user.role });
 
-    // 6. Generate a short-lived one-time code and redirect (JWT stays server-side)
-    // Note: `oauthToken` is used here to avoid shadowing the `code` variable from req.query above.
-    const oauthToken = crypto.randomUUID();
-    oauthCodes.set(oauthToken, { token, expiresAt: Date.now() + OAUTH_CODE_TTL_MS });
-    const finalRedirectUrl = `${frontendUrl}/auth?code=${oauthToken}`;
-    console.log(`[GitHub OAuth] SUCCESS: Redirecting to frontend with one-time code...`);
-    res.redirect(finalRedirectUrl);
+    // 7. Mint a Firebase custom token and wrap it in a one-time code
+    const customToken = await authB.createCustomToken(firebaseUser.uid);
+    const oauthCode   = crypto.randomUUID();
+    oauthCodes.set(oauthCode, { customToken, expiresAt: Date.now() + OAUTH_CODE_TTL_MS });
+
+    console.log(`[GitHub OAuth] Success for ${email} — redirecting with one-time code`);
+    res.redirect(`${frontendUrl}/auth?code=${oauthCode}`);
   } catch (error) {
-    console.error('[GitHub OAuth] EXCEPTION:', error.response?.data || error.message);
+    console.error('[GitHub OAuth] Error:', error.response?.data || error.message);
     res.redirect(`${frontendUrl}/auth?error=GitHub+authentication+failed`);
   }
 });
 
 /**
  * GET /api/auth/exchange
- * Exchanges a short-lived one-time OAuth code for a JWT.
- * The code is deleted immediately after use (single-use).
+ * Exchanges a one-time code for a Firebase custom token.
+ * The code is deleted immediately (single-use, 60 s TTL).
  *
  * Query: { code: string }
- * Returns: { token: string }
+ * Returns: { customToken: string }
  */
 router.get('/exchange', (req, res) => {
   const { code } = req.query;
@@ -446,16 +307,14 @@ router.get('/exchange', (req, res) => {
   }
 
   const entry = oauthCodes.get(code);
-
   if (!entry || Date.now() > entry.expiresAt) {
-    oauthCodes.delete(code); // clean up expired entry if present
+    oauthCodes.delete(code);
     return res.status(401).json({ error: 'Code expired or invalid' });
   }
 
-  // One-time use: delete immediately before returning the token
   oauthCodes.delete(code);
-  console.log(`[GitHub OAuth] Code exchanged for JWT successfully.`);
-  return res.json({ token: entry.token });
+  console.log('[GitHub OAuth] One-time code exchanged for custom token successfully');
+  return res.json({ customToken: entry.customToken });
 });
 
 module.exports = router;

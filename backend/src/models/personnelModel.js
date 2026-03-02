@@ -1,162 +1,155 @@
-const { query } = require('../config/database');
-
 /**
- * Data Access Layer for personnel_data_sheet table
+ * Personnel Model
+ * Firestore DAL for the "personnel" collection (capstone-31b9e / Project B)
+ * Document ID: auto-generated
  */
 
+const { firestoreB } = require('../config/firebaseProjectB');
+
+const PERSONNEL = () => firestoreB.collection('personnel');
+
+function toRecord(doc) {
+  return { id: doc.id, ...doc.data() };
+}
+
 async function createPersonnelRecord(data) {
-    const sql = `
-        INSERT INTO personnel_data_sheet (
-            date_started, surname, first_name, middle_name,
-            date_of_birth, place_of_birth, sex, civil_status, citizenship,
-            height, weight, blood_type,
-            sss_number, pag_ibig_number, philhealth_number, tin, employee_number,
-            residential_address, permanent_address, zip_code, telephone_number, 
-            cellphone_number, email_address,
-            emergency_name, emergency_relationship, emergency_address, 
-            emergency_occupation, emergency_contact_number,
-            father_name, mother_maiden_name, parents_address,
-            education_background
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
+  const doc = {
+    dateStarted:            data.dateStarted,
+    surname:                data.surname,
+    firstName:              data.firstName,
+    middleName:             data.middleName          || null,
+    dateOfBirth:            data.dateOfBirth         || null,
+    placeOfBirth:           data.placeOfBirth        || null,
+    sex:                    data.sex                 || null,
+    civilStatus:            data.civilStatus         || null,
+    citizenship:            data.citizenship         || null,
+    height:                 data.height              || null,
+    weight:                 data.weight              || null,
+    bloodType:              data.bloodType           || null,
+    sssNumber:              data.sssNumber           || null,
+    pagIbigNumber:          data.pagIbigNumber       || null,
+    philHealthNumber:       data.philHealthNumber    || null,
+    tin:                    data.tin                 || null,
+    employeeNumber:         data.employeeNumber      || null,
+    residentialAddress:     data.residentialAddress  || null,
+    permanentAddress:       data.permanentAddress    || null,
+    zipCode:                data.zipCode             || null,
+    telephoneNumber:        data.telephoneNumber     || null,
+    cellphoneNumber:        data.cellphoneNumber,
+    emailAddress:           data.emailAddress,
+    emergencyName:          data.emergencyName,
+    emergencyRelationship:  data.emergencyRelationship   || null,
+    emergencyAddress:       data.emergencyAddress        || null,
+    emergencyOccupation:    data.emergencyOccupation     || null,
+    emergencyContactNumber: data.emergencyContactNumber,
+    fatherName:             data.fatherName          || null,
+    motherMaidenName:       data.motherMaidenName    || null,
+    parentsAddress:         data.parentsAddress      || null,
+    education:              data.education           || [],
+    createdAt:              new Date().toISOString(),
+    updatedAt:              new Date().toISOString(),
+  };
 
-    const params = [
-        data.dateStarted, data.surname, data.firstName, data.middleName || null,
-        data.dateOfBirth || null, data.placeOfBirth || null, data.sex || null, data.civilStatus || null, data.citizenship || null,
-        data.height || null, data.weight || null, data.bloodType || null,
-        data.sssNumber || null, data.pagIbigNumber || null, data.philHealthNumber || null, data.tin || null, data.employeeNumber || null,
-        data.residentialAddress || null, data.permanentAddress || null, data.zipCode || null, data.telephoneNumber || null,
-        data.cellphoneNumber, data.emailAddress,
-        data.emergencyName, data.emergencyRelationship || null, data.emergencyAddress || null,
-        data.emergencyOccupation || null, data.emergencyContactNumber,
-        data.fatherName || null, data.motherMaidenName || null, data.parentsAddress || null,
-        JSON.stringify(data.education)
-    ];
-
-    try {
-        const result = await query(sql, params);
-        return { id: result.insertId, ...data };
-    } catch (error) {
-        console.error('Error creating personnel record:', error);
-        throw error;
-    }
+  const ref = await PERSONNEL().add(doc);
+  return { id: ref.id, ...doc };
 }
 
 async function getAllPersonnelRecords() {
-    const sql = `
-        SELECT 
-            id, 
-            DATE_FORMAT(date_started, '%Y-%m-%d') as dateStarted, 
-            surname, first_name as firstName, middle_name as middleName,
-            DATE_FORMAT(date_of_birth, '%Y-%m-%d') as dateOfBirth, 
-            place_of_birth as placeOfBirth, sex, civil_status as civilStatus, citizenship,
-            height, weight, blood_type as bloodType,
-            sss_number as sssNumber, pag_ibig_number as pagIbigNumber, philhealth_number as philHealthNumber, 
-            tin, employee_number as employeeNumber,
-            residential_address as residentialAddress, permanent_address as permanentAddress, 
-            zip_code as zipCode, telephone_number as telephoneNumber, 
-            cellphone_number as cellphoneNumber, email_address as emailAddress,
-            emergency_name as emergencyName, emergency_relationship as emergencyRelationship, 
-            emergency_address as emergencyAddress, emergency_occupation as emergencyOccupation, 
-            emergency_contact_number as emergencyContactNumber,
-            father_name as fatherName, mother_maiden_name as motherMaidenName, 
-            parents_address as parentsAddress,
-            education_background as education,
-            created_at as createdAt, updated_at as updatedAt
-        FROM personnel_data_sheet
-        ORDER BY created_at DESC
-    `;
+  const snap = await PERSONNEL().orderBy('createdAt', 'desc').get();
+  return snap.docs.map(toRecord);
+}
 
-    try {
-        const records = await query(sql);
-        return records.map(record => ({
-            ...record,
-            education: typeof record.education === 'string' ? JSON.parse(record.education) : record.education
-        }));
-    } catch (error) {
-        console.error('Error getting all personnel records:', error);
-        throw error;
-    }
+async function getPersonnelRecordById(id) {
+  const doc = await PERSONNEL().doc(id).get();
+  return doc.exists ? toRecord(doc) : null;
 }
 
 async function updatePersonnelRecord(id, data) {
-    const sql = `
-        UPDATE personnel_data_sheet SET
-            date_started = ?, surname = ?, first_name = ?, middle_name = ?,
-            date_of_birth = ?, place_of_birth = ?, sex = ?, civil_status = ?, citizenship = ?,
-            height = ?, weight = ?, blood_type = ?,
-            sss_number = ?, pag_ibig_number = ?, philhealth_number = ?, tin = ?, employee_number = ?,
-            residential_address = ?, permanent_address = ?, zip_code = ?, telephone_number = ?, 
-            cellphone_number = ?, email_address = ?,
-            emergency_name = ?, emergency_relationship = ?, emergency_address = ?, 
-            emergency_occupation = ?, emergency_contact_number = ?,
-            father_name = ?, mother_maiden_name = ?, parents_address = ?,
-            education_background = ?,
-            updated_at = NOW()
-        WHERE id = ?
-    `;
+  const updates = {
+    dateStarted:            data.dateStarted,
+    surname:                data.surname,
+    firstName:              data.firstName,
+    middleName:             data.middleName          || null,
+    dateOfBirth:            data.dateOfBirth         || null,
+    placeOfBirth:           data.placeOfBirth        || null,
+    sex:                    data.sex                 || null,
+    civilStatus:            data.civilStatus         || null,
+    citizenship:            data.citizenship         || null,
+    height:                 data.height              || null,
+    weight:                 data.weight              || null,
+    bloodType:              data.bloodType           || null,
+    sssNumber:              data.sssNumber           || null,
+    pagIbigNumber:          data.pagIbigNumber       || null,
+    philHealthNumber:       data.philHealthNumber    || null,
+    tin:                    data.tin                 || null,
+    employeeNumber:         data.employeeNumber      || null,
+    residentialAddress:     data.residentialAddress  || null,
+    permanentAddress:       data.permanentAddress    || null,
+    zipCode:                data.zipCode             || null,
+    telephoneNumber:        data.telephoneNumber     || null,
+    cellphoneNumber:        data.cellphoneNumber,
+    emailAddress:           data.emailAddress,
+    emergencyName:          data.emergencyName,
+    emergencyRelationship:  data.emergencyRelationship   || null,
+    emergencyAddress:       data.emergencyAddress        || null,
+    emergencyOccupation:    data.emergencyOccupation     || null,
+    emergencyContactNumber: data.emergencyContactNumber,
+    fatherName:             data.fatherName          || null,
+    motherMaidenName:       data.motherMaidenName    || null,
+    parentsAddress:         data.parentsAddress      || null,
+    education:              data.education           || [],
+    updatedAt:              new Date().toISOString(),
+  };
 
-    const params = [
-        data.dateStarted, data.surname, data.firstName, data.middleName || null,
-        data.dateOfBirth || null, data.placeOfBirth || null, data.sex || null, data.civilStatus || null, data.citizenship || null,
-        data.height || null, data.weight || null, data.bloodType || null,
-        data.sssNumber || null, data.pagIbigNumber || null, data.philHealthNumber || null, data.tin || null, data.employeeNumber || null,
-        data.residentialAddress || null, data.permanentAddress || null, data.zipCode || null, data.telephoneNumber || null,
-        data.cellphoneNumber, data.emailAddress,
-        data.emergencyName, data.emergencyRelationship || null, data.emergencyAddress || null,
-        data.emergencyOccupation || null, data.emergencyContactNumber,
-        data.fatherName || null, data.motherMaidenName || null, data.parentsAddress || null,
-        JSON.stringify(data.education),
-        id
-    ];
-
-    try {
-        await query(sql, params);
-        return { id, ...data };
-    } catch (error) {
-        console.error('Error updating personnel record:', error);
-        throw error;
-    }
+  await PERSONNEL().doc(id).update(updates);
+  return { id, ...updates };
 }
-
 
 async function deletePersonnelRecord(id) {
-    const sql = 'DELETE FROM personnel_data_sheet WHERE id = ?';
-    try {
-        const result = await query(sql, [id]);
-        return result.affectedRows > 0;
-    } catch (error) {
-        console.error('Error deleting personnel record:', error);
-        throw error;
-    }
+  await PERSONNEL().doc(id).delete();
+  return true;
 }
 
+/**
+ * Prefix search on surname then firstName.
+ * Requires Firestore index on surname ASC (and separately on firstName ASC).
+ */
 async function searchPersonnel(queryStr) {
-    const sql = `
-        SELECT 
-            id, 
-            surname, first_name as firstName, middle_name as middleName,
-            employee_number as employeeNumber
-        FROM personnel_data_sheet 
-        WHERE surname LIKE ? OR first_name LIKE ?
-        ORDER BY surname ASC, first_name ASC
-        LIMIT 20
-    `;
-    const searchTerm = `%${queryStr}%`;
+  if (!queryStr) return [];
+  const term = queryStr.trim();
 
-    try {
-        const records = await query(sql, [searchTerm, searchTerm]);
-        return records;
-    } catch (error) {
-        console.error('Error searching personnel records:', error);
-        throw error;
+  const [bySurname, byFirstName] = await Promise.all([
+    PERSONNEL()
+      .orderBy('surname')
+      .startAt(term)
+      .endAt(term + '\uf8ff')
+      .limit(20)
+      .get(),
+    PERSONNEL()
+      .orderBy('firstName')
+      .startAt(term)
+      .endAt(term + '\uf8ff')
+      .limit(20)
+      .get(),
+  ]);
+
+  const seen = new Set();
+  const results = [];
+  for (const doc of [...bySurname.docs, ...byFirstName.docs]) {
+    if (!seen.has(doc.id)) {
+      seen.add(doc.id);
+      const d = doc.data();
+      results.push({ id: doc.id, surname: d.surname, firstName: d.firstName, middleName: d.middleName, employeeNumber: d.employeeNumber });
     }
+  }
+  return results.slice(0, 20);
 }
 
 module.exports = {
-    createPersonnelRecord,
-    getAllPersonnelRecords,
-    updatePersonnelRecord,
-    deletePersonnelRecord,
-    searchPersonnel
+  createPersonnelRecord,
+  getAllPersonnelRecords,
+  getPersonnelRecordById,
+  updatePersonnelRecord,
+  deletePersonnelRecord,
+  searchPersonnel,
 };

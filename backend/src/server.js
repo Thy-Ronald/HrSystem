@@ -18,12 +18,10 @@ const { errorHandler } = require('./middlewares/errorHandler');
 const { generalApiLimiter } = require('./middlewares/rateLimiter');
 
 // Service / utility imports
-const { testConnection } = require('./config/database');
 const cacheService = require('./services/cacheService');
 
 // Background jobs
 const { startContractExpirationJob } = require('./jobs/contractExpirationJob');
-const { startCacheRefreshJob, stopCacheRefreshJob } = require('./jobs/cacheRefreshJob');
 const { startRealtimeRefreshJob, stopRealtimeRefreshJob } = require('./jobs/realtimeRefreshJob');
 
 // Socket handlers
@@ -58,12 +56,11 @@ app.use(express.json());
 app.use('/api', generalApiLimiter);
 
 // ─── HTTP routes ──────────────────────────────────────────────────────────────
-app.get('/api/health', async (_req, res) => {
-  const dbStatus = await testConnection();
+app.get('/api/health', (_req, res) => {
   res.json({
-    status: 'ok',
+    status:    'ok',
     timestamp: new Date().toISOString(),
-    database: dbStatus ? 'connected' : 'disconnected',
+    database:  'firestore',
   });
 });
 
@@ -103,14 +100,6 @@ async function startServer() {
     console.warn('⚠️ Using in-memory cache fallback');
   }
 
-  // Test database connection
-  const dbConnected = await testConnection();
-  if (!dbConnected) {
-    console.warn('⚠ Warning: Database connection failed. The application may not work correctly.');
-    console.warn('⚠ Please ensure MySQL is running and database credentials are correct.');
-    console.warn('⚠ Run: npm run migrate (or node src/database/migrate.js) to set up the database schema.');
-  }
-
   server.listen(PORT, () => {
     console.log(`Backend listening on port ${PORT}`);
     console.log(`Socket.IO server ready`);
@@ -129,15 +118,7 @@ async function startServer() {
       console.log('Contract expiration notifications disabled due to missing EmailJS configuration.');
     }
 
-    // Start GitHub issues cache refresh job (runs every 30 minutes)
-    if (dbConnected) {
-      startCacheRefreshJob();
-      console.log('GitHub issues cache refresh job started.');
-    } else {
-      console.log('Cache refresh job disabled - database not connected.');
-    }
-
-    // Start Real-time GitHub monitoring (checks every 15s)
+    // Start Real-time GitHub monitoring (checks every 5 min)
     startRealtimeRefreshJob(io);
   });
 }
@@ -145,12 +126,9 @@ async function startServer() {
 // ─── Graceful shutdown ────────────────────────────────────────────────────────
 async function gracefulShutdown(signal) {
   console.log(`${signal} received, shutting down gracefully...`);
-  stopCacheRefreshJob();
   stopRealtimeRefreshJob();
   employeeTrackingSocket.stop();
   await cacheService.disconnect();
-  const { closePool } = require('./config/database');
-  await closePool();
   process.exit(0);
 }
 

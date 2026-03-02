@@ -1,5 +1,5 @@
 const { githubClient, withAuth } = require('./githubClients');
-const { query } = require('../../config/database');
+const { firestoreB } = require('../../config/firebaseProjectB');
 const {
     getCachedGitHubResponse,
     setCachedGitHubResponse,
@@ -38,37 +38,38 @@ async function getRepoInfo(repoFullName) {
 async function getAccessibleRepositories(userId = null) {
     const cacheKey = userId ? `accessible_repos_db_${userId}` : 'accessible_repos_db_all';
     const cached = await getCachedGitHubResponse(cacheKey);
-    if (cached) {
-        return cached.data;
-    }
+    if (cached) return cached.data;
 
     try {
-        // Fetch from tracked_repositories table
-        let sql, params;
+        let snap;
         if (userId) {
-            sql = 'SELECT * FROM tracked_repositories WHERE user_id = ? ORDER BY added_at DESC';
-            params = [userId];
+            snap = await firestoreB.collection(`users/${userId}/repositories`).orderBy('addedAt', 'desc').get();
         } else {
-            // For background jobs, get unique repositories across all users
-            sql = 'SELECT DISTINCT full_name, owner, name, description, stars, avatar_url FROM tracked_repositories ORDER BY added_at DESC';
-            params = [];
+            // Collection group query across all users' repositories sub-collections
+            snap = await firestoreB.collectionGroup('repositories').get();
         }
 
-        const trackedRepos = await query(sql, params);
-
-        const repos = trackedRepos.map(repo => ({
-            owner: repo.owner,
-            name: repo.name,
-            fullName: repo.full_name,
-            description: repo.description,
-            stars: repo.stars,
-            avatarUrl: repo.avatar_url
-        }));
+        const seen = new Set();
+        const repos = [];
+        for (const doc of snap.docs) {
+            const d = doc.data();
+            if (!seen.has(d.fullName)) {
+                seen.add(d.fullName);
+                repos.push({
+                    owner:       d.owner,
+                    name:        d.name,
+                    fullName:    d.fullName,
+                    description: d.description,
+                    stars:       d.stars,
+                    avatarUrl:   d.avatarUrl,
+                });
+            }
+        }
 
         await setCachedGitHubResponse(cacheKey, repos);
         return repos;
     } catch (error) {
-        console.error('[githubRepoService] getAccessibleRepositories DB error:', error.message);
+        console.error('[githubRepoService] getAccessibleRepositories error:', error.message);
         throw error;
     }
 }
@@ -79,30 +80,29 @@ async function getAccessibleRepositories(userId = null) {
 const addTrackedRepository = async (repoData, userId) => {
     try {
         const { fullName, name, owner, description, stars, avatarUrl } = repoData;
+        const repoCol = firestoreB.collection(`users/${userId}/repositories`);
 
-        // Clear previous tracked repositories FOR THIS USER only to enforce single repo mode per user if desired
-        // Or keep multiple. The UI seems to imply one active repo being "changed".
-        await query('DELETE FROM tracked_repositories WHERE user_id = ?', [userId]);
+        // Delete all existing tracked repos for this user (single-repo-per-user mode)
+        const existing = await repoCol.get();
+        const batch = firestoreB.batch();
+        existing.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
 
-        const sql = `
-            INSERT INTO tracked_repositories 
-                (user_id, full_name, name, owner, description, stars, avatar_url)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `;
-
-        await query(sql, [
+        // Add the new repo using fullName as document ID (/ replaced with _)
+        const docId = fullName.replace('/', '_');
+        await repoCol.doc(docId).set({
             userId,
             fullName,
             name,
             owner,
-            description || '',
-            stars || 0,
-            avatarUrl || ''
-        ]);
+            description: description || '',
+            stars:       stars       || 0,
+            avatarUrl:   avatarUrl   || '',
+            addedAt:     new Date().toISOString(),
+            updatedAt:   new Date().toISOString(),
+        });
 
-        // Invalidate cache for this user
         await deleteCachedGitHubResponse(`accessible_repos_db_${userId}`);
-
         return { success: true };
     } catch (error) {
         console.error('[githubRepoService] addTrackedRepository error:', error.message);
@@ -115,12 +115,9 @@ const addTrackedRepository = async (repoData, userId) => {
  */
 async function removeTrackedRepository(fullName, userId) {
     try {
-        const sql = 'DELETE FROM tracked_repositories WHERE full_name = ? AND user_id = ?';
-        await query(sql, [fullName, userId]);
-
-        // Invalidate cache for this user
+        const docId = fullName.replace('/', '_');
+        await firestoreB.doc(`users/${userId}/repositories/${docId}`).delete();
         await deleteCachedGitHubResponse(`accessible_repos_db_${userId}`);
-
         return { success: true };
     } catch (error) {
         console.error('[githubRepoService] removeTrackedRepository error:', error.message);

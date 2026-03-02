@@ -1,68 +1,91 @@
-const { query } = require('../config/database');
+/**
+ * Notification Model
+ * Firestore DAL for the "notifications" collection (capstone-31b9e / Project B)
+ */
+
+const { firestoreB } = require('../config/firebaseProjectB');
+
+const NOTIFS = () => firestoreB.collection('notifications');
 
 const Notification = {
-    create: async ({ user_id, type, title, message, data }) => {
-        const sql = `
-      INSERT INTO notifications (user_id, type, title, message, data, created_at)
-      VALUES (?, ?, ?, ?, ?, NOW())
-    `;
-        const result = await query(sql, [user_id, type, title, message, JSON.stringify(data || {})]);
-        return result.insertId;
-    },
+  create: async ({ user_id, type, title, message, data }) => {
+    const doc = {
+      userId:    user_id,
+      type,
+      title,
+      message,
+      data:      data || {},
+      isRead:    false,
+      createdAt: new Date().toISOString(),
+    };
+    const ref = await NOTIFS().add(doc);
+    return ref.id;
+  },
 
-    getAllForUser: async (userId, limit = 50, offset = 0) => {
-        const sql = `
-      SELECT * FROM notifications 
-      WHERE user_id = ? 
-      ORDER BY created_at DESC 
-      LIMIT ? OFFSET ?
-    `;
-        const rows = await query(sql, [userId, limit, offset]);
-        return rows;
-    },
+  getAllForUser: async (userId, limit = 50, offset = 0) => {
+    const snap = await NOTIFS()
+      .where('userId', '==', userId)
+      .orderBy('createdAt', 'desc')
+      .limit(limit + offset)
+      .get();
 
-    markAsRead: async (id) => {
-        const sql = `UPDATE notifications SET is_read = TRUE WHERE id = ?`;
-        await query(sql, [id]);
-        return true;
-    },
+    return snap.docs.slice(offset).map(doc => ({
+      id:         doc.id,
+      user_id:    doc.data().userId,
+      type:       doc.data().type,
+      title:      doc.data().title,
+      message:    doc.data().message,
+      data:       doc.data().data,
+      is_read:    doc.data().isRead,
+      created_at: doc.data().createdAt,
+    }));
+  },
 
-    markAllAsRead: async (userId) => {
-        const sql = `UPDATE notifications SET is_read = TRUE WHERE user_id = ?`;
-        await query(sql, [userId]);
-        return true;
-    },
+  markAsRead: async (id) => {
+    await NOTIFS().doc(id).update({ isRead: true });
+    return true;
+  },
 
-    deleteAllForUser: async (userId) => {
-        const sql = `DELETE FROM notifications WHERE user_id = ?`;
-        await query(sql, [userId]);
-        return true;
-    },
+  markAllAsRead: async (userId) => {
+    const snap = await NOTIFS()
+      .where('userId', '==', userId)
+      .where('isRead', '==', false)
+      .get();
+    const batch = firestoreB.batch();
+    snap.docs.forEach(doc => batch.update(doc.ref, { isRead: true }));
+    await batch.commit();
+    return true;
+  },
 
-    /**
-     * Create a notification in DB and emit to all active user sockets (O(1) lookup)
-     */
-    createAndNotify: async (payload, io, userSockets) => {
-        const { user_id, type, title, message, data } = payload;
-        const id = await Notification.create({ user_id, type, title, message, data });
+  deleteAllForUser: async (userId) => {
+    const snap = await NOTIFS().where('userId', '==', userId).get();
+    const batch = firestoreB.batch();
+    snap.docs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+    return true;
+  },
 
-        if (io && userSockets) {
-            const sockets = userSockets.get(String(user_id));
-            if (sockets) {
-                const notification = {
-                    id,
-                    type,
-                    title,
-                    message,
-                    data,
-                    created_at: new Date().toISOString(),
-                    is_read: false
-                };
-                sockets.forEach(sid => io.to(sid).emit('notification:new', notification));
-            }
-        }
-        return id;
+  createAndNotify: async (payload, io, userSockets) => {
+    const { user_id, type, title, message, data } = payload;
+    const id = await Notification.create({ user_id, type, title, message, data });
+
+    if (io && userSockets) {
+      const sockets = userSockets.get(String(user_id));
+      if (sockets) {
+        const notification = {
+          id,
+          type,
+          title,
+          message,
+          data,
+          created_at: new Date().toISOString(),
+          is_read:    false,
+        };
+        sockets.forEach(sid => io.to(sid).emit('notification:new', notification));
+      }
     }
+    return id;
+  },
 };
 
 module.exports = Notification;

@@ -1,334 +1,120 @@
-const { query } = require('../config/database');
+/**
+ * Contract Store
+ * Firestore DAL for the "contracts" collection (capstone-31b9e / Project B)
+ * Document ID: auto-generated
+ */
+
+const { firestoreB } = require('../config/firebaseProjectB');
 const { validateContractData, validateContractUpdateData } = require('../utils/sqlValidation');
 
-/**
- * Data Access Layer for staff_contract table
- * Provides CRUD operations with prepared statements for SQL injection prevention
- */
+const CONTRACTS = () => firestoreB.collection('contracts');
 
-/**
- * Create a new contract
- * @param {Object} data - Contract data
- * @returns {Promise<Object>} - Created contract with ID
- * @throws {Error} - Validation or database error
- */
+/** Compute expiration date from assessment date + term months */
+function calcExpiration(assessmentDate, termMonths) {
+  const d = new Date(assessmentDate);
+  d.setMonth(d.getMonth() + termMonths);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Firestore doc  camelCase contract object */
+function toContract(doc) {
+  return { id: doc.id, ...doc.data() };
+}
+
 async function createContract(data) {
-  // Validate and sanitize input
-  const validatedData = validateContractData(data);
+  const v = validateContractData(data);
+  const expirationDate =
+    v.expirationDate ||
+    (v.assessmentDate && v.termMonths
+      ? calcExpiration(v.assessmentDate, v.termMonths)
+      : null);
 
-  // Calculate expiration_date if not provided (assessment_date + term_months)
-  let expirationDate = validatedData.expirationDate;
-  if (!expirationDate && validatedData.assessmentDate && validatedData.termMonths) {
-    const assessmentDate = new Date(validatedData.assessmentDate);
-    const calculatedExpiration = new Date(assessmentDate);
-    calculatedExpiration.setMonth(calculatedExpiration.getMonth() + validatedData.termMonths);
-    expirationDate = calculatedExpiration.toISOString().slice(0, 19).replace('T', ' ');
-  }
+  const doc = {
+    name:                 v.name,
+    position:             v.position,
+    assessmentDate:       v.assessmentDate,
+    basicSalary:          v.basicSalary,
+    allowance:            v.allowance ?? null,
+    attendanceBonus:      v.attendanceBonus ?? null,
+    fullAttendanceBonus:  v.fullAttendanceBonus ?? null,
+    signingBonus:         v.signingBonus ?? null,
+    termMonths:           v.termMonths,
+    expirationDate:       expirationDate,
+    resignationDate:      v.resignationDate ?? null,
+    createdDate:          new Date().toISOString(),
+    updatedDate:          new Date().toISOString(),
+  };
 
-  // Use prepared statement to prevent SQL injection
-  const sql = `
-    INSERT INTO staff_contract (
-      name,
-      position,
-      assessment_date,
-      basic_salary,
-      allowance,
-      attendance_bonus,
-      full_attendance_bonus,
-      signing_bonus,
-      term_months,
-      expiration_date,
-      resignation_date
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
-
-  const params = [
-    validatedData.name,
-    validatedData.position,
-    validatedData.assessmentDate,
-    validatedData.basicSalary,
-    validatedData.allowance,
-    validatedData.attendanceBonus,
-    validatedData.fullAttendanceBonus,
-    validatedData.signingBonus,
-    validatedData.termMonths,
-    expirationDate,
-    validatedData.resignationDate,
-  ];
-
-  try {
-    const result = await query(sql, params);
-
-    // Fetch and return the created contract
-    return await getContractById(result.insertId);
-  } catch (error) {
-    console.error('Error creating contract:', error);
-    throw error;
-  }
+  const ref = await CONTRACTS().add(doc);
+  return { id: ref.id, ...doc };
 }
 
-/**
- * Get all contracts from the database
- * @returns {Promise<Array>} - Array of all contracts
- * @throws {Error} - Database error
- */
 async function getAllContracts() {
-  const sql = `
-    SELECT 
-      id,
-      name,
-      position,
-      assessment_date as assessmentDate,
-      basic_salary as basicSalary,
-      allowance,
-      attendance_bonus as attendanceBonus,
-      full_attendance_bonus as fullAttendanceBonus,
-      signing_bonus as signingBonus,
-      term_months as termMonths,
-      expiration_date as expirationDate,
-      resignation_date as resignationDate,
-      created_date as createdDate,
-      updated_date as updatedDate
-    FROM staff_contract
-    ORDER BY created_date DESC
-  `;
-
-  try {
-    const contracts = await query(sql);
-    return contracts;
-  } catch (error) {
-    console.error('Error getting all contracts:', error);
-    throw error;
-  }
+  const snap = await CONTRACTS().orderBy('createdDate', 'desc').get();
+  return snap.docs.map(toContract);
 }
 
-/**
- * Get a contract by ID
- * @param {number} id - Contract ID
- * @returns {Promise<Object|null>} - Contract object or null if not found
- * @throws {Error} - Database error
- */
 async function getContractById(id) {
-  // Validate ID
-  const contractId = parseInt(id, 10);
-  if (!Number.isInteger(contractId) || contractId <= 0) {
-    throw new Error('Invalid contract ID');
-  }
-
-  const sql = `
-    SELECT 
-      id,
-      name,
-      position,
-      assessment_date as assessmentDate,
-      basic_salary as basicSalary,
-      allowance,
-      attendance_bonus as attendanceBonus,
-      full_attendance_bonus as fullAttendanceBonus,
-      signing_bonus as signingBonus,
-      term_months as termMonths,
-      expiration_date as expirationDate,
-      resignation_date as resignationDate,
-      created_date as createdDate,
-      updated_date as updatedDate
-    FROM staff_contract
-    WHERE id = ?
-    LIMIT 1
-  `;
-
-  try {
-    const results = await query(sql, [contractId]);
-    return results.length > 0 ? results[0] : null;
-  } catch (error) {
-    console.error('Error getting contract by ID:', error);
-    throw error;
-  }
+  const doc = await CONTRACTS().doc(id).get();
+  return doc.exists ? toContract(doc) : null;
 }
 
-/**
- * Update a contract by ID
- * @param {number} id - Contract ID
- * @param {Object} data - Partial contract data to update
- * @returns {Promise<Object|null>} - Updated contract or null if not found
- * @throws {Error} - Validation or database error
- */
 async function updateContract(id, data) {
-  // Validate ID
-  const contractId = parseInt(id, 10);
-  if (!Number.isInteger(contractId) || contractId <= 0) {
-    throw new Error('Invalid contract ID');
-  }
+  const v = validateContractUpdateData(data);
+  const updates = {};
 
-  // Validate and sanitize input (allows partial updates)
-  const validatedData = validateContractUpdateData(data);
+  if (v.name              !== undefined) updates.name              = v.name;
+  if (v.position          !== undefined) updates.position          = v.position;
+  if (v.assessmentDate    !== undefined) updates.assessmentDate    = v.assessmentDate;
+  if (v.basicSalary       !== undefined) updates.basicSalary       = v.basicSalary;
+  if (v.allowance         !== undefined) updates.allowance         = v.allowance;
+  if (v.attendanceBonus   !== undefined) updates.attendanceBonus   = v.attendanceBonus;
+  if (v.fullAttendanceBonus !== undefined) updates.fullAttendanceBonus = v.fullAttendanceBonus;
+  if (v.signingBonus      !== undefined) updates.signingBonus      = v.signingBonus;
+  if (v.resignationDate   !== undefined) updates.resignationDate   = v.resignationDate;
 
-  // Build dynamic UPDATE query based on provided fields
-  const fields = [];
-  const params = [];
-
-  if (validatedData.name !== undefined) {
-    fields.push('name = ?');
-    params.push(validatedData.name);
-  }
-  if (validatedData.position !== undefined) {
-    fields.push('position = ?');
-    params.push(validatedData.position);
-  }
-  if (validatedData.assessmentDate !== undefined) {
-    fields.push('assessment_date = ?');
-    params.push(validatedData.assessmentDate);
-  }
-  if (validatedData.basicSalary !== undefined) {
-    fields.push('basic_salary = ?');
-    params.push(validatedData.basicSalary);
-  }
-  if (validatedData.allowance !== undefined) {
-    fields.push('allowance = ?');
-    params.push(validatedData.allowance);
-  }
-  if (validatedData.attendanceBonus !== undefined) {
-    fields.push('attendance_bonus = ?');
-    params.push(validatedData.attendanceBonus);
-  }
-  if (validatedData.fullAttendanceBonus !== undefined) {
-    fields.push('full_attendance_bonus = ?');
-    params.push(validatedData.fullAttendanceBonus);
-  }
-  if (validatedData.signingBonus !== undefined) {
-    fields.push('signing_bonus = ?');
-    params.push(validatedData.signingBonus);
-  }
-  if (validatedData.termMonths !== undefined) {
-    fields.push('term_months = ?');
-    params.push(validatedData.termMonths);
-    // Recalculate expiration_date if term_months changes
-    if (!data.expirationDate) {
-      // Get current assessment_date to recalculate
-      const current = await getContractById(contractId);
+  if (v.termMonths !== undefined) {
+    updates.termMonths = v.termMonths;
+    // Recalculate expiration if not explicitly provided
+    if (v.expirationDate === undefined) {
+      const current = await getContractById(id);
       if (current && current.assessmentDate) {
-        const assessmentDate = new Date(current.assessmentDate);
-        const calculatedExpiration = new Date(assessmentDate);
-        calculatedExpiration.setMonth(calculatedExpiration.getMonth() + validatedData.termMonths);
-        fields.push('expiration_date = ?');
-        params.push(calculatedExpiration.toISOString().slice(0, 19).replace('T', ' '));
+        updates.expirationDate = calcExpiration(current.assessmentDate, v.termMonths);
       }
     }
   }
-  if (validatedData.expirationDate !== undefined) {
-    fields.push('expiration_date = ?');
-    params.push(validatedData.expirationDate);
-  }
-  if (validatedData.resignationDate !== undefined) {
-    fields.push('resignation_date = ?');
-    params.push(validatedData.resignationDate);
-  }
+  if (v.expirationDate !== undefined) updates.expirationDate = v.expirationDate;
 
-  if (fields.length === 0) {
-    throw new Error('No valid fields provided for update');
-  }
+  if (Object.keys(updates).length === 0) throw new Error('No valid fields provided for update');
 
-  // Add ID to params for WHERE clause
-  params.push(contractId);
-
-  // Use prepared statement to prevent SQL injection
-  const sql = `
-    UPDATE staff_contract
-    SET ${fields.join(', ')}
-    WHERE id = ?
-  `;
-
-  try {
-    const result = await query(sql, params);
-
-    // Check if any rows were affected
-    if (result.affectedRows === 0) {
-      return null; // Contract not found
-    }
-
-    // Fetch and return the updated contract
-    return await getContractById(contractId);
-  } catch (error) {
-    console.error('Error updating contract:', error);
-    throw error;
-  }
+  updates.updatedDate = new Date().toISOString();
+  await CONTRACTS().doc(id).update(updates);
+  return getContractById(id);
 }
 
-/**
- * Delete a contract by ID
- * @param {number} id - Contract ID
- * @returns {Promise<boolean>} - True if deleted, false if not found
- * @throws {Error} - Database error
- */
 async function deleteContract(id) {
-  // Validate ID
-  const contractId = parseInt(id, 10);
-  if (!Number.isInteger(contractId) || contractId <= 0) {
-    throw new Error('Invalid contract ID');
-  }
-
-  // Use prepared statement to prevent SQL injection
-  const sql = `
-    DELETE FROM staff_contract
-    WHERE id = ?
-  `;
-
-  try {
-    const result = await query(sql, [contractId]);
-
-    // Return true if a row was deleted, false otherwise
-    return result.affectedRows > 0;
-  } catch (error) {
-    console.error('Error deleting contract:', error);
-    throw error;
-  }
+  await CONTRACTS().doc(id).delete();
+  return true;
 }
 
 /**
- * Get contracts expiring within a specific number of days
- * Uses expiration_date field (or calculates from assessment_date + term_months if null)
- * @param {number} days - Number of days from today (default: 7)
- * @returns {Promise<Array>} - Array of expiring contracts
+ * Contracts expiring within `days` days (resignationDate must be null).
+ * Requires a Firestore composite index on (resignationDate ASC, expirationDate ASC).
  */
 async function getContractsExpiringInDays(days = 7) {
-  const sql = `
-    SELECT 
-      id,
-      name,
-      position,
-      assessment_date as assessmentDate,
-      basic_salary as basicSalary,
-      allowance,
-      attendance_bonus as attendanceBonus,
-      full_attendance_bonus as fullAttendanceBonus,
-      signing_bonus as signingBonus,
-      term_months as termMonths,
-      expiration_date as expirationDate,
-      resignation_date as resignationDate,
-      created_date as createdDate,
-      updated_date as updatedDate,
-      COALESCE(expiration_date, DATE_ADD(assessment_date, INTERVAL term_months MONTH)) as calculatedExpirationDate
-    FROM staff_contract
-    WHERE resignation_date IS NULL
-      AND COALESCE(expiration_date, DATE_ADD(assessment_date, INTERVAL term_months MONTH)) 
-          BETWEEN CURDATE() 
-          AND DATE_ADD(CURDATE(), INTERVAL ? DAY)
-    ORDER BY calculatedExpirationDate ASC
-  `;
+  const today  = new Date().toISOString().slice(0, 10);
+  const cutoff = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
 
-  try {
-    const contracts = await query(sql, [days]);
-    // Ensure expirationDate is set for all contracts
-    return contracts.map(contract => ({
-      ...contract,
-      expirationDate: contract.expirationDate || contract.calculatedExpirationDate,
-    }));
-  } catch (error) {
-    console.error('Error getting expiring contracts:', error);
-    throw error;
-  }
+  const snap = await CONTRACTS()
+    .where('resignationDate', '==', null)
+    .where('expirationDate',  '>=', today)
+    .where('expirationDate',  '<=', cutoff)
+    .orderBy('expirationDate', 'asc')
+    .get();
+
+  return snap.docs.map(toContract);
 }
 
-// Export all methods
 module.exports = {
   createContract,
   getAllContracts,
@@ -336,7 +122,7 @@ module.exports = {
   updateContract,
   deleteContract,
   getContractsExpiringInDays,
-  // Legacy method names for backward compatibility
-  addContract: createContract,
+  // Legacy aliases
+  addContract:   createContract,
   listContracts: getAllContracts,
 };

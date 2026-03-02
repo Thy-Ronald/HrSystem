@@ -9,7 +9,7 @@
  */
 
 // Static imports — previously scattered as dynamic require() calls inside hot paths
-const { verifyToken, generateToken } = require('../utils/jwt');
+const { authB } = require('../config/firebaseProjectB');
 const userService = require('../services/userService');
 const monitoringRequestModel = require('../models/monitoringRequestModel');
 const Notification = require('../models/notificationModel');
@@ -61,53 +61,34 @@ function setupMonitoringSocket(io, userSockets) {
 
             const { sanitized } = validation;
 
-            // Extract User ID from token if available (to link with persistent requests)
+            // Extract User ID from Firebase ID token (falls back to temp anonymous ID)
             let userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            let jwtToken = token;
             let avatarUrl = null;
 
             if (token) {
                 try {
-                    const decoded = verifyToken(token);
-                    if (decoded && decoded.userId) {
-                        userId = decoded.userId;
-                        avatarUrl = decoded.avatar_url;
-                        console.log(`[Monitoring] User authenticated with token. ID: ${userId}, Avatar: ${avatarUrl ? 'Yes' : 'No'}`);
-                    }
-                    // Fallback: If avatar missing from token (legacy token), fetch from DB
-                    if (decoded && decoded.userId && !avatarUrl) {
+                    const decoded = await authB.verifyIdToken(token);
+                    if (decoded && decoded.uid) {
+                        userId = decoded.uid;
+                        // Fetch avatar from Firestore profile
                         try {
-                            const user = await userService.findUserById(decoded.userId);
-                            if (user) {
-                                avatarUrl = user.avatar_url;
-                                console.log(`[Monitoring] Fetched avatar from DB for user ${userId}`);
-                            }
+                            const user = await userService.findUserById(decoded.uid);
+                            if (user) avatarUrl = user.avatarUrl || null;
                         } catch (dbErr) {
-                            console.error('[Monitoring] Failed to fetch user avatar from DB:', dbErr);
+                            console.error('[Monitoring] Failed to fetch user avatar:', dbErr);
                         }
+                        console.log(`[Monitoring] User authenticated with Firebase token. UID: ${userId}`);
                     }
                 } catch (err) {
-                    console.log('[Monitoring] Invalid token provided in auth, using temporary ID');
-                    // Generate new token if invalid
-                    jwtToken = generateToken({
-                        userId,
-                        role: sanitized.role,
-                        name: sanitized.name,
-                    });
+                    console.log('[Monitoring] Invalid Firebase token in auth, using temporary ID');
                 }
-            } else {
-                jwtToken = generateToken({
-                    userId,
-                    role: sanitized.role,
-                    name: sanitized.name,
-                });
             }
 
-            socket.data.role = sanitized.role;
-            socket.data.name = sanitized.name;
-            socket.data.userId = userId;
+            socket.data.role          = sanitized.role;
+            socket.data.name          = sanitized.name;
+            socket.data.userId        = userId;
             socket.data.authenticated = true;
-            socket.data.token = jwtToken;
+            socket.data.token         = token || null;
 
             // Maintain userSockets map (O(1) lookup)
             if (!userSockets.has(String(userId))) {

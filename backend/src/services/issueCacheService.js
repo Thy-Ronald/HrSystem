@@ -28,7 +28,16 @@
  */
 
 const axios = require('axios');
-const { query, transaction } = require('../config/database');
+const { firestoreB } = require('../config/firebaseProjectB');
+
+// Firestore collection references
+const METADATA = () => firestoreB.collection('github_cache_metadata');
+const ISSUES = () => firestoreB.collection('github_issues_cache');
+
+// Convert repo full name to a valid Firestore document ID
+function repoDocId(repoFullName) {
+  return repoFullName.replace('/', '_');
+}
 
 // GitHub API configuration
 const GITHUB_API = 'https://api.github.com';
@@ -202,13 +211,8 @@ function getDateRange(filter) {
  * @returns {Promise<Object|null>} Cache metadata or null if not cached
  */
 async function getCacheMetadata(repoFullName) {
-  const sql = `
-    SELECT * FROM github_cache_metadata 
-    WHERE repo_full_name = ? AND username IS NULL AND filter_type = 'all'
-    LIMIT 1
-  `;
-  const results = await query(sql, [repoFullName]);
-  return results.length > 0 ? results[0] : null;
+  const doc = await METADATA().doc(repoDocId(repoFullName)).get();
+  return doc.exists ? doc.data() : null;
 }
 
 /**
@@ -217,27 +221,21 @@ async function getCacheMetadata(repoFullName) {
  * @param {Object} data - Metadata to update
  */
 async function updateCacheMetadata(repoFullName, data) {
-  const sql = `
-    INSERT INTO github_cache_metadata 
-      (repo_full_name, filter_type, last_fetched_at, last_full_refresh_at, 
-       total_issues_cached, last_issues_fetched, etag)
-    VALUES (?, 'all', NOW(), ?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE
-      last_fetched_at = NOW(),
-      last_full_refresh_at = COALESCE(VALUES(last_full_refresh_at), last_full_refresh_at),
-      total_issues_cached = VALUES(total_issues_cached),
-      last_issues_fetched = VALUES(last_issues_fetched),
-      etag = COALESCE(VALUES(etag), etag),
-      updated_at = NOW()
-  `;
-
-  await query(sql, [
-    repoFullName,
-    data.isFullRefresh ? new Date() : null,
-    data.totalCached || 0,
-    data.fetchedCount || 0,
-    data.etag || null,
-  ]);
+  const update = {
+    repo_full_name: repoFullName,
+    filter_type: 'all',
+    last_fetched_at: new Date().toISOString(),
+    total_issues_cached: data.totalCached || 0,
+    last_issues_fetched: data.fetchedCount || 0,
+    updated_at: new Date().toISOString(),
+  };
+  if (data.isFullRefresh) {
+    update.last_full_refresh_at = new Date().toISOString();
+  }
+  if (data.etag) {
+    update.etag = data.etag;
+  }
+  await METADATA().doc(repoDocId(repoFullName)).set(update, { merge: true });
 }
 
 /**
@@ -406,63 +404,38 @@ async function saveIssuesToCache(issues) {
     return { inserted: 0, updated: 0 };
   }
 
-  let inserted = 0;
-  let updated = 0;
+  const BATCH_SIZE = 500;
+  let saved = 0;
 
-  // Use transaction for batch insert
-  await transaction(async (conn) => {
-    const sql = `
-      INSERT INTO github_issues_cache 
-        (github_issue_id, issue_number, repo_full_name, repo_owner, title, body, state,
-         assignees, labels, status, github_created_at, github_updated_at,
-         last_assigned_at, last_assigned_user)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        title = VALUES(title),
-        body = VALUES(body),
-        state = VALUES(state),
-        assignees = VALUES(assignees),
-        labels = VALUES(labels),
-        status = VALUES(status),
-        github_updated_at = VALUES(github_updated_at),
-        last_assigned_at = VALUES(last_assigned_at),
-        last_assigned_user = VALUES(last_assigned_user),
-        updated_at = NOW()
-    `;
-
-    for (const issue of issues) {
-      try {
-        const [result] = await conn.execute(sql, [
-          issue.githubIssueId,
-          issue.issueNumber,
-          issue.repoFullName,
-          issue.repoOwner,
-          issue.title,
-          issue.body || '',
-          issue.state,
-          JSON.stringify(issue.assignees),
-          JSON.stringify(issue.labels),
-          issue.status,
-          issue.githubCreatedAt,
-          issue.githubUpdatedAt,
-          issue.lastAssignedAt,
-          issue.lastAssignedUser,
-        ]);
-
-        // affectedRows = 1 for insert, 2 for update
-        if (result.affectedRows === 1) {
-          inserted++;
-        } else if (result.affectedRows === 2) {
-          updated++;
-        }
-      } catch (err) {
-        console.error(`[IssueCache] Error saving issue #${issue.issueNumber}:`, err.message);
-      }
+  for (let i = 0; i < issues.length; i += BATCH_SIZE) {
+    const chunk = issues.slice(i, i + BATCH_SIZE);
+    const batch = firestoreB.batch();
+    for (const issue of chunk) {
+      const docRef = ISSUES().doc(String(issue.githubIssueId));
+      batch.set(docRef, {
+        githubIssueId: issue.githubIssueId,
+        issueNumber: issue.issueNumber,
+        repoFullName: issue.repoFullName,
+        repoOwner: issue.repoOwner,
+        title: issue.title,
+        body: issue.body || '',
+        state: issue.state,
+        assignees: Array.isArray(issue.assignees) ? issue.assignees : [],
+        labels: Array.isArray(issue.labels) ? issue.labels : [],
+        status: issue.status,
+        githubCreatedAt: issue.githubCreatedAt || null,
+        githubUpdatedAt: issue.githubUpdatedAt || null,
+        lastAssignedAt: issue.lastAssignedAt || null,
+        lastAssignedUser: issue.lastAssignedUser || null,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      saved++;
     }
-  });
+    await batch.commit();
+  }
 
-  console.log(`[IssueCache] Saved to cache: ${inserted} inserted, ${updated} updated`);
-  return { inserted, updated };
+  console.log(`[IssueCache] Saved ${saved} issues to Firestore cache`);
+  return { inserted: saved, updated: 0 };
 }
 
 /**
@@ -519,11 +492,8 @@ async function refreshRepoCache(repoFullName, forceFullRefresh = false) {
     const saveResult = await saveIssuesToCache(issues);
 
     // Get total cached count
-    const countResult = await query(
-      'SELECT COUNT(*) as count FROM github_issues_cache WHERE repo_full_name = ?',
-      [repoFullName]
-    );
-    const totalCached = countResult[0]?.count || 0;
+    const countSnap = await ISSUES().where('repoFullName', '==', repoFullName).count().get();
+    const totalCached = countSnap.data().count || 0;
 
     // Update metadata
     await updateCacheMetadata(repoFullName, {
@@ -569,97 +539,55 @@ async function refreshRepoCache(repoFullName, forceFullRefresh = false) {
 async function getCachedIssues(repoFullName, filter = 'today', username = null) {
   const { startDate, endDate } = getDateRange(filter);
 
-  // First query: Get status counts per user
-  let statusSql = `
-    SELECT 
-      LOWER(TRIM(username)) as normalized_username,
-      status,
-      COUNT(*) as count
-    FROM (
-      SELECT 
-        JSON_UNQUOTE(JSON_EXTRACT(assignees, CONCAT('$[', idx.i, ']'))) as username,
-        status,
-        last_assigned_at
-      FROM github_issues_cache
-      CROSS JOIN (
-        SELECT 0 as i UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4
-        UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9
-      ) as idx
-      WHERE repo_full_name = ?
-        AND JSON_UNQUOTE(JSON_EXTRACT(assignees, CONCAT('$[', idx.i, ']'))) IS NOT NULL
-        AND last_assigned_at >= ?
-        AND last_assigned_at <= ?
-  `;
-
-  const statusParams = [repoFullName, startDate, endDate];
-
-  if (username) {
-    statusSql += ` AND JSON_CONTAINS(assignees, ?)`;
-    statusParams.push(JSON.stringify(username));
-  }
-
-  statusSql += `
-    ) as expanded
-    WHERE username IS NOT NULL
-    GROUP BY normalized_username, status
-    ORDER BY normalized_username, status
-  `;
-
-  // Second query: Get unique issues per user with title and body for P value extraction
-  // Use GROUP BY instead of DISTINCT for better MySQL compatibility
-  // Handle case where body column might not exist yet
-  let pValueSql = `
-    SELECT 
-      LOWER(TRIM(JSON_UNQUOTE(JSON_EXTRACT(assignees, CONCAT('$[', idx.i, ']'))))) as normalized_username,
-      issue_number,
-      title,
-      COALESCE(body, '') as body
-    FROM github_issues_cache
-    CROSS JOIN (
-      SELECT 0 as i UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4
-      UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9
-    ) as idx
-    WHERE repo_full_name = ?
-      AND JSON_UNQUOTE(JSON_EXTRACT(assignees, CONCAT('$[', idx.i, ']'))) IS NOT NULL
-      AND LOWER(TRIM(JSON_UNQUOTE(JSON_EXTRACT(assignees, CONCAT('$[', idx.i, ']'))))) IS NOT NULL
-      AND last_assigned_at >= ?
-      AND last_assigned_at <= ?
-  `;
-
-  const pValueParams = [repoFullName, startDate, endDate];
-
-  if (username) {
-    pValueSql += ` AND JSON_CONTAINS(assignees, ?)`;
-    pValueParams.push(JSON.stringify(username));
-  }
-
-  pValueSql += `
-    GROUP BY normalized_username, issue_number, title, body
-  `;
+  const startIso = startDate instanceof Date ? startDate.toISOString() : startDate;
+  const endIso = endDate instanceof Date ? endDate.toISOString() : endDate;
 
   try {
-    // Execute status query first
-    const statusResults = await query(statusSql, statusParams);
+    // Build Firestore query
+    let q = ISSUES()
+      .where('repoFullName', '==', repoFullName)
+      .where('lastAssignedAt', '>=', startIso)
+      .where('lastAssignedAt', '<=', endIso);
 
-    // Try to execute P value query, but handle case where body column doesn't exist
-    let pValueResults = [];
-    try {
-      pValueResults = await query(pValueSql, pValueParams);
-    } catch (pValueError) {
-      // If body column doesn't exist yet, skip P value extraction
-      // This can happen if migration hasn't been run
-      const errorMessage = pValueError.message || String(pValueError);
-      if (errorMessage.includes('Unknown column') ||
-        errorMessage.includes('Invalid field') ||
-        errorMessage.includes('body') && errorMessage.includes('doesn\'t exist')) {
-        console.log(`[IssueCache] Body column not found, skipping P value extraction. Run migration: node backend/src/database/add_body_column_migration.js`);
-        pValueResults = []; // Set to empty array so code continues normally
-      } else {
-        // Log the error but don't fail the entire request
-        console.error(`[IssueCache] Error fetching P values:`, errorMessage);
-        pValueResults = []; // Set to empty array so code continues normally
+    if (username) {
+      q = q.where('assignees', 'array-contains', username.toLowerCase().trim());
+    }
+
+    const snap = await q.get();
+    const docs = snap.docs.map(d => d.data());
+
+    // Build statusResults equivalent: [{normalized_username, status, count}]
+    const statusMap = new Map(); // key: `${user}|${status}`
+    for (const doc of docs) {
+      const assignees = Array.isArray(doc.assignees) ? doc.assignees : [];
+      for (const assignee of assignees) {
+        const key = `${assignee.toLowerCase().trim()}|${doc.status}`;
+        statusMap.set(key, (statusMap.get(key) || 0) + 1);
       }
     }
+    const statusResults = Array.from(statusMap.entries()).map(([k, count]) => {
+      const [normalized_username, status] = k.split('|');
+      return { normalized_username, status, count };
+    });
+
+    // Build pValueResults equivalent: [{normalized_username, issue_number, title, body}]
+    const seenIssues = new Set();
+    const pValueResults = [];
+    for (const doc of docs) {
+      const assignees = Array.isArray(doc.assignees) ? doc.assignees : [];
+      for (const assignee of assignees) {
+        const key = `${assignee.toLowerCase().trim()}_${doc.issueNumber}`;
+        if (!seenIssues.has(key)) {
+          seenIssues.add(key);
+          pValueResults.push({
+            normalized_username: assignee.toLowerCase().trim(),
+            issue_number: doc.issueNumber,
+            title: doc.title || '',
+            body: doc.body || '',
+          });
+        }
+      }
+    };
 
     // Aggregate status results by user
     const userStats = new Map();
@@ -850,9 +778,18 @@ async function getIssuesWithCache(repoFullName, filter = 'today', username = nul
  * @param {string} repoFullName - Repository full name
  */
 async function clearRepoCache(repoFullName) {
-  await query('DELETE FROM github_issues_cache WHERE repo_full_name = ?', [repoFullName]);
-  await query('DELETE FROM github_cache_metadata WHERE repo_full_name = ?', [repoFullName]);
-  await query('DELETE FROM github_user_issue_stats WHERE repo_full_name = ?', [repoFullName]);
+  // Delete all issue docs for this repo in batches of 500
+  const deleteCollection = async (q) => {
+    const snap = await q.limit(500).get();
+    if (snap.empty) return;
+    const batch = firestoreB.batch();
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+    if (snap.size === 500) await deleteCollection(q);
+  };
+
+  await deleteCollection(ISSUES().where('repoFullName', '==', repoFullName));
+  await METADATA().doc(repoDocId(repoFullName)).delete();
   console.log(`[IssueCache] Cleared cache for ${repoFullName}`);
 }
 
@@ -861,13 +798,17 @@ async function clearRepoCache(repoFullName) {
  * @returns {Promise<Array>} Array of repo metadata
  */
 async function getTrackedRepositories() {
-  const sql = `
-    SELECT repo_full_name, last_fetched_at, total_issues_cached
-    FROM github_cache_metadata
-    WHERE filter_type = 'all'
-    ORDER BY last_fetched_at DESC
-  `;
-  return query(sql);
+  const snap = await METADATA().where('filter_type', '==', 'all').get();
+  const repos = snap.docs.map(d => {
+    const data = d.data();
+    return {
+      repo_full_name: data.repo_full_name,
+      last_fetched_at: data.last_fetched_at,
+      total_issues_cached: data.total_issues_cached,
+    };
+  });
+  repos.sort((a, b) => (b.last_fetched_at || '').localeCompare(a.last_fetched_at || ''));
+  return repos;
 }
 
 module.exports = {

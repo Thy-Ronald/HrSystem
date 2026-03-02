@@ -1,122 +1,107 @@
-const { query } = require('../config/database');
+/**
+ * Monitoring Request Model
+ * Firestore DAL for "monitoring_requests" collection (capstone-31b9e / Project B)
+ * User names/emails are denormalized at write time to avoid JOINs.
+ */
+
+const { firestoreB } = require('../config/firebaseProjectB');
+
+const REQUESTS = () => firestoreB.collection('monitoring_requests');
+const USERS    = () => firestoreB.collection('users');
+
+async function getUserProfile(uid) {
+  const doc = await USERS().doc(uid).get();
+  return doc.exists ? { name: doc.data().name, email: doc.data().email } : { name: 'Unknown', email: '' };
+}
+
+function toRequest(doc) {
+  const d = doc.data();
+  return {
+    id:             doc.id,
+    admin_id:       d.adminId,
+    target_user_id: d.targetUserId,
+    status:         d.status,
+    admin_name:     d.adminName,
+    admin_email:    d.adminEmail,
+    employee_name:  d.employeeName,
+    employee_email: d.employeeEmail,
+    created_at:     d.createdAt,
+    updated_at:     d.updatedAt,
+  };
+}
 
 async function createRequest(adminId, targetUserId) {
-    const sql = `
-        INSERT INTO monitoring_requests (admin_id, target_user_id, status)
-        VALUES (?, ?, 'pending')
-    `;
-    try {
-        const result = await query(sql, [adminId, targetUserId]);
-        return { id: result.insertId, admin_id: adminId, target_user_id: targetUserId, status: 'pending' };
-    } catch (error) {
-        console.error('Error creating monitoring request:', error);
-        throw error;
-    }
+  const [admin, employee] = await Promise.all([
+    getUserProfile(adminId),
+    getUserProfile(targetUserId),
+  ]);
+
+  const doc = {
+    adminId,
+    targetUserId,
+    status:        'pending',
+    adminName:     admin.name,
+    adminEmail:    admin.email,
+    employeeName:  employee.name,
+    employeeEmail: employee.email,
+    createdAt:     new Date().toISOString(),
+    updatedAt:     new Date().toISOString(),
+  };
+
+  const ref = await REQUESTS().add(doc);
+  return toRequest({ id: ref.id, data: () => doc });
 }
 
 async function getRequestsForUser(userId) {
-    const sql = `
-        SELECT 
-            mr.id, 
-            mr.admin_id, 
-            mr.status, 
-            mr.created_at,
-            u.name as admin_name,
-            u.email as admin_email
-        FROM monitoring_requests mr
-        JOIN users u ON mr.admin_id = u.id
-        WHERE mr.target_user_id = ? AND mr.status IN ('pending', 'approved')
-        ORDER BY mr.created_at DESC
-    `;
-    try {
-        const requests = await query(sql, [userId]);
-        return requests;
-    } catch (error) {
-        console.error('Error getting monitoring requests:', error);
-        throw error;
-    }
+  const snap = await REQUESTS()
+    .where('targetUserId', '==', userId)
+    .where('status', 'in', ['pending', 'approved'])
+    .orderBy('createdAt', 'desc')
+    .get();
+  return snap.docs.map(toRequest);
+}
+
+async function getRequestsByAdmin(adminId) {
+  const snap = await REQUESTS()
+    .where('adminId', '==', adminId)
+    .where('status', 'in', ['pending', 'approved', 'rejected'])
+    .orderBy('createdAt', 'desc')
+    .get();
+  return snap.docs.map(toRequest);
 }
 
 async function updateRequestStatus(requestId, status) {
-    const sql = `
-        UPDATE monitoring_requests 
-        SET status = ? 
-        WHERE id = ?
-    `;
-    try {
-        await query(sql, [status, requestId]);
-        return { id: requestId, status };
-    } catch (error) {
-        console.error('Error updating monitoring request status:', error);
-        throw error;
-    }
+  await REQUESTS().doc(requestId).update({ status, updatedAt: new Date().toISOString() });
+  return { id: requestId, status };
 }
 
-// Check if a pending request already exists
 async function findPendingRequest(adminId, targetUserId) {
-    const sql = `
-        SELECT id FROM monitoring_requests 
-        WHERE admin_id = ? AND target_user_id = ? AND status = 'pending'
-    `;
-    try {
-        const result = await query(sql, [adminId, targetUserId]);
-        return result[0];
-    } catch (error) {
-        throw error;
-    }
+  const snap = await REQUESTS()
+    .where('adminId',       '==', adminId)
+    .where('targetUserId',  '==', targetUserId)
+    .where('status',        '==', 'pending')
+    .limit(1)
+    .get();
+  if (snap.empty) return null;
+  return toRequest(snap.docs[0]);
 }
 
 async function getById(id) {
-    const sql = `SELECT * FROM monitoring_requests WHERE id = ?`;
-    try {
-        const result = await query(sql, [id]);
-        return result[0];
-    } catch (error) {
-        console.error('Error getting request by ID:', error);
-        throw error;
-    }
+  const doc = await REQUESTS().doc(id).get();
+  return doc.exists ? toRequest(doc) : null;
 }
 
 async function deleteRequest(id) {
-    const sql = `DELETE FROM monitoring_requests WHERE id = ?`;
-    try {
-        await query(sql, [id]);
-        return true;
-    } catch (error) {
-        console.error('Error deleting request:', error);
-        throw error;
-    }
+  await REQUESTS().doc(id).delete();
+  return true;
 }
 
 module.exports = {
-    createRequest,
-    getRequestsForUser,
-    updateRequestStatus,
-    findPendingRequest,
-    getById,
-    getRequestsByAdmin,
-    deleteRequest
+  createRequest,
+  getRequestsForUser,
+  getRequestsByAdmin,
+  updateRequestStatus,
+  findPendingRequest,
+  getById,
+  deleteRequest,
 };
-
-async function getRequestsByAdmin(adminId) {
-    const sql = `
-        SELECT 
-            mr.id, 
-            mr.target_user_id, 
-            mr.status, 
-            mr.created_at,
-            u.name as employee_name,
-            u.email as employee_email
-        FROM monitoring_requests mr
-        JOIN users u ON mr.target_user_id = u.id
-        WHERE mr.admin_id = ? AND mr.status IN ('pending', 'approved', 'rejected')
-        ORDER BY mr.created_at DESC
-    `;
-    try {
-        const requests = await query(sql, [adminId]);
-        return requests;
-    } catch (error) {
-        console.error('Error getting requests by admin:', error);
-        throw error;
-    }
-}

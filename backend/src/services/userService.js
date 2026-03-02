@@ -1,135 +1,114 @@
 /**
  * User Service
- * Handles user database operations
+ * Handles user operations via Firestore (capstone-31b9e / Project B)
+ * User document path: users/{firebaseUid}
  */
 
-const { query } = require('../config/database');
-const bcrypt = require('bcrypt');
+const { authB, firestoreB } = require('../config/firebaseProjectB');
 
-const SALT_ROUNDS = 10;
+const USERS = () => firestoreB.collection('users');
 
 /**
- * Create a new user
- * @param {string} email - User email
- * @param {string} password - Plain text password (optional for OAuth)
- * @param {string} name - User full name
- * @param {string} role - User role (admin/employee)
- * @param {Object} oauthData - Optional OAuth data (github_id, avatar_url)
- * @returns {Promise<Object>} Created user (without password)
+ * Create a Firestore user profile.
+ * The Firebase Auth account must already exist before calling this.
+ * @param {string} email
+ * @param {*} _password  - ignored; Firebase Auth manages passwords
+ * @param {string} name
+ * @param {string} role
+ * @param {Object} oauthData  - { firebase_uid (required), github_id, avatar_url }
  */
-async function createUser(email, password, name, role = 'employee', oauthData = {}) {
-  try {
-    // Hash password if provided
-    const passwordHash = password ? await bcrypt.hash(password, SALT_ROUNDS) : null;
-    const { github_id = null, avatar_url = null } = oauthData;
+async function createUser(email, _password, name, role = 'employee', oauthData = {}) {
+  const { firebase_uid, github_id = null, avatar_url = null } = oauthData;
+  if (!firebase_uid) throw new Error('firebase_uid is required to create a user profile');
 
-    // Insert user
-    const result = await query(
-      `INSERT INTO users (email, password_hash, name, role, github_id, avatar_url) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [email.toLowerCase().trim(), passwordHash, name.trim(), role, github_id, avatar_url]
-    );
+  const profile = {
+    email:     email.toLowerCase().trim(),
+    name:      name.trim(),
+    role,
+    githubId:  github_id,
+    avatarUrl: avatar_url,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
 
-    // Return user without password
-    const users = await query(
-      'SELECT id, email, name, role, github_id, avatar_url, created_at FROM users WHERE id = ?',
-      [result.insertId]
-    );
-
-    return Array.isArray(users) ? users[0] : users;
-  } catch (error) {
-    if (error.code === 'ER_DUP_ENTRY') {
-      throw new Error('Email or GitHub ID already exists');
-    }
-    throw error;
-  }
+  await USERS().doc(firebase_uid).set(profile, { merge: true });
+  return { id: firebase_uid, ...profile };
 }
 
 /**
- * Find user by email
- * @param {string} email - User email
- * @returns {Promise<Object|null>} User object with password_hash or null
+ * Find a user by email via Firebase Auth  Firestore.
  */
 async function findUserByEmail(email) {
   try {
-    const users = await query(
-      'SELECT id, email, password_hash, name, role, github_id, avatar_url, created_at FROM users WHERE email = ?',
-      [email.toLowerCase().trim()]
-    );
-    return users[0] || null;
-  } catch (error) {
-    throw error;
+    const fbUser = await authB.getUserByEmail(email.toLowerCase().trim());
+    return findUserByFirebaseUid(fbUser.uid);
+  } catch (err) {
+    if (err.code === 'auth/user-not-found') return null;
+    throw err;
   }
 }
 
 /**
- * Find user by GitHub ID
- * @param {string} githubId - GitHub user ID
- * @returns {Promise<Object|null>} User object or null
+ * Find a user by GitHub ID.
  */
 async function findUserByGithubId(githubId) {
-  try {
-    const users = await query(
-      'SELECT id, email, password_hash, name, role, github_id, avatar_url, created_at FROM users WHERE github_id = ?',
-      [githubId]
-    );
-    return users[0] || null;
-  } catch (error) {
-    throw error;
-  }
+  const snap = await USERS().where('githubId', '==', String(githubId)).limit(1).get();
+  if (snap.empty) return null;
+  const doc = snap.docs[0];
+  return { id: doc.id, ...doc.data() };
 }
 
 /**
- * Find user by ID
- * @param {number} id - User ID
- * @returns {Promise<Object|null>} User object (without password) or null
+ * Find a user by their Firebase UID.
+ */
+async function findUserByFirebaseUid(uid) {
+  const doc = await USERS().doc(uid).get();
+  if (!doc.exists) return null;
+  return { id: doc.id, ...doc.data() };
+}
+
+/**
+ * Alias kept for backward compatibility  uid IS the user id now.
  */
 async function findUserById(id) {
-  try {
-    const users = await query(
-      'SELECT id, email, name, role, github_id, avatar_url, created_at FROM users WHERE id = ?',
-      [id]
-    );
-    return users[0] || null;
-  } catch (error) {
-    throw error;
-  }
+  return findUserByFirebaseUid(id);
 }
 
 /**
- * Verify password
- * @param {string} password - Plain text password
- * @param {string} hash - Hashed password
- * @returns {Promise<boolean>} True if password matches
+ * No-op in Firestore: uid IS the document key.
+ * Kept only so auth.js (GitHub OAuth path) still compiles.
  */
-async function verifyPassword(password, hash) {
-  return bcrypt.compare(password, hash);
+async function linkFirebaseUid(_userId, _firebaseUid) {
+  // Nothing to do  the Firestore doc key is already the Firebase UID.
+}
+
+/**
+ * Search users by name prefix (requires a Firestore composite index on 'name').
+ */
+async function searchUsers(queryStr) {
+  if (!queryStr) return [];
+  const term = queryStr.trim();
+  const snap = await USERS()
+    .orderBy('name')
+    .startAt(term)
+    .endAt(term + '\uf8ff')
+    .limit(20)
+    .get();
+  return snap.docs.map(doc => ({
+    id:        doc.id,
+    name:      doc.data().name,
+    email:     doc.data().email,
+    role:      doc.data().role,
+    avatar_url: doc.data().avatarUrl,
+  }));
 }
 
 module.exports = {
   createUser,
   findUserByEmail,
   findUserByGithubId,
+  findUserByFirebaseUid,
+  linkFirebaseUid,
   findUserById,
-  verifyPassword,
-  searchUsers
+  searchUsers,
 };
-
-/**
- * Search users by name or email
- * @param {string} queryStr - Search query
- * @returns {Promise<Array>} Array of matching users
- */
-async function searchUsers(queryStr) {
-  try {
-    const searchTerm = `%${queryStr}%`;
-    const users = await query(
-      'SELECT id, name, email, role, avatar_url FROM users WHERE name LIKE ? OR email LIKE ? LIMIT 20',
-      [searchTerm, searchTerm]
-    );
-    return users;
-  } catch (error) {
-    throw error;
-  }
-}
-
