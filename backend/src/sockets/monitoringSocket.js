@@ -144,7 +144,6 @@ function setupMonitoringSocket(io, userSockets) {
 
                 socket.emit('monitoring:session-created', {
                     sessionId,
-                    token: jwtToken,
                     monitoringExpected,
                     activeRequest,
                 });
@@ -177,7 +176,6 @@ function setupMonitoringSocket(io, userSockets) {
 
             } else if (sanitized.role === 'admin') {
                 socket.emit('monitoring:auth-success', {
-                    token: jwtToken,
                     message: 'Authenticated. Search for employees to connect.',
                 });
             }

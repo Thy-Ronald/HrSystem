@@ -1,6 +1,8 @@
+// Load environment variables FIRST — before any other require() that reads process.env
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
 const http = require('http');
 const { Server } = require('socket.io');
 const compression = require('compression');
@@ -30,8 +32,6 @@ const employeeTrackingSocket = require('./sockets/employeeTrackingSocket');
 // Services with side-effects
 const { initializeEmailJS } = require('./services/emailService');
 const monitoringService = require('./services/monitoringService');
-
-dotenv.config();
 
 // ─── Fast lookup for user sockets: Map<userId, Set<socketId>> ────────────────
 const userSockets = new Map();

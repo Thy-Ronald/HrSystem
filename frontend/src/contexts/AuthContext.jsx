@@ -20,6 +20,8 @@ export function AuthProvider({ children }) {
 
   // Prevent onIdTokenChanged from firing "not logged in" while OAuth is exchanging
   const oauthInProgressRef = useRef(false);
+  // Prevent onIdTokenChanged from calling callVerifyEndpoint during email/password signup
+  const signupInProgressRef = useRef(false);
   // Track current user in a ref so closures in onIdTokenChanged can read it
   const userRef = useRef(null);
 
@@ -84,12 +86,16 @@ export function AuthProvider({ children }) {
         setToken(idToken);
 
         // Only call verify on initial/session-restore load (not on every token refresh)
-        if (userRef.current === null) {
+        // Skip if signup is in progress — profile doesn't exist yet
+        if (userRef.current === null && !signupInProgressRef.current) {
           await callVerifyEndpoint(idToken, false);
+        } else if (signupInProgressRef.current) {
+          setLoading(false); // release loading; signup() will handle its own flow
         }
       } else {
         // Signed out or no session
         if (oauthInProgressRef.current) return; // OAuth is about to sign in — wait
+        if (signupInProgressRef.current) return; // signup is in progress — wait
         userRef.current = null;
         setUser(null);
         setToken(null);
@@ -166,11 +172,17 @@ export function AuthProvider({ children }) {
   // ── Signup ────────────────────────────────────────────────────────────────
   const signup = async (email, password, name, role) => {
     let cred;
+
+    // Block onIdTokenChanged from calling callVerifyEndpoint before the
+    // Firestore profile has been created.
+    signupInProgressRef.current = true;
+
     try {
       cred = await createUserWithEmailAndPassword(auth, email, password);
     } catch (error) {
+      signupInProgressRef.current = false;
       const code = error.code;
-      if (code === 'auth/email-already-in-use') throw new Error('An account with this email already exists');
+      if (code === 'auth/email-already-in-use') throw new Error('An account with this email already exists. Try logging in instead.');
       if (code === 'auth/weak-password')         throw new Error('Password must be at least 6 characters long');
       if (code === 'auth/invalid-email')         throw new Error('Invalid email format');
       throw error;
@@ -178,26 +190,43 @@ export function AuthProvider({ children }) {
 
     const idToken = await cred.user.getIdToken();
 
-    // Create MySQL profile on backend
-    const response = await fetch(`${API_BASE}/api/auth/signup`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${idToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ name: name.trim(), role: role || 'employee' }),
-    });
+    // Create Firestore profile + set role claim on backend
+    let response;
+    try {
+      response = await fetch(`${API_BASE}/api/auth/signup`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: name.trim(), role: role || 'employee' }),
+      });
+    } catch (networkError) {
+      // Network failure — clean up the orphaned Firebase Auth user so the
+      // user can retry with the same email.
+      await cred.user.delete().catch(() => {});
+      signupInProgressRef.current = false;
+      throw new Error('Could not reach the server. Check your connection and try again.');
+    }
 
     const contentType = response.headers.get('content-type');
     if (!contentType?.includes('application/json')) {
+      await cred.user.delete().catch(() => {});
+      signupInProgressRef.current = false;
       throw new Error(`Server error: ${response.status}. Check if the backend is running.`);
     }
 
     const data = await response.json();
     if (!response.ok) {
+      // Backend profile creation failed — delete the Firebase Auth user so
+      // the user can try again with the same email without hitting
+      // auth/email-already-in-use on the next attempt.
+      await cred.user.delete().catch(() => {});
+      signupInProgressRef.current = false;
       throw new Error(data.message || data.error || 'Signup failed');
     }
 
+    signupInProgressRef.current = false;
     userRef.current = data.user;
     setUser(data.user);
     setToken(idToken);

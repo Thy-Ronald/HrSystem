@@ -67,13 +67,6 @@
         { "fieldPath": "assignees",      "arrayConfig": "CONTAINS" },
         { "fieldPath": "lastAssignedAt", "order": "ASCENDING"    }
       ]
-    },
-    {
-      "collectionGroup": "repositories",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "fullName", "order": "ASCENDING" }
-      ]
     }
   ],
   "fieldOverrides": []

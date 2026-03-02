@@ -30,7 +30,7 @@ const {
   getTrackedRepositories,
 } = require('../services/issueCacheService');
 
-const { getJobStatus, forceRefreshRepo } = require('../jobs/cacheRefreshJob');
+// cacheRefreshJob removed — cache is refreshed on-demand via issueCacheService
 const cacheService = require('../services/cacheService');
 
 // Redis cache TTL: 5 minutes (optimized from 2 minutes for better hit rates)
@@ -259,7 +259,7 @@ async function handleClearCache(req, res, next) {
  */
 async function handleGetJobStatus(req, res, next) {
   try {
-    const status = getJobStatus();
+    const status = { enabled: false, reason: 'Cache is refreshed on-demand' };
     const repos = await getTrackedRepositories();
 
     res.json({

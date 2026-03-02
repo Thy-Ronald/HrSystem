@@ -117,6 +117,3 @@ module.exports = {
   httpAuth,
   requireRole,
 };
-
-
-/**
