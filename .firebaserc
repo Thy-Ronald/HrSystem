@@ -1,5 +1,12 @@
 {
   "projects": {
     "default": "capstone-31b9e"
+  },
+  "targets": {
+    "capstone-31b9e": {
+      "hosting": {
+        "thyinc": ["thyinc"]
+      }
+    }
   }
 }
