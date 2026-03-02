@@ -89,6 +89,10 @@ async function _fetchIssuesByUserForPeriod(repoFullName, filter, cacheKey) {
     };
 
     try {
+        // Fetch auth headers once — token is module-level cached (5 min TTL),
+        // so calling this inside the loop was adding unnecessary await overhead per page.
+        const authHeaders = await withAuth();
+
         let hasNextPage = true;
         let cursor = null;
         let pageCount = 0;
@@ -119,7 +123,6 @@ async function _fetchIssuesByUserForPeriod(repoFullName, filter, cacheKey) {
                 }
             `;
 
-            const authHeaders = await withAuth();
             const response = await githubGraphQLClient.post('', { query, variables: { owner, repo, cursor } }, { headers: authHeaders });
             if (response.data.errors) throw new Error(response.data.errors[0]?.message || 'GraphQL query failed');
 
@@ -235,6 +238,7 @@ async function _fetchIssueTimeline(repoFullName, filter, date, cacheKey) {
         let allIssues = [];
         let pageCount = 0;
         const maxPages = 15;
+        const authHeaders = await withAuth(); // hoist outside loop
 
         while (hasNextPage && pageCount < maxPages) {
             pageCount++;
@@ -268,7 +272,6 @@ async function _fetchIssueTimeline(repoFullName, filter, date, cacheKey) {
                     }
                 }
             `;
-            const authHeaders = await withAuth();
             const response = await githubGraphQLClient.post('', { query, variables: { owner, repo, cursor } }, { headers: authHeaders });
             if (response.data.errors) throw new Error(response.data.errors[0]?.message || 'GraphQL query failed');
 

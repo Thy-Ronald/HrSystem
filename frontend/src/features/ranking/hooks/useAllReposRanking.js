@@ -9,6 +9,7 @@ const sharedCache = new Map();
 const cacheTimestamps = new Map();
 
 const RESET_HOUR = 18; // 6 PM
+const BATCH_SIZE = 3;  // max concurrent repo fetches — prevents rate-limit bursts
 
 /**
  * Check if cache timestamp is past the 6 PM reset time

@@ -1,7 +1,8 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { fetchCachedIssues, fetchRepositories } from '../../../services/api';
 import { transformRankingData } from '../utils/dataTransform';
+import { generateCacheKey, setCached } from '../utils/cacheUtils';
 
 /**
  * useRankingData Hook
@@ -88,6 +89,18 @@ export function useRankingData() {
     setSelectedFilter(filter);
     setError('');
   }, []);
+
+  // Seed localStorage so the RankingModal (useAllReposRanking) finds the data
+  // on first open and skips its own network fetch.
+  useEffect(() => {
+    if (!batchData || typeof batchData !== 'object' || Array.isArray(batchData)) return;
+    Object.entries(batchData).forEach(([repoFullName, data]) => {
+      if (Array.isArray(data) && data.length > 0) {
+        const key = generateCacheKey('allrepos', repoFullName, selectedFilter);
+        setCached(key, data);
+      }
+    });
+  }, [batchData, selectedFilter]);
 
   return {
     rankingData,
