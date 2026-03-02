@@ -10,6 +10,12 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    minify: 'esbuild',
+    esbuildOptions: {
+      drop: ['console', 'debugger'],
+    },
+  },
   server: {
     proxy: {
       '/api': {
