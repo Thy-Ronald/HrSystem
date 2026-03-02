@@ -200,16 +200,9 @@ export const MonitoringProvider = ({ children }) => {
     // Re-auth on refresh/navigation
     useEffect(() => {
         if (user && isConnected) {
-            if (role === 'admin') {
-                emit('monitoring:auth', { token: getToken(), role: user.role, name: user.name });
-            } else if (role === 'employee') {
-                // Employee auths without code now
-                emit('monitoring:auth', {
-                    token: getToken(),
-                    role: user.role,
-                    name: user.name
-                });
-            }
+            getToken().then(token => {
+                emit('monitoring:auth', { token, role: user.role, name: user.name });
+            });
         } else if (!user && isSharing) {
             // User logged out, stop sharing immediately
             console.log('[Monitoring] User logged out, stopping share');
@@ -306,7 +299,9 @@ export const MonitoringProvider = ({ children }) => {
         toast.info('Session reset.');
         // Re-auth to get new session
         if (isConnected && role === 'employee') {
-            emit('monitoring:auth', { role: user.role, name: user.name });
+            getToken().then(token => {
+                emit('monitoring:auth', { token, role: user.role, name: user.name });
+            });
         }
     }, [stopSharing, toast, isConnected, role, user, emit]);
 

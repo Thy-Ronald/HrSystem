@@ -66,10 +66,17 @@ function startRealtimeRefreshJob(io) {
                 return;
             }
 
-            for (const repoFullName of repos) {
-                const result = await checkRepoChanges(repoFullName);
+            const results = await Promise.allSettled(
+                repos.map(repoFullName => checkRepoChanges(repoFullName).then(r => ({ repoFullName, ...r })))
+            );
 
-                if (result.changed) {
+            for (const settled of results) {
+                if (settled.status === 'rejected') {
+                    console.error(`[RealtimeJob] Error checking repo:`, settled.reason?.message);
+                    continue;
+                }
+                const { repoFullName, changed } = settled.value;
+                if (changed) {
                     console.log(`[RealtimeJob] Change detected in ${repoFullName}, notifying clients...`);
                     io.emit('github:repo-updated', {
                         repo: repoFullName,

@@ -42,8 +42,8 @@ function validateName(name) {
     return { valid: false, sanitized: '', error: 'Name must not exceed 50 characters' };
   }
 
-  // Allow letters, numbers, spaces, hyphens, and underscores
-  if (!/^[a-zA-Z0-9\s\-_]+$/.test(trimmed)) {
+  // Allow letters (including accented/Unicode), numbers, spaces, hyphens, underscores, apostrophes, and dots
+  if (!/^[\p{L}\p{N}\s\-_'.]+$/u.test(trimmed)) {
     return { valid: false, sanitized: '', error: 'Name contains invalid characters' };
   }
 

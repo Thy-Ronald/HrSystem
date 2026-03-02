@@ -83,24 +83,23 @@ async function linkFirebaseUid(_userId, _firebaseUid) {
 }
 
 /**
- * Search users by name prefix (requires a Firestore composite index on 'name').
+ * Search users by name or email (case-insensitive substring match).
+ * Fetches all users and filters in-memory — suitable for small user bases.
  */
 async function searchUsers(queryStr) {
   if (!queryStr) return [];
-  const term = queryStr.trim();
-  const snap = await USERS()
-    .orderBy('name')
-    .startAt(term)
-    .endAt(term + '\uf8ff')
-    .limit(20)
-    .get();
-  return snap.docs.map(doc => ({
-    id:        doc.id,
-    name:      doc.data().name,
-    email:     doc.data().email,
-    role:      doc.data().role,
-    avatar_url: doc.data().avatarUrl,
-  }));
+  const term = queryStr.trim().toLowerCase();
+  const snap = await USERS().get();
+  return snap.docs
+    .map(doc => {
+      const d = doc.data();
+      return { id: doc.id, name: d.name, email: d.email, role: d.role, avatar_url: d.avatarUrl };
+    })
+    .filter(u =>
+      (u.name  && u.name.toLowerCase().includes(term)) ||
+      (u.email && u.email.toLowerCase().includes(term))
+    )
+    .slice(0, 20);
 }
 
 module.exports = {

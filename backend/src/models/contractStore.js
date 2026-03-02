@@ -5,7 +5,7 @@
  */
 
 const { firestoreB } = require('../config/firebaseProjectB');
-const { validateContractData, validateContractUpdateData } = require('../utils/sqlValidation');
+const { validateContractData, validateContractUpdateData } = require('../utils/validation');
 
 const CONTRACTS = () => firestoreB.collection('contracts');
 

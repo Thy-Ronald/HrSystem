@@ -1,6 +1,6 @@
 /**
- * SQL validation utilities
- * Provides input validation and sanitization for SQL operations
+ * Validation utilities
+ * Provides input validation and sanitization for contract and general data
  */
 
 /**
@@ -37,7 +37,7 @@ function validateRequiredString(value, fieldName, maxLength = 255) {
 /**
  * Validate and sanitize datetime input
  * @param {string|Date} value - Input value
- * @returns {string|null} - ISO datetime string (YYYY-MM-DD HH:mm:ss)
+ * @returns {string|null} - ISO date string (YYYY-MM-DD HH:mm:ss)
  */
 function validateDateTime(value) {
   if (!value) return null;
@@ -45,7 +45,6 @@ function validateDateTime(value) {
   if (isNaN(date.getTime())) {
     throw new Error('Invalid datetime format');
   }
-  // Format as MySQL DATETIME: YYYY-MM-DD HH:mm:ss
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -129,8 +128,7 @@ function validateFloat(value, min = Number.NEGATIVE_INFINITY, max = Number.MAX_S
 }
 
 /**
- * Validate contract data before database insertion
- * Matches staff_contract table schema
+ * Validate contract data before insertion
  * @param {Object} data - Contract data
  * @returns {Object} - Validated and sanitized contract data
  */
@@ -151,8 +149,7 @@ function validateContractData(data) {
 }
 
 /**
- * Validate contract data for updates (allows partial updates)
- * Only validates fields that are present in the data object
+ * Validate contract data for partial updates
  * @param {Object} data - Contract data to update
  * @returns {Object} - Validated and sanitized contract data
  */

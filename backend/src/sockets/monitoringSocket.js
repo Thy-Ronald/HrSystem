@@ -88,7 +88,6 @@ function setupMonitoringSocket(io, userSockets) {
             socket.data.name          = sanitized.name;
             socket.data.userId        = userId;
             socket.data.authenticated = true;
-            socket.data.token         = token || null;
 
             // Maintain userSockets map (O(1) lookup)
             if (!userSockets.has(String(userId))) {
