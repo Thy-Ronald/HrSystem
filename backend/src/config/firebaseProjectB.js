@@ -1,25 +1,25 @@
 const admin = require('firebase-admin');
 const path = require('path');
 
-// Load the service account from the path specified in environment variables.
-// Download this from: Firebase Console → capstone-31b9e → Project Settings
-//                     → Service Accounts → Generate new private key.
-// Place the file inside backend/ and set FIREBASE_B_CREDENTIAL_PATH to its path.
-const credentialPath = process.env.FIREBASE_B_CREDENTIAL_PATH
-  ? path.resolve(process.env.FIREBASE_B_CREDENTIAL_PATH)
-  : null;
-
-if (!credentialPath) {
-  throw new Error(
-    'FIREBASE_B_CREDENTIAL_PATH is not set. ' +
-    'Download the service account JSON for capstone-31b9e and set the env var to its path.'
-  );
+// Credential resolution order:
+//  1. FIREBASE_B_CREDENTIAL_PATH — path to a service account JSON file (local dev)
+//  2. FIREBASE_B_CREDENTIAL_JSON — full JSON string (Cloud Run / CI env var)
+//  3. Application Default Credentials — automatic on Google Cloud (Cloud Run)
+function resolveCredential() {
+  if (process.env.FIREBASE_B_CREDENTIAL_PATH) {
+    const filePath = path.resolve(process.env.FIREBASE_B_CREDENTIAL_PATH);
+    return admin.credential.cert(require(filePath));
+  }
+  if (process.env.FIREBASE_B_CREDENTIAL_JSON) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_B_CREDENTIAL_JSON);
+    return admin.credential.cert(serviceAccount);
+  }
+  // Fallback: Application Default Credentials (works on Cloud Run / GCE automatically)
+  return admin.credential.applicationDefault();
 }
 
-const serviceAccount = require(credentialPath);
-
 const projectBApp = admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+  credential: resolveCredential(),
   projectId: 'capstone-31b9e',
 }, 'projectB');
 

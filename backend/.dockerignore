@@ -1,0 +1,7 @@
+node_modules/
+.env
+.env.*
+npm-debug.log*
+
+# Project B credential — loaded via ADC or FIREBASE_B_CREDENTIAL_JSON on Cloud Run
+capstone-31b9e-firebase-adminsdk.json

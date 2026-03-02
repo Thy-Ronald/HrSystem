@@ -1,0 +1,15 @@
+# Upload rules for gcloud run deploy --source .
+# Overrides .gitignore — explicitly lists what to exclude from the Cloud Build upload.
+
+node_modules/
+npm-debug.log*
+
+# All .env files — env vars are set via Cloud Run environment variables
+.env
+.env.*
+
+# Project B credential — NOT needed in the image (ADC handles it on Cloud Run)
+capstone-31b9e-firebase-adminsdk.json
+
+# NOTE: safedrain-b50e8-firebase-adminsdk-fbsvc-c2b87409f7.json is intentionally
+# NOT excluded — it must be bundled in the Docker image for Project A (read-only).
