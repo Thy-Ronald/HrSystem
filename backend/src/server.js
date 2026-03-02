@@ -127,11 +127,9 @@ async function startServer() {
       // Use the same socket config as the main client so Upstash idle-timeout
       // reconnects work (without reconnectStrategy the clients die permanently).
       const adapterSocketConfig = {
-        reconnectStrategy: (retries) => {
-          if (retries > 7) return new Error('[Redis Adapter] Max reconnect attempts');
-          return Math.min(retries * 500, 5000);
-        },
-        keepAlive: 10000, // send TCP keepalive every 10 s to prevent idle drops
+        reconnectStrategy: (retries) => Math.min(retries * 500, 10000), // always retry
+        keepAlive: 10000,     // TCP-level keepalive
+        connectTimeout: 10000, // more time for Upstash TLS on cold start
       };
       const pubClient = createClient({ url: process.env.REDIS_URL, socket: adapterSocketConfig });
       const subClient = pubClient.duplicate();
@@ -139,6 +137,20 @@ async function startServer() {
       // Must attach 'error' handlers BEFORE calling connect().
       pubClient.on('error', (err) => console.error('[Redis Adapter] pub error:', err.message));
       subClient.on('error', (err) => console.error('[Redis Adapter] sub error:', err.message));
+
+      // Application-level heartbeat — keeps pub connection alive across Upstash's
+      // ~30 s server-side idle timeout (TCP keepAlive alone is not enough).
+      let adapterPingInterval = null;
+      pubClient.on('ready', () => {
+        if (!adapterPingInterval) {
+          adapterPingInterval = setInterval(() => {
+            pubClient.ping().catch(() => {});
+          }, 25000);
+        }
+      });
+      pubClient.on('end', () => {
+        if (adapterPingInterval) { clearInterval(adapterPingInterval); adapterPingInterval = null; }
+      });
 
       await Promise.all([pubClient.connect(), subClient.connect()]);
       io.adapter(createAdapter(pubClient, subClient));

@@ -56,12 +56,12 @@ class CacheService {
         console.log('[CacheService] Waiting for shared Redis client to become ready...');
         await new Promise((resolve) => {
           const onReady = () => { this.isConnected = true; resolve(); };
-          const onError = () => resolve(); // resolve anyway — error handler above handles state
           existing.once('ready', onReady);
-          existing.once('error', onError);
+          // Do NOT resolve on error — a transient connect failure triggers 'error'
+          // before the retry succeeds. Let the 5 s timeout handle the fallback;
+          // the persistent 'ready' listener above will flip isConnected later.
           setTimeout(() => {
             existing.off('ready', onReady);
-            existing.off('error', onError);
             resolve(); // timed out — fall through with whatever state we have
           }, 5000);
         });

@@ -8,25 +8,32 @@ const { createClient } = require('redis');
 
 let client = null;
 let ready = false;
+let pingInterval = null;
 
 if (process.env.REDIS_URL) {
   client = createClient({
     url: process.env.REDIS_URL,
     socket: {
-      // Exponential back-off capped at 5 s; give up after 7 retries (~30 s total)
-      reconnectStrategy: (retries) => {
-        if (retries > 7) return new Error('[Redis] Max reconnect attempts reached');
-        return Math.min(retries * 500, 5000);
-      },
-      // Send TCP keepalive every 10 s so Upstash's ~30 s idle timeout
-      // never fires on an otherwise-quiet connection.
+      // Always retry with exponential back-off (no hard cap) so a bad cold-start
+      // doesn't permanently kill the client.
+      reconnectStrategy: (retries) => Math.min(retries * 500, 10000),
+      // TCP-level keepalive (prevents OS/firewall idle drops).
       keepAlive: 10000,
+      // Give TLS handshake more time — Upstash from cold Cloud Run can be slow.
+      connectTimeout: 10000,
     },
   });
 
   client.on('ready', () => {
     ready = true;
     console.log('[Redis] Connected to Upstash Redis');
+    // Application-level heartbeat: send a PING every 25 s so Upstash's
+    // ~30 s idle-disconnect timer never fires on a quiet connection.
+    if (!pingInterval) {
+      pingInterval = setInterval(() => {
+        if (ready) client.ping().catch(() => {});
+      }, 25000);
+    }
   });
   client.on('error', (err) => {
     ready = false;
@@ -35,6 +42,7 @@ if (process.env.REDIS_URL) {
   client.on('end', () => {
     ready = false;
     console.warn('[Redis] Connection closed');
+    if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
   });
 
   client.connect().catch((err) => {
