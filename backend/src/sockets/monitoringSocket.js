@@ -19,6 +19,19 @@ const { socketRateLimiter } = require('../middlewares/rateLimiter');
 const monitoringService = require('../services/monitoringService');
 
 /**
+ * Grace period (ms) before telling admins an employee is offline.
+ * Handles brief Socket.IO reconnects (e.g. Cloud Run keepalive, network hiccup).
+ * If the employee reconnects within this window, the offline event is cancelled.
+ */
+const OFFLINE_GRACE_MS = 6_000;
+
+/**
+ * sessionId → timeoutId — pending "employee went offline" timers.
+ * Keyed by sessionId so the reconnect handler can cancel them.
+ */
+const pendingOfflineTimers = new Map();
+
+/**
  * Attach all monitoring socket event handlers to the given io instance.
  */
 function setupMonitoringSocket(io, userSockets) {
@@ -111,6 +124,13 @@ function setupMonitoringSocket(io, userSockets) {
                         // updateEmployeeSocket keeps the O(1) socket index consistent
                         monitoringService.updateEmployeeSocket(sessionId, session.employeeSocketId, socket.id);
                         console.log(`[Monitoring] Employee ${sanitized.name} reconnected (${session.employeeSocketId} -> ${socket.id}), reusing session ${sessionId}`);
+                    }
+                    // Cancel any pending "offline" notification — employee is back within grace period
+                    const existingTimer = pendingOfflineTimers.get(sessionId);
+                    if (existingTimer) {
+                        clearTimeout(existingTimer);
+                        pendingOfflineTimers.delete(sessionId);
+                        console.log(`[Monitoring] Offline grace timer cancelled for ${sanitized.name} (session ${sessionId})`);
                     }
                 } else {
                     // Rate limiting: 5 sessions per 15 minutes
@@ -552,34 +572,57 @@ function setupMonitoringSocket(io, userSockets) {
 
                 const session = monitoringService.getSession(sessionId);
                 if (session) {
-                    // Notify viewing admins (real-time)
-                    io.to(sessionId).emit('monitoring:stream-stopped', { sessionId, reason: 'offline' });
+                    // ── Grace period ─────────────────────────────────────────────
+                    // Don't immediately broadcast "offline" — the socket may be
+                    // doing a brief automatic reconnect (network hiccup, Cloud Run
+                    // keepalive).  If the employee re-authenticates inside
+                    // OFFLINE_GRACE_MS the timer is cancelled and admins never see
+                    // an offline flash.  Only if the employee stays offline past the
+                    // grace window do we fire the real stream-stopped / notification.
+                    const existingTimer = pendingOfflineTimers.get(sessionId);
+                    if (existingTimer) clearTimeout(existingTimer);
 
-                    // Use session.adminUserIds — cross-instance safe (no io.sockets.sockets.get)
-                    // Also union with the DB-stored request owner so offline admins are notified.
-                    (async () => {
-                        try {
-                            const adminsToNotify = new Set(session.adminUserIds);
+                    const timerId = setTimeout(() => {
+                        pendingOfflineTimers.delete(sessionId);
 
-                            const requests = await monitoringRequestModel.getRequestsForUser(session.employeeId);
-                            const activeRequest = requests.find(r => r.status === 'approved');
-                            if (activeRequest) {
-                                adminsToNotify.add(String(activeRequest.admin_id));
+                        // Re-fetch session — it may have been cleaned up or
+                        // employee is already back (employeeSocketId set again).
+                        const liveSession = monitoringService.getSession(sessionId);
+                        if (!liveSession || liveSession.employeeSocketId) return; // employee reconnected
+
+                        console.log(`[Monitoring] Grace period expired — ${session.employeeName} is offline`);
+
+                        // Notify viewing admins (real-time)
+                        io.to(sessionId).emit('monitoring:stream-stopped', { sessionId, reason: 'offline' });
+
+                        // Use session.adminUserIds — cross-instance safe (no io.sockets.sockets.get)
+                        (async () => {
+                            try {
+                                const adminsToNotify = new Set(liveSession.adminUserIds);
+
+                                const requests = await monitoringRequestModel.getRequestsForUser(liveSession.employeeId);
+                                const activeRequest = requests.find(r => r.status === 'approved');
+                                if (activeRequest) {
+                                    adminsToNotify.add(String(activeRequest.admin_id));
+                                }
+
+                                await Promise.all([...adminsToNotify].map(async (adminId) => {
+                                    await Notification.createAndNotify({
+                                        user_id: adminId,
+                                        type: 'monitoring_disconnect',
+                                        title: 'Monitoring Stopped',
+                                        message: `${liveSession.employeeName} went offline.`,
+                                        data: { sessionId, reason: 'offline', employeeName: liveSession.employeeName },
+                                    }, io, userSockets);
+                                }));
+                            } catch (err) {
+                                console.error('[Monitoring] Disconnect notify error:', err);
                             }
+                        })();
+                    }, OFFLINE_GRACE_MS);
 
-                            await Promise.all([...adminsToNotify].map(async (adminId) => {
-                                await Notification.createAndNotify({
-                                    user_id: adminId,
-                                    type: 'monitoring_disconnect',
-                                    title: 'Monitoring Stopped',
-                                    message: `${session.employeeName} went offline.`,
-                                    data: { sessionId, reason: 'offline', employeeName: session.employeeName },
-                                }, io, userSockets);
-                            }));
-                        } catch (err) {
-                            console.error('[Monitoring] Disconnect notify error:', err);
-                        }
-                    })();
+                    pendingOfflineTimers.set(sessionId, timerId);
+                    console.log(`[Monitoring] Grace timer started for ${session.employeeName} (${OFFLINE_GRACE_MS}ms)`);
                 }
 
             } else if (socket.data.role === 'admin' && socket.data.sessionId) {

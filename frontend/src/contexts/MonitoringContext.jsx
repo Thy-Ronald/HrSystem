@@ -66,6 +66,11 @@ export const MonitoringProvider = ({ children }) => {
         sessionId
     );
 
+    // Ref-tracked isSharing — stable reference usable inside closures without stale
+    // value problems (avoids adding isSharing to effect dependency arrays).
+    const isSharingRef = useRef(false);
+    useEffect(() => { isSharingRef.current = isSharing; }, [isSharing]);
+
     const startSharing = useCallback(async () => {
         const stream = await startSharingBase();
         return stream;
@@ -81,7 +86,11 @@ export const MonitoringProvider = ({ children }) => {
             setLoading(false);
             setJustReconnected(true);
 
-            if (monitoringExpected && activeRequest) {
+            // Only show the "resume sharing" modal if the employee is NOT already sharing.
+            // isSharingRef is used instead of isSharing to avoid a stale closure value
+            // (this handler is registered once when isConnected becomes true and may fire
+            // on subsequent socket reconnects when the dep array hasn't re-run).
+            if (monitoringExpected && activeRequest && !isSharingRef.current) {
                 console.log('[MonitoringContext] Server expecting resume for request:', activeRequest.requestId);
                 setResumeData(activeRequest);
                 // Also persist to localStorage in case they refresh while the modal is open
@@ -187,14 +196,36 @@ export const MonitoringProvider = ({ children }) => {
         const handleNewSession = (newSession) => {
             console.log('[MonitoringContext] Real-time: New session available:', newSession.sessionId);
             setSessions(prev => {
-                // Check by sessionId first (duplicate event)
-                if (prev.find(s => s.sessionId === newSession.sessionId)) return prev;
-                // After a server restart, the employee gets a NEW sessionId. Replace any existing
-                // card for the same employee so the old 'offline' card doesn't linger.
+                const existingIdx = prev.findIndex(s => s.sessionId === newSession.sessionId);
+                if (existingIdx !== -1) {
+                    // Same sessionId came back (employee reconnected within grace period or
+                    // after a longer absence).  Clear the stale offline marker so the card
+                    // becomes active again; keep all other existing state.
+                    const existing = prev[existingIdx];
+                    if (!existing.disconnectReason && existing.streamActive === false) {
+                        // Nothing meaningful changed — avoid an unnecessary re-render.
+                        // This branch fires when new-session arrives before stream-stopped did.
+                    }
+                    const updated = [...prev];
+                    updated[existingIdx] = {
+                        ...existing,
+                        disconnectReason: null,
+                        streamActive: false, // employee still needs to re-start sharing
+                        avatarUrl: newSession.avatarUrl || existing.avatarUrl,
+                        lastSocketUpdate: Date.now(),
+                    };
+                    return updated;
+                }
+                // New sessionId for same employee (e.g., server restart) — replace old card
+                // so stale 'offline' cards don't linger alongside the fresh one.
                 const withoutOld = prev.filter(s => String(s.employeeId) !== String(newSession.employeeId));
-                return [...withoutOld, newSession];
+                return [...withoutOld, { ...newSession, lastSocketUpdate: Date.now() }];
             });
-            // Automatically join the room for this new session
+            // Always re-join the room — the admin's socket must be inside the session
+            // room to receive monitoring:stream-started / ice-candidates after reconnect.
+            // Delete from joinedSessionsRef first so the join-session is emitted even if
+            // we previously joined this session ID.
+            joinedSessionsRef.current.delete(newSession.sessionId);
             emit('monitoring:join-session', { sessionId: newSession.sessionId });
         };
 
