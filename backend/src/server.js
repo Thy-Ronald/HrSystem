@@ -134,15 +134,27 @@ async function startServer() {
       // reconnects work (without reconnectStrategy the clients die permanently).
       const adapterSocketConfig = {
         reconnectStrategy: (retries) => Math.min(retries * 500, 10000), // always retry
-        keepAlive: 10000,     // TCP-level keepalive
-        connectTimeout: 10000, // more time for Upstash TLS on cold start
+        keepAlive: 10000,      // TCP-level keepalive
+        connectTimeout: 30000, // generous time for Upstash TLS on cold start
       };
       const pubClient = createClient({ url: process.env.REDIS_URL, socket: adapterSocketConfig });
       const subClient = pubClient.duplicate();
 
       // Must attach 'error' handlers BEFORE calling connect().
-      pubClient.on('error', (err) => console.error('[Redis Adapter] pub error:', err.message));
-      subClient.on('error', (err) => console.error('[Redis Adapter] sub error:', err.message));
+      // Throttle: log first error, then every 10th per client.
+      let pubErrs = 0, subErrs = 0;
+      pubClient.on('error', (err) => {
+        pubErrs++;
+        if (pubErrs === 1) console.error('[Redis Adapter] pub error:', err.message);
+        else if (pubErrs % 10 === 0) console.warn(`[Redis Adapter] pub still failing (${pubErrs}): ${err.message}`);
+      });
+      subClient.on('error', (err) => {
+        subErrs++;
+        if (subErrs === 1) console.error('[Redis Adapter] sub error:', err.message);
+        else if (subErrs % 10 === 0) console.warn(`[Redis Adapter] sub still failing (${subErrs}): ${err.message}`);
+      });
+      pubClient.on('ready', () => { pubErrs = 0; });
+      subClient.on('ready', () => { subErrs = 0; });
 
       // Application-level heartbeat — keeps pub connection alive across Upstash's
       // ~30 s server-side idle timeout (TCP keepAlive alone is not enough).

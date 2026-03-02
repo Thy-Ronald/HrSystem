@@ -9,6 +9,7 @@ const { createClient } = require('redis');
 let client = null;
 let ready = false;
 let pingInterval = null;
+let errorCount = 0;           // throttle repetitive error logs
 
 if (process.env.REDIS_URL) {
   client = createClient({
@@ -19,13 +20,14 @@ if (process.env.REDIS_URL) {
       reconnectStrategy: (retries) => Math.min(retries * 500, 10000),
       // TCP-level keepalive (prevents OS/firewall idle drops).
       keepAlive: 10000,
-      // Give TLS handshake more time — Upstash from cold Cloud Run can be slow.
-      connectTimeout: 10000,
+      // Give TLS handshake generous time — Cloud Run cold-starts can be slow.
+      connectTimeout: 30000,
     },
   });
 
   client.on('ready', () => {
     ready = true;
+    errorCount = 0;
     console.log('[Redis] Connected to Upstash Redis');
     // Application-level heartbeat: send a PING every 25 s so Upstash's
     // ~30 s idle-disconnect timer never fires on a quiet connection.
@@ -37,7 +39,14 @@ if (process.env.REDIS_URL) {
   });
   client.on('error', (err) => {
     ready = false;
-    console.error('[Redis] Error:', err.message);
+    errorCount++;
+    // Log the first error, then only every 10th to avoid log spam
+    // while the client retries in the background.
+    if (errorCount === 1) {
+      console.error('[Redis] Error:', err.message, '(will keep retrying in background)');
+    } else if (errorCount % 10 === 0) {
+      console.warn(`[Redis] Still failing after ${errorCount} attempts: ${err.message}`);
+    }
   });
   client.on('end', () => {
     ready = false;
