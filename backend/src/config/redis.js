@@ -45,9 +45,9 @@ if (process.env.REDIS_URL) {
     if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
   });
 
-  client.connect().catch((err) => {
-    console.error('[Redis] Failed to connect:', err.message);
-  });
+  // NOTE: We do NOT call client.connect() here.
+  // server.js calls the exported connect() explicitly during startServer()
+  // so the connection attempt happens AFTER Cloud Run networking is ready.
 } else {
   console.warn('[Redis] REDIS_URL not set — caching disabled');
 }
@@ -116,5 +116,26 @@ function isReady() {
   return ready;
 }
 
-module.exports = { cacheGet, cacheSet, cacheDel, getClient, isReady };
+/**
+ * Explicitly connect to Redis.  Gives Upstash up to 20 s to complete the
+ * TLS handshake.  If it doesn't make it in time the server continues
+ * without Redis and the built-in reconnectStrategy keeps retrying in
+ * the background — the 'ready' event will flip the flag when it connects.
+ */
+async function connect() {
+  if (!client) return;
+  try {
+    await Promise.race([
+      client.connect(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Initial connect timed out after 20 s')), 20000)
+      ),
+    ]);
+  } catch (err) {
+    console.warn('[Redis] ' + err.message);
+    console.warn('[Redis] Server will continue — Redis will reconnect in the background');
+  }
+}
+
+module.exports = { cacheGet, cacheSet, cacheDel, getClient, isReady, connect };
 

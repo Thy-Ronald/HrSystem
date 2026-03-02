@@ -108,7 +108,13 @@ employeeTrackingSocket.start(io);
 
 // ─── Server startup ───────────────────────────────────────────────────────────
 async function startServer() {
-  // Initialize Redis cache service
+  // ── 1. Connect the shared Redis client FIRST ─────────────────────────────
+  //    redis.js no longer auto-connects at require() time.  Doing it here
+  //    ensures Cloud Run networking is ready before the TLS handshake.
+  const sharedRedis = require('./config/redis');
+  await sharedRedis.connect();   // waits up to 20 s, never throws
+
+  // ── 2. Initialize Redis cache service (reuses the shared client) ────────
   try {
     await cacheService.connect();
     if (cacheService.getConnectionStatus()) {
@@ -152,7 +158,15 @@ async function startServer() {
         if (adapterPingInterval) { clearInterval(adapterPingInterval); adapterPingInterval = null; }
       });
 
-      await Promise.all([pubClient.connect(), subClient.connect()]);
+      // Give adapter clients 20 s to connect.  If they don't make it the
+      // server starts without the adapter (single-instance only) and the
+      // clients keep retrying in the background.
+      await Promise.race([
+        Promise.all([pubClient.connect(), subClient.connect()]),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Adapter connect timed out after 20 s')), 20000)
+        ),
+      ]);
       io.adapter(createAdapter(pubClient, subClient));
       console.log('✅ Socket.IO Redis adapter configured (cross-instance support enabled)');
     } catch (adapterErr) {
