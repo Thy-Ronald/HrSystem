@@ -69,12 +69,22 @@ class MonitoringService {
   }
 
   /**
-   * Add admin to a session
-   * @param {string} sessionId - Session ID
-   * @param {string} adminSocketId - Socket ID of the admin
-   * @param {string} adminName - Name of the admin
-   * @returns {boolean} Success
+   * Recreate a session that was lost (e.g., server restart edge-case).
+   * Reuses the same sessionId so existing room memberships stay valid.
    */
+  recreateSession(sessionId, employeeSocketId, employeeName, employeeId, avatarUrl) {
+    this.sessions.set(sessionId, {
+      employeeSocketId,
+      employeeName,
+      employeeId,
+      avatarUrl: avatarUrl || null,
+      adminSocketIds: new Set(),
+      streamActive: false,
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
+    });
+  }
+
   addAdminToSession(sessionId, adminSocketId, adminName) {
     const session = this.sessions.get(sessionId);
     if (!session) {

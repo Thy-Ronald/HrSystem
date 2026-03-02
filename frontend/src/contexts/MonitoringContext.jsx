@@ -92,7 +92,15 @@ export const MonitoringProvider = ({ children }) => {
             setSessions(prev => {
                 const exists = prev.find(s => s.sessionId === sid);
                 if (exists) {
-                    return prev.map(s => s.sessionId === sid ? { ...s, employeeId, streamActive: active, avatarUrl, lastSocketUpdate: Date.now() } : s);
+                    return prev.map(s => s.sessionId === sid ? {
+                        ...s,
+                        employeeId,
+                        // Never downgrade streamActive — only monitoring:stream-stopped should set it false
+                        streamActive: s.streamActive || active,
+                        // Never clear existing avatarUrl if new value is absent
+                        avatarUrl: avatarUrl || s.avatarUrl,
+                        lastSocketUpdate: Date.now()
+                    } : s);
                 }
                 return [...prev, { sessionId: sid, employeeName, employeeId, avatarUrl, streamActive: active, lastSocketUpdate: Date.now() }];
             });
@@ -102,7 +110,13 @@ export const MonitoringProvider = ({ children }) => {
 
         const handleSessionJoined = ({ sessionId: sid, avatarUrl, streamActive: active }) => {
             console.log(`[MonitoringContext] Syncing session-joined for ${sid}, active: ${active}`);
-            setSessions(prev => prev.map(s => s.sessionId === sid ? { ...s, streamActive: active, avatarUrl, lastSocketUpdate: Date.now() } : s));
+            setSessions(prev => prev.map(s => s.sessionId === sid ? {
+                ...s,
+                // Never downgrade — session-joined may carry stale streamActive:false
+                streamActive: s.streamActive || active,
+                avatarUrl: avatarUrl || s.avatarUrl,
+                lastSocketUpdate: Date.now()
+            } : s));
         };
 
         const handleConnectError = ({ message }) => {

@@ -88,6 +88,7 @@ function setupMonitoringSocket(io, userSockets) {
             socket.data.name          = sanitized.name;
             socket.data.userId        = userId;
             socket.data.authenticated = true;
+            socket.data.avatarUrl     = avatarUrl;
 
             // Maintain userSockets map (O(1) lookup)
             if (!userSockets.has(String(userId))) {
@@ -287,11 +288,36 @@ function setupMonitoringSocket(io, userSockets) {
                 return;
             }
 
-            const session = monitoringService.getSession(sessionId);
+            let session = monitoringService.getSession(sessionId);
             if (!session) {
-                console.log(`[Monitoring] Session not found: ${sessionId}`);
-                socket.emit('monitoring:error', { message: 'Session not found or expired' });
-                return;
+                // Session was lost (server edge-case). Reconstruct it from socket data so
+                // the employee can still start sharing — the admin is already in the
+                // Socket.IO room (via socket.join) so io.to(sessionId) still reaches them.
+                console.warn(`[Monitoring] Session ${sessionId} missing — reconstructing from socket data for ${socket.data.name}`);
+                monitoringService.recreateSession(
+                    sessionId,
+                    socket.id,
+                    socket.data.name,
+                    socket.data.userId,
+                    socket.data.avatarUrl || null
+                );
+                session = monitoringService.getSession(sessionId);
+                if (!session) {
+                    console.error(`[Monitoring] Failed to reconstruct session ${sessionId}`);
+                    socket.emit('monitoring:error', { message: 'Session not found or expired', sessionId });
+                    return;
+                }
+                // Re-populate adminSocketIds from the Socket.IO room (admins joined earlier)
+                const room = io.sockets.adapter.rooms.get(sessionId);
+                if (room) {
+                    room.forEach(sid => {
+                        const s = io.sockets.sockets.get(sid);
+                        if (s && s.data.role === 'admin') {
+                            session.adminSocketIds.add(sid);
+                        }
+                    });
+                }
+                console.log(`[Monitoring] Session ${sessionId} reconstructed with ${session.adminSocketIds.size} admin(s)`);
             }
 
             console.log(`[Monitoring] Session found: ${sessionId}`);

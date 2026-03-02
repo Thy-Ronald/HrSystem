@@ -84,26 +84,33 @@ export const useReceivedRequests = ({ isSharing, startSharing, stopSharing, setJ
         try {
             localStorage.removeItem('monitoring_manual_disconnect');
 
-            // 1. Start sharing FIRST
-            await startSharing();
-
-            // 2. Approve in DB
+            // 1. Approve in DB FIRST — this adds the admin to the session room
+            //    so that monitoring:stream-started reliably reaches them.
             const { respondToMonitoringRequest } = await import('../../../services/api');
             await respondToMonitoringRequest(requestId, 'approved');
+
+            // 2. Start sharing — admin is now in the room via the HTTP handler
+            try {
+                await startSharing();
+            } catch (shareErr) {
+                // Roll back approval if user cancelled or sharing failed
+                const isCancellation = shareErr.name === 'NotAllowedError' || shareErr.message?.includes('Permission denied');
+                await respondToMonitoringRequest(requestId, 'rejected').catch(() => {});
+                if (isCancellation) {
+                    toast.info('Screen sharing cancelled. Request has been declined.');
+                } else {
+                    toast.error('Failed to start sharing. Request has been declined.');
+                }
+                return false;
+            }
 
             toast.success('Request Approved & Sharing Started');
             setJustReconnected(false);
             fetchRequests();
             return true;
         } catch (error) {
-            console.error('[Monitoring] Approval/Sharing failed:', error);
-
-            const isCancellation = error.name === 'NotAllowedError' || error.message?.includes('Permission denied');
-            if (isCancellation) {
-                toast.info('Screen sharing cancelled. Request remains pending.');
-            } else {
-                toast.error('Failed to start sharing or approve request');
-            }
+            console.error('[Monitoring] Approval failed:', error);
+            toast.error('Failed to approve request');
             return false;
         }
     };

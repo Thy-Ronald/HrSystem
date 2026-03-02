@@ -146,8 +146,9 @@ async function respondToRequest(req, res) {
                         const sessionData = monitoringService.getSession(employeeSessionId);
                         adminSocket.emit('monitoring:connect-success', {
                             sessionId: employeeSessionId,
-                            employeeName: req.user.name || request.user_name || 'Employee', // Use req.user.name from auth
-                            employeeId: currentUserId, // Added for reconnection
+                            employeeName: req.user.name || 'Employee',
+                            employeeId: currentUserId,
+                            avatarUrl: req.user.avatar_url || null,
                             streamActive: sessionData ? sessionData.streamActive : false
                         });
 
