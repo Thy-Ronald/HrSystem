@@ -52,6 +52,17 @@ const io = new Server(server, {
     methods: ['GET', 'POST'],
     credentials: true,
   },
+  // ── Performance tuning ──────────────────────────────────────────────────
+  // Disable per-message WebSocket deflate: WebRTC signaling payloads (SDP/ICE)
+  // are already structured data and screen-share video is binary. Compressing them
+  // at the WS layer burns CPU without saving meaningful bandwidth.
+  perMessageDeflate: false,
+  // Raise the HTTP payload cap to 5 MB so large SDP offers (many ICE candidates)
+  // never trigger a "packet too large" error at the Socket.IO layer.
+  maxHttpBufferSize: 5e6,
+  // Ping / pong: detect dead connections faster without being too aggressive.
+  pingInterval: 20000, // default 25 000 ms
+  pingTimeout:  15000, // default 20 000 ms
 });
 const PORT = process.env.PORT || 4000;
 

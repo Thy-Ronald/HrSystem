@@ -108,9 +108,9 @@ function setupMonitoringSocket(io, userSockets) {
                     sessionId = existingSessionId;
                     const session = monitoringService.getSession(sessionId);
                     if (session) {
-                        const oldSocketId = session.employeeSocketId;
-                        session.employeeSocketId = socket.id;
-                        console.log(`[Monitoring] Employee ${sanitized.name} reconnected (${oldSocketId} -> ${socket.id}), reusing session ${sessionId}`);
+                        // updateEmployeeSocket keeps the O(1) socket index consistent
+                        monitoringService.updateEmployeeSocket(sessionId, session.employeeSocketId, socket.id);
+                        console.log(`[Monitoring] Employee ${sanitized.name} reconnected (${session.employeeSocketId} -> ${socket.id}), reusing session ${sessionId}`);
                     }
                 } else {
                     // Rate limiting: 5 sessions per 15 minutes
@@ -255,7 +255,9 @@ function setupMonitoringSocket(io, userSockets) {
                 }
 
                 targetSocketIds.forEach(sid => {
-                    monitoringService.addAdminToSession(sessionId, sid);
+                    // Pass adminUserId so session.adminUserIds stays accurate for
+                    // cross-instance disconnect notifications (Redis adapter).
+                    monitoringService.addAdminToSession(sessionId, sid, undefined, adminUserId);
                     // Cross-instance room join (works with Redis adapter)
                     io.in(sid).socketsJoin(sessionId);
                     // Set sessionId on the admin socket if it's local (for disconnect cleanup)
@@ -287,24 +289,13 @@ function setupMonitoringSocket(io, userSockets) {
 
         // ── monitoring:start-sharing (Employee) ──────────────────────
         socket.on('monitoring:start-sharing', async () => {
-            console.log(`[Monitoring] ========== START SHARING EVENT ==========`);
-            console.log(`[Monitoring] Received monitoring:start-sharing from socket ${socket.id}`);
-            console.log(`[Monitoring] Socket data:`, {
-                authenticated: socket.data.authenticated,
-                role: socket.data.role,
-                sessionId: socket.data.sessionId,
-                name: socket.data.name,
-            });
-
             if (!socket.data.authenticated || socket.data.role !== 'employee' || !socket.data.sessionId) {
-                console.log(`[Monitoring] Unauthorized: authenticated=${socket.data.authenticated}, role=${socket.data.role}, sessionId=${socket.data.sessionId}`);
                 console.warn(`[Monitoring] Unauthorized start-sharing attempt from ${socket.id}`);
                 return;
             }
 
             const sessionId = socket.data.sessionId;
             if (!validateSessionId(sessionId)) {
-                console.log(`[Monitoring] Invalid session ID format: ${sessionId}`);
                 socket.emit('monitoring:error', { message: 'Invalid session ID' });
                 return;
             }
@@ -341,19 +332,7 @@ function setupMonitoringSocket(io, userSockets) {
                 console.log(`[Monitoring] Session ${sessionId} reconstructed with ${session.adminSocketIds.size} admin(s)`);
             }
 
-            console.log(`[Monitoring] Session found: ${sessionId}`);
-            console.log(`[Monitoring] Session details:`, {
-                employeeSocketId: session.employeeSocketId,
-                employeeName: session.employeeName,
-                adminCount: session.adminSocketIds.size,
-                adminSocketIds: Array.from(session.adminSocketIds),
-                streamActive: session.streamActive,
-            });
-
             monitoringService.setStreamActive(sessionId, true);
-            console.log(`[Monitoring] Stream active set to true for session ${sessionId}`);
-
-            console.log(`[Monitoring] Emitting stream-started to room ${sessionId}`);
             io.to(sessionId).emit('monitoring:stream-started', {
                 sessionId,
                 employeeName: session.employeeName,
@@ -377,18 +356,13 @@ function setupMonitoringSocket(io, userSockets) {
             if (session) {
                 const stopReason = reason || 'manual';
 
-                console.log(`[Monitoring] Emitting stream-stopped to room ${sessionId}, reason: ${stopReason}`);
                 io.to(sessionId).emit('monitoring:stream-stopped', { sessionId, reason: stopReason });
 
-                // Create persistent notification only for non-manual disconnects
+                // Create persistent notification only for non-manual disconnects.
+                // Use session.adminUserIds (populated by addAdminToSession) — this is
+                // cross-instance safe and does not require io.sockets.sockets.get().
                 if (stopReason !== 'manual') {
-                    const adminUserIds = new Set();
-                    session.adminSocketIds.forEach(sid => {
-                        const s = io.sockets.sockets.get(sid);
-                        if (s && s.data.userId) adminUserIds.add(String(s.data.userId));
-                    });
-
-                    Promise.all([...adminUserIds].map(async (adminId) => {
+                    Promise.all([...session.adminUserIds].map(async (adminId) => {
                         try {
                             await Notification.createAndNotify({
                                 user_id: adminId,
@@ -425,7 +399,7 @@ function setupMonitoringSocket(io, userSockets) {
                 return;
             }
 
-            monitoringService.addAdminToSession(sessionId, socket.id, socket.data.name);
+            monitoringService.addAdminToSession(sessionId, socket.id, socket.data.name, socket.data.userId);
             socket.join(sessionId);
             socket.data.sessionId = sessionId; // Needed for disconnect cleanup
 
@@ -574,27 +548,19 @@ function setupMonitoringSocket(io, userSockets) {
             if (socket.data.role === 'employee' && socket.data.sessionId) {
                 const sessionId = socket.data.sessionId;
 
-                console.log(`[Monitoring] DEBUG: Employee ${socket.data.name} (UID: ${socket.data.userId}) disconnected in session ${sessionId}`);
                 monitoringService.cleanupEmployeeSession(socket.id);
 
                 const session = monitoringService.getSession(sessionId);
                 if (session) {
-                    console.log(`[Monitoring] DEBUG: Session ${sessionId} still active in service. Notifying room admins...`);
-
                     // Notify viewing admins (real-time)
                     io.to(sessionId).emit('monitoring:stream-stopped', { sessionId, reason: 'offline' });
-                    console.log(`[Monitoring] DEBUG: monitoring:stream-stopped emitted to room ${sessionId}`);
 
-                    // Identify all admins to be notified persistently
-                    const adminsToNotify = new Set();
-                    session.adminSocketIds.forEach(sid => {
-                        const s = io.sockets.sockets.get(sid);
-                        if (s && s.data.userId) adminsToNotify.add(String(s.data.userId));
-                    });
-
-                    // Also notify the "owner" admin (requester) even if not currently viewing
+                    // Use session.adminUserIds — cross-instance safe (no io.sockets.sockets.get)
+                    // Also union with the DB-stored request owner so offline admins are notified.
                     (async () => {
                         try {
+                            const adminsToNotify = new Set(session.adminUserIds);
+
                             const requests = await monitoringRequestModel.getRequestsForUser(session.employeeId);
                             const activeRequest = requests.find(r => r.status === 'approved');
                             if (activeRequest) {
@@ -614,9 +580,6 @@ function setupMonitoringSocket(io, userSockets) {
                             console.error('[Monitoring] Disconnect notify error:', err);
                         }
                     })();
-
-                } else {
-                    console.log(`[Monitoring] Disconnect: Session ${sessionId} not found after cleanup`);
                 }
 
             } else if (socket.data.role === 'admin' && socket.data.sessionId) {

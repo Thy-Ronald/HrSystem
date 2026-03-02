@@ -6,8 +6,18 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useSocket } from './useSocket';
 
-const STUN_SERVERS = {
-  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+// ICE configuration — multiple STUN servers so ICE negotiation has fallbacks
+// if the first STUN is slow/unreachable, improving connection success rate
+// and reducing setup latency when many peers connect simultaneously.
+// iceCandidatePoolSize pre-gathers candidates before the offer/answer exchange.
+const ICE_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+  ],
+  iceCandidatePoolSize: 10, // pre-gather candidates to reduce connection time
 };
 
 export function useScreenShare(role, sessionId) {
@@ -159,7 +169,7 @@ export function useScreenShare(role, sessionId) {
           peerConnectionsRef.current.get(fromSocketId).close();
         }
 
-        const pc = new RTCPeerConnection(STUN_SERVERS);
+        const pc = new RTCPeerConnection(ICE_CONFIG);
         peerConnectionsRef.current.set(fromSocketId, pc);
 
         // Add local stream tracks
@@ -245,7 +255,7 @@ export function useScreenShare(role, sessionId) {
         existingPc.close();
       }
 
-      const pc = new RTCPeerConnection(STUN_SERVERS);
+      const pc = new RTCPeerConnection(ICE_CONFIG);
       peerConnectionsRef.current.set('active', pc);
 
       // Handle incoming stream

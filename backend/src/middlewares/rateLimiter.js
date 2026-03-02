@@ -62,8 +62,12 @@ const signalingLimiter = rateLimit({
  * Tracks requests per socket ID
  */
 class SocketRateLimiter {
-  constructor() {
+  /**
+   * @param {number} maxEntries - Max entries before evicting oldest (prevents unbounded growth)
+   */
+  constructor(maxEntries = 10000) {
     this.requests = new Map(); // socketId -> { count, resetTime }
+    this.maxEntries = maxEntries;
   }
 
   /**
@@ -78,11 +82,12 @@ class SocketRateLimiter {
     const record = this.requests.get(socketId);
 
     if (!record || now > record.resetTime) {
-      // Create new record or reset expired one
-      this.requests.set(socketId, {
-        count: 1,
-        resetTime: now + windowMs,
-      });
+      // Evict the oldest entry when at capacity (prevent unbounded memory growth under heavy load)
+      if (!record && this.requests.size >= this.maxEntries) {
+        const oldestKey = this.requests.keys().next().value;
+        this.requests.delete(oldestKey);
+      }
+      this.requests.set(socketId, { count: 1, resetTime: now + windowMs });
       return true;
     }
 

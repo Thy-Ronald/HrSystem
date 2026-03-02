@@ -44,7 +44,9 @@ function getSocket() {
 
       // Connection settings
       timeout: 20000,
-      transports: ['websocket', 'polling'],
+      // Force WebSocket from the first connection (avoids the polling→WS upgrade
+      // round-trip that adds ~150–300 ms latency on Cloud Run).
+      transports: ['websocket'],
 
       // Authentication (for production JWT auth)
       auth: token ? { token } : {},

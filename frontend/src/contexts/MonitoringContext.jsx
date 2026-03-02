@@ -45,9 +45,18 @@ export const MonitoringProvider = ({ children }) => {
     }, [sessionId]);
 
     const sessionsRef = useRef(sessions);
+    const sessionsWriteTimerRef = useRef(null);
     useEffect(() => {
         sessionsRef.current = sessions;
-        localStorage.setItem('monitoring_sessions', JSON.stringify(sessions));
+        // Debounce the localStorage write — sessions can change many times per second
+        // (e.g. during stream-started/stopped bursts). Writing on every change blocks the
+        // main thread with JSON serialization. 500 ms gives a nice balance: state is
+        // persisted quickly enough to survive a refresh, without burdening every render.
+        clearTimeout(sessionsWriteTimerRef.current);
+        sessionsWriteTimerRef.current = setTimeout(() => {
+            localStorage.setItem('monitoring_sessions', JSON.stringify(sessions));
+        }, 500);
+        return () => clearTimeout(sessionsWriteTimerRef.current);
     }, [sessions]);
 
     // Screen sharing hook (attached to provider so it persists navigation)
@@ -324,19 +333,22 @@ export const MonitoringProvider = ({ children }) => {
         }
     }, [fetchSessions, role, isConnected]);
 
+    // Stable string derived from session IDs — used in the auto-join effect deps so the
+    // effect only re-runs when the actual set of sessions changes, not on every render.
+    const sessionIdList = useMemo(() => sessions.map(s => s.sessionId).join(','), [sessions]);
+
     // Join all sessions when admin re-authenticates or sessions list changes
     useEffect(() => {
         if (role === 'admin' && isConnected) {
             sessions.forEach(s => {
                 // Optimization: Use joinedSessionsRef to avoid redundant join emits
                 if (!joinedSessionsRef.current.has(s.sessionId)) {
-                    console.log(`[MonitoringContext] Auto-joining room: ${s.sessionId}`);
                     emit('monitoring:join-session', { sessionId: s.sessionId });
                     joinedSessionsRef.current.add(s.sessionId);
                 }
             });
         }
-    }, [isConnected, role, sessions.map(s => s.sessionId).join(','), emit]); // Added emit to deps
+    }, [isConnected, role, sessionIdList, emit]); // sessionIdList is stable unless sessions actually change
 
     const resetSession = useCallback(() => {
         stopSharing();
