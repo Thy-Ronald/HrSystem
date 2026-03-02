@@ -9,7 +9,9 @@
  * - Graceful degradation
  */
 
-const redis = require('redis');
+// Reuse the shared Upstash client from config/redis.js so we don't open a
+// second TCP connection for every Cloud Run instance.
+const sharedRedis = require('../config/redis');
 
 class CacheService {
   constructor() {
@@ -26,63 +28,30 @@ class CacheService {
    */
   async connect() {
     try {
-      // Use Redis URL from env or default to localhost
-      let redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-      
-      // Validate and clean Redis URL
-      if (redisUrl) {
-        // Remove any whitespace
-        redisUrl = redisUrl.trim();
-        
-        // Validate URL format
-        try {
-          const url = new URL(redisUrl);
-          if (!url.protocol || !url.protocol.startsWith('redis')) {
-            throw new Error(`Invalid Redis URL protocol. Must start with 'redis://' or 'rediss://'. Got: ${redisUrl}`);
-          }
-        } catch (urlError) {
-          throw new Error(`Invalid Redis URL format: ${redisUrl}. Error: ${urlError.message}. Expected format: redis://[username]:[password]@[host]:[port]`);
-        }
+      // Reuse the already-connected client from config/redis.js.
+      // This avoids opening a second TCP connection to Upstash per instance.
+      const existing = sharedRedis.getClient();
+      if (existing) {
+        this.client = existing;
+        // Treat ready state from the shared client (may already be connected)
+        this.isConnected = sharedRedis.isReady();
+
+        // Keep isConnected in sync with the shared client's lifecycle events.
+        // Use once-then-re-register pattern so we don't stack duplicate listeners.
+        existing.on('ready', () => { this.isConnected = true; });
+        existing.on('error', () => { this.isConnected = sharedRedis.isReady(); });
+        existing.on('end',   () => { this.isConnected = false; });
+
+        console.log('[CacheService] Reusing shared Redis client from config/redis.js');
+        return;
       }
-      
-      this.client = redis.createClient({ 
-        url: redisUrl,
-        socket: {
-          reconnectStrategy: (retries) => {
-            if (retries > 10) {
-              console.warn('⚠️ Redis reconnection failed after 10 attempts, using in-memory cache');
-              this.isConnected = false;
-              return false; // Stop reconnecting
-            }
-            return Math.min(retries * 100, 3000); // Exponential backoff
-          }
-        }
-      });
-      
-      this.client.on('error', (err) => {
-        console.error('Redis Client Error:', err.message);
-        this.isConnected = false;
-      });
 
-      this.client.on('connect', () => {
-        console.log('🔄 Connecting to Redis...');
-      });
-
-      this.client.on('ready', () => {
-        console.log('✅ Redis connected and ready');
-        this.isConnected = true;
-      });
-
-      this.client.on('end', () => {
-        console.log('⚠️ Redis connection ended, using in-memory cache');
-        this.isConnected = false;
-      });
-
-      await this.client.connect();
-    } catch (error) {
-      console.warn('⚠️ Redis not available, falling back to in-memory cache:', error.message);
+      // Fallback: no shared client (REDIS_URL not set) — use in-memory cache only.
+      console.warn('[CacheService] No shared Redis client available — using in-memory cache');
       this.isConnected = false;
-      // Continue with in-memory cache
+    } catch (error) {
+      console.warn('⚠️ CacheService init error, falling back to in-memory cache:', error.message);
+      this.isConnected = false;
     }
   }
 
@@ -366,14 +335,10 @@ class CacheService {
    * Gracefully disconnect from Redis
    */
   async disconnect() {
-    if (this.client && this.isConnected) {
-      try {
-        await this.client.quit();
-        console.log('✅ Redis disconnected gracefully');
-      } catch (error) {
-        console.error('Error disconnecting Redis:', error.message);
-      }
-    }
+    // The client is now shared from config/redis.js — do not quit it here.
+    // Lifecycle of the shared connection is managed by redis.js itself.
+    this.isConnected = false;
+    this.client = null;
   }
 }
 

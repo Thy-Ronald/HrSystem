@@ -93,5 +93,17 @@ async function cacheDel(...keys) {
   }
 }
 
-module.exports = { cacheGet, cacheSet, cacheDel };
+/**
+ * Expose the raw client so other services (e.g. CacheService) can reuse the
+ * same connection instead of opening a second one to Upstash.
+ */
+function getClient() {
+  return client;
+}
+
+function isReady() {
+  return ready;
+}
+
+module.exports = { cacheGet, cacheSet, cacheDel, getClient, isReady };
 
