@@ -1,0 +1,80 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "contracts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "resignationDate", "order": "ASCENDING" },
+        { "fieldPath": "expirationDate",  "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId",    "order": "ASCENDING"  },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "isRead", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "monitoring_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "targetUserId", "order": "ASCENDING"  },
+        { "fieldPath": "status",       "order": "ASCENDING"  },
+        { "fieldPath": "createdAt",    "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "monitoring_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "adminId",   "order": "ASCENDING"  },
+        { "fieldPath": "status",    "order": "ASCENDING"  },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "monitoring_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "adminId",      "order": "ASCENDING" },
+        { "fieldPath": "targetUserId", "order": "ASCENDING" },
+        { "fieldPath": "status",       "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "github_issues_cache",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "repoFullName",   "order": "ASCENDING" },
+        { "fieldPath": "lastAssignedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "github_issues_cache",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "repoFullName",   "order": "ASCENDING"    },
+        { "fieldPath": "assignees",      "arrayConfig": "CONTAINS" },
+        { "fieldPath": "lastAssignedAt", "order": "ASCENDING"    }
+      ]
+    },
+    {
+      "collectionGroup": "repositories",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "fullName", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

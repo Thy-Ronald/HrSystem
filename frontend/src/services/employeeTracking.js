@@ -49,8 +49,8 @@ async function fetchDeduped(key, fetcher) {
 }
 // -------------------------------------------------------------------------
 
-function authHeaders() {
-  const token = getToken();
+async function authHeaders() {
+  const token = await getToken();
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -66,7 +66,7 @@ async function handleResponse(res) {
 /** Fetch all employees (profile data only). */
 export async function fetchEmployees() {
   const res = await fetch(`${API_BASE}/api/employee-tracking/employees`, {
-    headers: authHeaders(),
+    headers: await authHeaders(),
   });
   return handleResponse(res);
 }
@@ -79,7 +79,7 @@ export async function fetchAllPresence() {
 
   return fetchDeduped(key, async () => {
     const res = await fetch(`${API_BASE}/api/employee-tracking/presence`, {
-      headers: authHeaders(),
+      headers: await authHeaders(),
     });
     const data = await handleResponse(res);
     memSet(key, data, 5 * 1000); // 5 s — socket keeps it fresh after this
@@ -101,7 +101,7 @@ export async function fetchUserScreenshots(uid, date) {
   return fetchDeduped(key, async () => {
     const url = new URL(`${API_BASE}/api/employee-tracking/screenshots/${uid}`);
     url.searchParams.set('date', d);
-    const res = await fetch(url.toString(), { headers: authHeaders() });
+    const res = await fetch(url.toString(), { headers: await authHeaders() });
     const data = await handleResponse(res);
     const isToday = d === todayKey();
     memSet(key, data, isToday ? 30 * 60 * 1000 : null);
@@ -122,7 +122,7 @@ export async function fetchUserActivity(uid, date) {
   return fetchDeduped(key, async () => {
     const url = new URL(`${API_BASE}/api/employee-tracking/activity/${uid}`);
     url.searchParams.set('date', d);
-    const res = await fetch(url.toString(), { headers: authHeaders() });
+    const res = await fetch(url.toString(), { headers: await authHeaders() });
     const data = await handleResponse(res);
     const isToday = d === todayKey();
     memSet(key, data, isToday ? 60 * 1000 : null);

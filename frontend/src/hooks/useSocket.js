@@ -12,7 +12,7 @@
 
 import { useEffect, useState, useCallback, useSyncExternalStore } from 'react';
 import { io } from 'socket.io-client';
-import { getToken } from '../utils/auth';
+import { getTokenSync } from '../utils/auth';
 
 // Backend URL - matches the API base
 const SOCKET_URL = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
@@ -32,7 +32,7 @@ function notifyListeners() {
 // Get or create the singleton socket
 function getSocket() {
   if (!socketInstance) {
-    const token = getToken();
+    const token = getTokenSync();
 
     socketInstance = io(SOCKET_URL, {
       // Reconnection settings

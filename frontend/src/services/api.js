@@ -2,11 +2,11 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
 import { getToken } from '../utils/auth';
 
 /**
- * Get authorization headers with JWT token
- * @returns {Object} Headers object with Authorization header
+ * Get authorization headers with a fresh Firebase ID token.
+ * @returns {Promise<Object>} Headers object with Authorization header
  */
-function getAuthHeaders() {
-  const token = getToken();
+async function getAuthHeaders() {
+  const token = await getToken();
   const headers = { 'Content-Type': 'application/json' };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -42,7 +42,7 @@ async function handleResponse(res) {
 export async function submitContract(payload) {
   const res = await fetch(`${API_BASE}/api/contracts`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
     body: JSON.stringify(payload),
   });
 
@@ -55,7 +55,7 @@ export async function submitContract(payload) {
  */
 export async function fetchContracts() {
   const res = await fetch(`${API_BASE}/api/contracts`, {
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 }
@@ -67,7 +67,7 @@ export async function fetchContracts() {
  */
 export async function fetchContractById(id) {
   const res = await fetch(`${API_BASE}/api/contracts/${id}`, {
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 }
@@ -81,7 +81,7 @@ export async function fetchContractById(id) {
 export async function updateContract(id, payload) {
   const res = await fetch(`${API_BASE}/api/contracts/${id}`, {
     method: 'PUT',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
     body: JSON.stringify(payload),
   });
 
@@ -96,7 +96,7 @@ export async function updateContract(id, payload) {
 export async function deleteContract(id) {
   const res = await fetch(`${API_BASE}/api/contracts/${id}`, {
     method: 'DELETE',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
 
   return handleResponse(res);
@@ -109,7 +109,7 @@ export async function deleteContract(id) {
  */
 export async function fetchExpiringContracts(days = 7) {
   const res = await fetch(`${API_BASE}/api/contracts/expiring?days=${days}`, {
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 }
@@ -121,7 +121,7 @@ export async function fetchExpiringContracts(days = 7) {
 export async function testExpirationNotifications() {
   const res = await fetch(`${API_BASE}/api/contracts/test-expiration-notifications`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 }
@@ -133,7 +133,7 @@ export async function testExpirationNotifications() {
 export async function testDirectEmail() {
   const res = await fetch(`${API_BASE}/api/contracts/test-email`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 }
@@ -156,7 +156,7 @@ export async function fetchGithubProfile(username) {
  */
 export async function fetchRepositories() {
   const res = await fetch(`${API_BASE}/api/github/repos`, {
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 }
@@ -169,7 +169,7 @@ export async function fetchRepositories() {
 export async function addTrackedRepository(repoData) {
   const res = await fetch(`${API_BASE}/api/github/tracked`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
     body: JSON.stringify(repoData),
   });
   return handleResponse(res);
@@ -184,7 +184,7 @@ export async function removeTrackedRepository(fullName) {
   const params = new URLSearchParams({ fullName });
   const res = await fetch(`${API_BASE}/api/github/tracked?${params}`, {
     method: 'DELETE',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 }
@@ -413,7 +413,7 @@ export async function fetchCachedIssues(repo, filter = 'today', options = {}) {
 export async function submitPersonnelRecord(payload) {
   const res = await fetch(`${API_BASE}/api/personnel`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
     body: JSON.stringify(payload),
   });
 
@@ -429,7 +429,7 @@ export async function submitPersonnelRecord(payload) {
 export async function updatePersonnelRecord(id, payload) {
   const res = await fetch(`${API_BASE}/api/personnel/${id}`, {
     method: 'PUT',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
     body: JSON.stringify(payload),
   });
 
@@ -445,7 +445,7 @@ export async function updatePersonnelRecord(id, payload) {
 export async function deletePersonnelRecord(id) {
   const res = await fetch(`${API_BASE}/api/personnel/${id}`, {
     method: 'DELETE',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
 
   return handleResponse(res);
@@ -458,7 +458,7 @@ export async function deletePersonnelRecord(id) {
  */
 export async function searchUsers(query) {
   const res = await fetch(`${API_BASE}/api/users/search?q=${encodeURIComponent(query)}`, {
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 }
@@ -475,7 +475,7 @@ export async function searchUsers(query) {
 export async function createMonitoringRequest(targetUserId) {
   const res = await fetch(`${API_BASE}/api/monitoring/requests`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
     body: JSON.stringify({ targetUserId }),
   });
   return handleResponse(res);
@@ -487,7 +487,7 @@ export async function createMonitoringRequest(targetUserId) {
  */
 export async function getMonitoringRequests() {
   const res = await fetch(`${API_BASE}/api/monitoring/requests`, {
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 }
@@ -498,7 +498,7 @@ export async function getMonitoringRequests() {
  */
 export async function getSentMonitoringRequests() {
   const res = await fetch(`${API_BASE}/api/monitoring/requests/sent`, {
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 }
@@ -511,7 +511,7 @@ export async function getSentMonitoringRequests() {
 export async function cancelMonitoringRequest(requestId) {
   const res = await fetch(`${API_BASE}/api/monitoring/requests/${requestId}`, {
     method: 'DELETE',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 }
@@ -522,7 +522,7 @@ export async function cancelMonitoringRequest(requestId) {
  */
 export async function getMonitoringSessions() {
   const res = await fetch(`${API_BASE}/api/monitoring/sessions`, {
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 }
@@ -535,7 +535,7 @@ export async function getMonitoringSessions() {
 export async function deleteMonitoringSession(sessionId) {
   const res = await fetch(`${API_BASE}/api/monitoring/sessions/${sessionId}`, {
     method: 'DELETE',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 }
@@ -549,7 +549,7 @@ export async function deleteMonitoringSession(sessionId) {
 export async function respondToMonitoringRequest(requestId, status) {
   const res = await fetch(`${API_BASE}/api/monitoring/requests/${requestId}/respond`, {
     method: 'PUT',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
     body: JSON.stringify({ status }),
   });
   return handleResponse(res);
@@ -561,7 +561,7 @@ export async function respondToMonitoringRequest(requestId, status) {
  */
 export async function fetchPersonnelRecords() {
   const res = await fetch(`${API_BASE}/api/personnel`, {
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 }
@@ -571,7 +571,7 @@ export async function fetchPersonnelRecords() {
 // --- Notifications ---
 export const getNotifications = async (page = 1, limit = 4) => {
   const res = await fetch(`${API_BASE}/api/notifications?page=${page}&limit=${limit}`, {
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 };
@@ -579,7 +579,7 @@ export const getNotifications = async (page = 1, limit = 4) => {
 export const markNotificationRead = async (id) => {
   const res = await fetch(`${API_BASE}/api/notifications/${id}/read`, {
     method: 'PUT',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 };
@@ -587,7 +587,7 @@ export const markNotificationRead = async (id) => {
 export const deleteAllNotifications = async () => {
   const res = await fetch(`${API_BASE}/api/notifications/all`, {
     method: 'DELETE',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 };
@@ -600,7 +600,7 @@ export const deleteAllNotifications = async () => {
  */
 export async function fetchSetting(key) {
   const res = await fetch(`${API_BASE}/api/settings/${key}`, {
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return handleResponse(res);
 }
@@ -613,7 +613,7 @@ export async function fetchSetting(key) {
 export async function updateSetting(payload) {
   const res = await fetch(`${API_BASE}/api/settings`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   return handleResponse(res);
