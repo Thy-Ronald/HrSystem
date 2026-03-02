@@ -1,27 +1,29 @@
 const Notification = require('../models/notificationModel');
 const { getContractsExpiringInDays } = require('../models/contractStore');
+const cacheService = require('../services/cacheService');
+
+const NOTIF_CACHE_TTL = 60; // 1 minute in seconds
 
 // Helper to merge DB notifications with virtual contract notifications
 const getUnifiedNotifications = async (req, res) => {
     try {
-        console.log('[NotificationController] GET /api/notifications called');
-
         const userId = req.user.userId;
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 4;
         const offset = (page - 1) * limit;
 
-        // 1. Fetch persistent notifications (e.g. Disconnects)
-        // We fetch a bit more to handle merging with virtual ones, 
-        // but for simplicity and to follow the requirement "prevent crashing or slowing down",
-        // we'll fetch with a reasonable maximum if not specified, 
-        // or specifically for this request.
-        console.log(`[NotificationController] Fetching DB notifications (page ${page}, limit ${limit})...`);
-        const dbNotifications = await Notification.getAllForUser(userId, 50, 0); // Get recent 50 for merging
+        // Serve from Redis cache when available
+        const cacheKey = `notifications:${userId}:p${page}:l${limit}`;
+        const cached = await cacheService.get(cacheKey, NOTIF_CACHE_TTL * 1000);
+        if (cached) {
+            return res.set('Cache-Control', 'private, max-age=60').json(cached);
+        }
 
-        // 2. Fetch expiring contracts (Virtual notifications)
-        console.log('[NotificationController] Fetching expiring contracts...');
-        const expiringContracts = await getContractsExpiringInDays(7);
+        // Fetch DB notifications and expiring contracts in parallel
+        const [dbNotifications, expiringContracts] = await Promise.all([
+            Notification.getAllForUser(userId, 50, 0),
+            getContractsExpiringInDays(7),
+        ]);
 
         const contractNotifications = expiringContracts.map(c => ({
             id: `contract_${c.id}`, // Virtual ID
@@ -42,13 +44,13 @@ const getUnifiedNotifications = async (req, res) => {
         const paginatedNotifications = allNotifications.slice(offset, offset + limit);
         const hasMore = allNotifications.length > offset + limit;
 
-        console.log('[NotificationController] Returning', paginatedNotifications.length, 'notifications. hasMore:', hasMore);
-        res.set('Cache-Control', 'private, max-age=30');
-        res.json({
+        const result = {
             notifications: paginatedNotifications,
             hasMore,
             total: allNotifications.length
-        });
+        };
+        await cacheService.set(cacheKey, result, NOTIF_CACHE_TTL);
+        res.set('Cache-Control', 'private, max-age=60').json(result);
     } catch (error) {
         console.error('[NotificationController] ERROR:', error);
         res.status(500).json({ message: 'Failed to fetch notifications' });
@@ -62,6 +64,8 @@ const markAsRead = async (req, res) => {
         if (!id.startsWith('contract_')) {
             await Notification.markAsRead(id);
         }
+        // Bust cache so the next fetch reflects the updated read state
+        await cacheService.deletePattern(`notifications:${req.user.userId}:*`);
         res.json({ success: true });
     } catch (error) {
         console.error('Error marking notification as read:', error);
@@ -73,6 +77,7 @@ const deleteAll = async (req, res) => {
     try {
         const userId = req.user.userId;
         await Notification.deleteAllForUser(userId);
+        await cacheService.deletePattern(`notifications:${userId}:*`);
         res.json({ success: true });
     } catch (error) {
         console.error('Error deleting all notifications:', error);

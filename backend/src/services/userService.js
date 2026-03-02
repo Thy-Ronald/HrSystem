@@ -32,6 +32,9 @@ async function createUser(email, _password, name, role = 'employee', oauthData =
   };
 
   await USERS().doc(firebase_uid).set(profile, { merge: true });
+  // Bust the searchUsers Redis cache so the new user appears immediately
+  const cacheService = require('./cacheService');
+  await cacheService.delete('users:all');
   return { id: firebase_uid, ...profile };
 }
 
@@ -84,17 +87,28 @@ async function linkFirebaseUid(_userId, _firebaseUid) {
 
 /**
  * Search users by name or email (case-insensitive substring match).
- * Fetches all users and filters in-memory — suitable for small user bases.
+ * Caches the full user list in Redis for 5 minutes to avoid a full-collection
+ * Firestore scan on every keystroke.
  */
 async function searchUsers(queryStr) {
   if (!queryStr) return [];
   const term = queryStr.trim().toLowerCase();
-  const snap = await USERS().get();
-  return snap.docs
-    .map(doc => {
+
+  const cacheService = require('./cacheService');
+  const CACHE_TTL = 300; // 5 minutes
+  const CACHE_TTL_MS = CACHE_TTL * 1000;
+
+  let allUsers = await cacheService.get('users:all', CACHE_TTL_MS);
+  if (!allUsers) {
+    const snap = await USERS().get();
+    allUsers = snap.docs.map(doc => {
       const d = doc.data();
       return { id: doc.id, name: d.name, email: d.email, role: d.role, avatar_url: d.avatarUrl };
-    })
+    });
+    await cacheService.set('users:all', allUsers, CACHE_TTL);
+  }
+
+  return allUsers
     .filter(u =>
       (u.name  && u.name.toLowerCase().includes(term)) ||
       (u.email && u.email.toLowerCase().includes(term))

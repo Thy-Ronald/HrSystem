@@ -23,7 +23,8 @@ async function createRequest(req, res) {
             return res.status(400).json({ error: 'A pending request already exists for this user' });
         }
 
-        const request = await monitoringRequestModel.createRequest(adminId, targetUserId);
+        // Pass req.user so createRequest skips a redundant Firestore read for the admin profile
+        const request = await monitoringRequestModel.createRequest(adminId, targetUserId, req.user);
 
         // Real-time Optimization: Notify employee immediately via Socket.IO
         const io = req.app.get('io');

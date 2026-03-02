@@ -30,9 +30,10 @@ function toRequest(doc) {
   };
 }
 
-async function createRequest(adminId, targetUserId) {
+async function createRequest(adminId, targetUserId, adminProfile = null) {
+  // adminProfile can be passed in from req.user to skip the getUserProfile(adminId) Firestore read
   const [admin, employee] = await Promise.all([
-    getUserProfile(adminId),
+    adminProfile ? Promise.resolve(adminProfile) : getUserProfile(adminId),
     getUserProfile(targetUserId),
   ]);
 

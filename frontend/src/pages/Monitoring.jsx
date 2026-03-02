@@ -71,8 +71,6 @@ const Monitoring = () => {
   useEffect(() => {
     if (user?.role === 'admin') {
       fetchSent();
-      const interval = setInterval(fetchSent, 15000); // Poll every 15s to keep it fresh
-      return () => clearInterval(interval);
     }
   }, [user, fetchSent]);
 

@@ -16,16 +16,33 @@ const githubGraphQLClient = axios.create({
 
 const settingsService = require('../settingsService');
 
+// Module-level token cache — avoids a Firestore read on every GitHub API call
+let _cachedToken = null;
+let _cacheExpiry = 0;
+const TOKEN_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 const withAuth = async () => {
+    // Return cached token if still valid
+    if (_cachedToken && Date.now() < _cacheExpiry) {
+        return { Authorization: `Bearer ${_cachedToken}` };
+    }
+
     // Try to get token from database first
     const dbToken = await settingsService.getSetting('github_token');
     if (dbToken) {
+        _cachedToken = dbToken;
+        _cacheExpiry = Date.now() + TOKEN_CACHE_TTL_MS;
         return { Authorization: `Bearer ${dbToken}` };
     }
 
     // Fallback to environment variable
     const token = process.env.GITHUB_TOKEN;
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    if (token) {
+        _cachedToken = token;
+        _cacheExpiry = Date.now() + TOKEN_CACHE_TTL_MS;
+        return { Authorization: `Bearer ${token}` };
+    }
+    return {};
 };
 
 // ─── Rate Limit Tracking ────────────────────────────────────

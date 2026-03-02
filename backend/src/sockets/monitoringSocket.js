@@ -127,9 +127,10 @@ function setupMonitoringSocket(io, userSockets) {
 
                 socket.data.sessionId = sessionId;
 
-                // Check for persistent approved requests to trigger "Resume Sharing" modal
+                // Single Firestore read for both: resume-modal detection + admin notification
                 let monitoringExpected = false;
                 let activeRequest = null;
+                let approvedAdmins = [];
                 try {
                     const requests = await monitoringRequestModel.getRequestsForUser(userId);
                     const approved = requests.find(r => r.status === 'approved');
@@ -138,6 +139,9 @@ function setupMonitoringSocket(io, userSockets) {
                         activeRequest = { adminName: approved.admin_name, requestId: approved.id };
                         console.log(`[Monitoring] Found approved request for ${sanitized.name}, expecting monitoring resume.`);
                     }
+                    approvedAdmins = requests
+                        .filter(r => r.status === 'approved')
+                        .map(r => r.admin_id);
                 } catch (err) {
                     console.error('[Monitoring] Error checking requests during auth:', err);
                 }
@@ -148,13 +152,8 @@ function setupMonitoringSocket(io, userSockets) {
                     activeRequest,
                 });
 
-                // Notify approved admins ONLY about the new session
+                // Notify approved admins (uses approvedAdmins populated above — no second Firestore read)
                 try {
-                    const requests = await monitoringRequestModel.getRequestsForUser(userId);
-                    const approvedAdmins = requests
-                        .filter(r => r.status === 'approved')
-                        .map(r => r.admin_id);
-
                     approvedAdmins.forEach(adminId => {
                         const sockets = userSockets.get(String(adminId));
                         if (sockets) {

@@ -24,7 +24,10 @@ export const MonitoringProvider = ({ children }) => {
         // connects. Keeping stale streamActive:true from localStorage causes session cards to
         // immediately attempt WebRTC before the socket has re-authenticated, leaving them stuck
         // on a loading spinner.
-        return JSON.parse(saved).map(s => ({ ...s, streamActive: false }));
+        // Reset volatile state — real values come from the server once connected.
+        // Clearing disconnectReason prevents stale 'offline' cards from showing
+        // during the auth handshake after a server restart.
+        return JSON.parse(saved).map(s => ({ ...s, streamActive: false, disconnectReason: null }));
     });
     const [connectError, setConnectError] = useState(null);
 
@@ -175,9 +178,12 @@ export const MonitoringProvider = ({ children }) => {
         const handleNewSession = (newSession) => {
             console.log('[MonitoringContext] Real-time: New session available:', newSession.sessionId);
             setSessions(prev => {
-                const exists = prev.find(s => s.sessionId === newSession.sessionId);
-                if (exists) return prev;
-                return [...prev, newSession];
+                // Check by sessionId first (duplicate event)
+                if (prev.find(s => s.sessionId === newSession.sessionId)) return prev;
+                // After a server restart, the employee gets a NEW sessionId. Replace any existing
+                // card for the same employee so the old 'offline' card doesn't linger.
+                const withoutOld = prev.filter(s => String(s.employeeId) !== String(newSession.employeeId));
+                return [...withoutOld, newSession];
             });
             // Automatically join the room for this new session
             emit('monitoring:join-session', { sessionId: newSession.sessionId });
@@ -311,14 +317,10 @@ export const MonitoringProvider = ({ children }) => {
         }
     }, [isConnected]);
 
-    // Initial fetch and polling
+    // Initial fetch — real-time socket events handle subsequent updates
     useEffect(() => {
         if (role === 'admin' && isConnected) {
             fetchSessions();
-            // Optimization: Increase polling interval to 2 minutes. 
-            // Real-time events should handle most status changes.
-            const interval = setInterval(() => fetchSessions(true), 120000);
-            return () => clearInterval(interval);
         }
     }, [fetchSessions, role, isConnected]);
 
