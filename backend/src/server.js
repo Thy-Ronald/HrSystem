@@ -126,6 +126,12 @@ async function startServer() {
     try {
       const pubClient = createClient({ url: process.env.REDIS_URL });
       const subClient = pubClient.duplicate();
+
+      // Must attach 'error' handlers BEFORE calling connect() — the redis package
+      // warns "missing 'error' handler" if the client emits an error with no listener.
+      pubClient.on('error', (err) => console.error('[Redis Adapter] pub error:', err.message));
+      subClient.on('error', (err) => console.error('[Redis Adapter] sub error:', err.message));
+
       await Promise.all([pubClient.connect(), subClient.connect()]);
       io.adapter(createAdapter(pubClient, subClient));
       console.log('✅ Socket.IO Redis adapter configured (cross-instance support enabled)');
