@@ -6,8 +6,6 @@ const cors = require('cors');
 const helmet = require('helmet');
 const http = require('http');
 const { Server } = require('socket.io');
-const { createAdapter } = require('@socket.io/redis-adapter');
-const { createClient } = require('redis');
 const compression = require('compression');
 
 // Route imports
@@ -108,17 +106,16 @@ employeeTrackingSocket.start(io);
 
 // ─── Server startup ───────────────────────────────────────────────────────────
 async function startServer() {
-  // ── 1. Connect the shared Redis client FIRST ─────────────────────────────
-  //    redis.js no longer auto-connects at require() time.  Doing it here
-  //    ensures Cloud Run networking is ready before the TLS handshake.
+  // ── 1. Connect the shared Redis REST client ────────────────────────────
+  //    Uses @upstash/redis (HTTP/REST) instead of TCP — no TLS port issues.
   const sharedRedis = require('./config/redis');
-  await sharedRedis.connect();   // waits up to 20 s, never throws
+  await sharedRedis.connect();   // pings Upstash over HTTPS, never throws
 
-  // ── 2. Initialize Redis cache service (reuses the shared client) ────────
+  // ── 2. Initialize Redis cache service (reuses the shared REST client) ──
   try {
     await cacheService.connect();
     if (cacheService.getConnectionStatus()) {
-      console.log('✅ Redis cache service initialized (Upstash)');
+      console.log('✅ Redis cache service initialized (Upstash REST)');
     } else {
       console.warn('⚠️ Redis not connected, using in-memory cache fallback');
     }
@@ -127,66 +124,9 @@ async function startServer() {
     console.warn('⚠️ Using in-memory cache fallback');
   }
 
-  // ── Socket.IO Redis adapter (enables cross-instance pub/sub on Cloud Run) ──
-  if (process.env.REDIS_URL) {
-    try {
-      // Use the same socket config as the main client so Upstash idle-timeout
-      // reconnects work (without reconnectStrategy the clients die permanently).
-      const adapterSocketConfig = {
-        reconnectStrategy: (retries) => Math.min(retries * 500, 10000), // always retry
-        keepAlive: 10000,      // TCP-level keepalive
-        connectTimeout: 30000, // generous time for Upstash TLS on cold start
-      };
-      const pubClient = createClient({ url: process.env.REDIS_URL, socket: adapterSocketConfig });
-      const subClient = pubClient.duplicate();
-
-      // Must attach 'error' handlers BEFORE calling connect().
-      // Throttle: log first error, then every 10th per client.
-      let pubErrs = 0, subErrs = 0;
-      pubClient.on('error', (err) => {
-        pubErrs++;
-        if (pubErrs === 1) console.error('[Redis Adapter] pub error:', err.message);
-        else if (pubErrs % 10 === 0) console.warn(`[Redis Adapter] pub still failing (${pubErrs}): ${err.message}`);
-      });
-      subClient.on('error', (err) => {
-        subErrs++;
-        if (subErrs === 1) console.error('[Redis Adapter] sub error:', err.message);
-        else if (subErrs % 10 === 0) console.warn(`[Redis Adapter] sub still failing (${subErrs}): ${err.message}`);
-      });
-      pubClient.on('ready', () => { pubErrs = 0; });
-      subClient.on('ready', () => { subErrs = 0; });
-
-      // Application-level heartbeat — keeps pub connection alive across Upstash's
-      // ~30 s server-side idle timeout (TCP keepAlive alone is not enough).
-      let adapterPingInterval = null;
-      pubClient.on('ready', () => {
-        if (!adapterPingInterval) {
-          adapterPingInterval = setInterval(() => {
-            pubClient.ping().catch(() => {});
-          }, 25000);
-        }
-      });
-      pubClient.on('end', () => {
-        if (adapterPingInterval) { clearInterval(adapterPingInterval); adapterPingInterval = null; }
-      });
-
-      // Give adapter clients 20 s to connect.  If they don't make it the
-      // server starts without the adapter (single-instance only) and the
-      // clients keep retrying in the background.
-      await Promise.race([
-        Promise.all([pubClient.connect(), subClient.connect()]),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Adapter connect timed out after 20 s')), 20000)
-        ),
-      ]);
-      io.adapter(createAdapter(pubClient, subClient));
-      console.log('✅ Socket.IO Redis adapter configured (cross-instance support enabled)');
-    } catch (adapterErr) {
-      console.warn('⚠️ Socket.IO Redis adapter failed, falling back to in-memory:', adapterErr.message);
-    }
-  } else {
-    console.warn('⚠️ REDIS_URL not set — Socket.IO running without Redis adapter (single-instance only)');
-  }
+  // NOTE: Socket.IO Redis adapter removed — Upstash Global database's TCP
+  // port is unreachable from Cloud Run (ECONNRESET).  Single-instance
+  // in-memory adapter is fine for current scale.
 
   server.listen(PORT, () => {
     console.log(`Backend listening on port ${PORT}`);

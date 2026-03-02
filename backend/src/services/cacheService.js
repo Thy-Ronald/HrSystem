@@ -28,9 +28,6 @@ class CacheService {
    */
   async connect() {
     try {
-      // Reuse the already-connected client from config/redis.js.
-      // server.js has already called redis.connect() and awaited it,
-      // so the client should be ready (or permanently retrying in the background).
       const existing = sharedRedis.getClient();
       if (!existing) {
         console.warn('[CacheService] No shared Redis client available — using in-memory cache');
@@ -39,18 +36,12 @@ class CacheService {
       }
 
       this.client = existing;
-
-      // Keep isConnected in sync with the shared client's lifecycle events
-      // so we auto-switch to/from memory fallback at runtime.
-      existing.on('ready', () => { this.isConnected = true; });
-      existing.on('error', () => { this.isConnected = sharedRedis.isReady(); });
-      existing.on('end',   () => { this.isConnected = false; });
-
+      // REST client is stateless — isReady() returns true if configured.
       this.isConnected = sharedRedis.isReady();
       if (this.isConnected) {
-        console.log('[CacheService] Reusing shared Redis client');
+        console.log('[CacheService] Reusing shared Upstash REST client');
       } else {
-        console.log('[CacheService] Redis not ready yet — using in-memory fallback (will auto-switch when connected)');
+        console.log('[CacheService] Redis not available — using in-memory fallback');
       }
     } catch (error) {
       console.warn('⚠️ CacheService init error, falling back to in-memory cache:', error.message);
