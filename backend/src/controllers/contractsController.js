@@ -8,6 +8,10 @@ const {
 } = require('../models/contractStore');
 const { checkAndNotifyExpiringContracts } = require('../services/notificationService');
 const { sendContractExpirationNotification } = require('../services/emailService');
+const cacheService = require('../services/cacheService');
+
+const CONTRACTS_CACHE_KEY = 'contracts:all';
+const CONTRACTS_CACHE_TTL = 5 * 60; // 5 minutes
 
 /**
  * Standard JSON response format
@@ -30,6 +34,7 @@ function sendSuccess(res, data, statusCode = 200, message = null) {
 async function createContractHandler(req, res, next) {
   try {
     const contract = await createContract(req.body);
+    await cacheService.del(CONTRACTS_CACHE_KEY);
 
     // Check if this contract expires in 7 days and send notification immediately
     if (contract.expirationDate) {
@@ -67,7 +72,12 @@ async function createContractHandler(req, res, next) {
  */
 async function getAllContractsHandler(_req, res, next) {
   try {
+    const cached = await cacheService.get(CONTRACTS_CACHE_KEY);
+    if (cached) {
+      return sendSuccess(res, cached, 200);
+    }
     const contracts = await getAllContracts();
+    await cacheService.set(CONTRACTS_CACHE_KEY, contracts, CONTRACTS_CACHE_TTL);
     return sendSuccess(res, contracts, 200);
   } catch (error) {
     // Pass error to error handler middleware
@@ -110,6 +120,7 @@ async function updateContractHandler(req, res, next) {
       return next(error);
     }
 
+    await cacheService.del(CONTRACTS_CACHE_KEY);
     return sendSuccess(res, contract, 200, 'Contract updated successfully');
   } catch (error) {
     // Pass error to error handler middleware
@@ -131,6 +142,7 @@ async function deleteContractHandler(req, res, next) {
       return next(error);
     }
 
+    await cacheService.del(CONTRACTS_CACHE_KEY);
     return sendSuccess(res, null, 200, 'Contract deleted successfully');
   } catch (error) {
     // Pass error to error handler middleware

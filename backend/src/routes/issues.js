@@ -37,6 +37,9 @@ const {
   handleCheckChanges,
 } = require('../controllers/issueCacheController');
 
+const { httpAuth } = require('../middlewares/monitoringAuth');
+const { cacheRefreshLimiter } = require('../middlewares/rateLimiter');
+
 const router = express.Router();
 
 /**
@@ -136,7 +139,7 @@ router.get('/job-status', handleGetJobStatus);
  *   result: { status, isFullRefresh, issuesFetched, issuesInserted, issuesUpdated, totalCached }
  * }
  */
-router.post('/refresh', handleRefreshCache);
+router.post('/refresh', httpAuth, cacheRefreshLimiter, handleRefreshCache);
 
 /**
  * DELETE /api/issues/cache
@@ -153,6 +156,6 @@ router.post('/refresh', handleRefreshCache);
  *   message: string
  * }
  */
-router.delete('/cache', handleClearCache);
+router.delete('/cache', httpAuth, cacheRefreshLimiter, handleClearCache);
 
 module.exports = router;

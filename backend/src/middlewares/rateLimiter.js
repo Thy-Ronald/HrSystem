@@ -116,6 +116,24 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 /**
+ * Cache refresh rate limiter
+ * Strict limit for POST /api/issues/refresh and DELETE /api/issues/cache
+ * These endpoints can trigger mass GitHub API calls + Firestore writes.
+ * Limits: 5 requests per 10 minutes per IP
+ */
+const cacheRefreshLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 5,
+  message: {
+    success: false,
+    error: 'Too many cache refresh requests',
+    message: 'You are triggering cache refreshes too frequently. Please wait 10 minutes.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/**
  * General API rate limiter
  * Broad protection for all /api/* routes
  * Limits: 200 requests per 15 minutes per IP
@@ -142,4 +160,5 @@ module.exports = {
   signalingLimiter,
   socketRateLimiter,
   generalApiLimiter,
+  cacheRefreshLimiter,
 };
